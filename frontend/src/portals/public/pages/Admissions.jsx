@@ -29,15 +29,21 @@ const EMPTY_FORM = {
 }
 
 const CLASSES = [
-  'Pre Primary',
-  'Middle School',
-  'High School',
-  'Senior Secondary',
-  'Cambridge Curriculum',
-  'CBSE',
-  'International Programs',
-  'STEM Education',
-  'Skill Development',
+  'Nursery',
+  'LKG',
+  'UKG',
+  'Class 1',
+  'Class 2',
+  'Class 3',
+  'Class 4',
+  'Class 5',
+  'Class 6',
+  'Class 7',
+  'Class 8',
+  'Class 9',
+  'Class 10',
+  'Class 11',
+  'Class 12',
 ]
 
 const REQUIRED_DOCS = [
