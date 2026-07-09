@@ -1,7 +1,7 @@
 import {
   BookOpenCheck, CalendarCheck2, ClipboardList, FileStack, GraduationCap,
   Home, LayoutGrid, LibraryBig, LogOut, Mail, Megaphone, NotebookPen,
-  ScrollText, Users, X,
+  ScrollText, Users, X, ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
