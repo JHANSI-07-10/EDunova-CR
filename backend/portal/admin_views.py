@@ -140,10 +140,11 @@ def _generate_credentials(enquiry):
                     [student.id],
                 )
             if table_exists("portal_parent_profile"):
+                parent_code = f"PRN-{parent.id:04d}-{get_random_string(4).upper()}"
                 cursor.execute(
-                    "INSERT INTO portal_parent_profile (user_id, address) VALUES (%s,%s) "
+                    "INSERT INTO portal_parent_profile (user_id, parent_code, address) VALUES (%s,%s,%s) "
                     "ON CONFLICT (user_id) DO NOTHING",
-                    [parent.id, enquiry.address],
+                    [parent.id, parent_code, enquiry.address],
                 )
             if table_exists("portal_student_profile"):
                 admission_number = f"STU-{enquiry.registration_number[-8:]}"
@@ -312,6 +313,24 @@ class UserListView(AdminMixin, APIView):
                         "ON CONFLICT DO NOTHING",
                         [user.id, d.get("class_id"), d.get("roll_number") or 1]
                     )
+        elif role == "Teacher":
+            employee_code = f"TCH-{user.id:04d}-{get_random_string(4).upper()}"
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_teacher_profile (user_id, employee_code, date_of_joining) "
+                    "VALUES (%s,%s,current_date) "
+                    "ON CONFLICT (user_id) DO NOTHING",
+                    [user.id, employee_code]
+                )
+        elif role == "Parent":
+            parent_code = f"PRN-{user.id:04d}-{get_random_string(4).upper()}"
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_parent_profile (user_id, parent_code) "
+                    "VALUES (%s,%s) "
+                    "ON CONFLICT (user_id) DO NOTHING",
+                    [user.id, parent_code]
+                )
         log_action(request.user, "user.create", "user", user.id, {"role": role})
         return Response({"id": user.id, "username": user.username, "temp_password": temp_password, "role": role})
 

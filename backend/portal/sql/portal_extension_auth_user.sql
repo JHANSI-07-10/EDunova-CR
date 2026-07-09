@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS public.portal_user_profile (
 
 CREATE TABLE IF NOT EXISTS public.portal_parent_profile (
   user_id integer PRIMARY KEY REFERENCES public.auth_user(id) ON DELETE CASCADE,
+  parent_code varchar(50) UNIQUE,
   father_name varchar(150),
   mother_name varchar(150),
   emergency_contact varchar(20),
