@@ -310,14 +310,35 @@ class AssignmentListView(StudentOnlyMixin, APIView):
             return Response([])
         data = rows(
             """
-            SELECT a.id, a.title, a.description, a.file_url, a.max_marks, a.due_date, s.name AS subject_name,
+            SELECT a.id, a.title, a.description, a.file_url, a.max_marks, a.due_date, a.assignment_type, a.quiz_questions, s.name AS subject_name,
               (SELECT json_build_object('id', sub.id, 'submission_url', sub.submission_url, 'submitted_at', sub.submitted_at,
-                                        'marks_obtained', sub.marks_obtained, 'teacher_feedback', sub.teacher_feedback)
+                                        'marks_obtained', sub.marks_obtained, 'teacher_feedback', sub.teacher_feedback, 'grade', sub.grade)
                FROM portal_assignment_submission sub WHERE sub.assignment_id=a.id AND sub.student_id=%s) AS my_submission
             FROM portal_assignment a JOIN portal_subject s ON s.id=a.subject_id
             WHERE a.class_id=%s ORDER BY a.due_date DESC
             """, [request.user.id, cls["class_id"]]
         )
+        
+        # Strip correct answers if not submitted yet to prevent cheating
+        import json
+        for row_dict in data:
+            if row_dict.get("assignment_type") == "Quiz" and row_dict.get("quiz_questions"):
+                has_submitted = row_dict.get("my_submission") is not None
+                try:
+                    questions = json.loads(row_dict["quiz_questions"]) if isinstance(row_dict["quiz_questions"], str) else row_dict["quiz_questions"]
+                    clean_qs = []
+                    for q in questions:
+                        clean_q = {
+                            "question_text": q.get("question_text"),
+                            "options": q.get("options") or []
+                        }
+                        if has_submitted:
+                            clean_q["correct_answer"] = q.get("correct_answer")
+                        clean_qs.append(clean_q)
+                    row_dict["quiz_questions"] = clean_qs
+                except Exception:
+                    pass
+
         return Response(serialise(data))
 
 
@@ -325,21 +346,61 @@ class AssignmentSubmitView(StudentOnlyMixin, APIView):
     def post(self, request, assignment_id):
         if not table_exists("portal_assignment_submission"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
+        
+        assign = row("SELECT id, assignment_type, quiz_questions, max_marks FROM portal_assignment WHERE id=%s", [assignment_id])
+        if not assign:
+            return Response({"detail": "Assignment not found."}, status=404)
+
         url = request.data.get("submission_url") or request.data.get("file_url")
         if not url:
             return Response({"detail": "submission_url is required."}, status=400)
+
+        marks_obtained = None
+        grade = None
+
+        if assign.get("assignment_type") == "Quiz":
+            import json
+            try:
+                student_answers = json.loads(url) if isinstance(url, str) else url
+                questions = assign.get("quiz_questions") or []
+                if isinstance(questions, str):
+                    questions = json.loads(questions)
+
+                correct_count = 0
+                total_questions = len(questions)
+
+                if total_questions > 0:
+                    for i, q in enumerate(questions):
+                        expected = q.get("correct_answer")
+                        student_ans = student_answers.get(str(i)) or student_answers.get(i)
+                        if student_ans and str(student_ans).strip().lower() == str(expected).strip().lower():
+                            correct_count += 1
+
+                    max_m = float(assign.get("max_marks") or 100)
+                    marks_obtained = round((correct_count / total_questions) * max_m, 2)
+                    pct = (marks_obtained / max_m) * 100
+                    if pct >= 90: grade = 'A+'
+                    elif pct >= 80: grade = 'A'
+                    elif pct >= 70: grade = 'B'
+                    elif pct >= 60: grade = 'C'
+                    elif pct >= 50: grade = 'D'
+                    else: grade = 'F'
+            except Exception:
+                pass
+
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO portal_assignment_submission (assignment_id, student_id, submission_url)
-                VALUES (%s,%s,%s)
+                INSERT INTO portal_assignment_submission (assignment_id, student_id, submission_url, marks_obtained, grade)
+                VALUES (%s,%s,%s,%s,%s)
                 ON CONFLICT (assignment_id, student_id)
-                DO UPDATE SET submission_url=EXCLUDED.submission_url, submitted_at=now()
+                DO UPDATE SET submission_url=EXCLUDED.submission_url, submitted_at=now(),
+                              marks_obtained=EXCLUDED.marks_obtained, grade=EXCLUDED.grade
                 RETURNING id
-                """, [assignment_id, request.user.id, url]
+                """, [assignment_id, request.user.id, str(url) if isinstance(url, (dict, list)) else url, marks_obtained, grade]
             )
             sid = cursor.fetchone()[0]
-        return Response({"detail": "Assignment submitted.", "id": sid})
+        return Response({"detail": "Assignment submitted.", "id": sid, "marks_obtained": marks_obtained, "grade": grade})
 
 
 class CourseListView(StudentOnlyMixin, APIView):

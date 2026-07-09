@@ -254,7 +254,7 @@ class AssignmentView(TeacherMixin, APIView):
             return Response([])
         data = rows(
             """
-            SELECT a.id, a.title, a.description, a.file_url, a.max_marks, a.due_date,
+            SELECT a.id, a.title, a.description, a.file_url, a.max_marks, a.due_date, a.assignment_type, a.quiz_questions,
                    c.name || '-' || c.section AS class_name, s.name AS subject_name,
                    (SELECT COUNT(*) FROM portal_assignment_submission sub WHERE sub.assignment_id=a.id)::int AS submission_count,
                    (SELECT COUNT(*) FROM portal_assignment_submission sub WHERE sub.assignment_id=a.id AND sub.marks_obtained IS NOT NULL)::int AS graded_count
@@ -272,14 +272,49 @@ class AssignmentView(TeacherMixin, APIView):
         data = request.data
         class_id = data.get("class_id")
         subject_id = data.get("subject_id")
+        assignment_type = data.get("assignment_type", "File")
+        import json
+        quiz_questions = json.dumps(data.get("quiz_questions", []))
         with connection.cursor() as cursor:
             cursor.execute(
-                """INSERT INTO portal_assignment (class_id, subject_id, teacher_id, title, description, file_url, max_marks, due_date)
-                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                [class_id, subject_id, request.user.id, data.get("title"), data.get("description"), data.get("file_url"), data.get("max_marks") or 100, data.get("due_date")],
+                """INSERT INTO portal_assignment (class_id, subject_id, teacher_id, title, description, file_url, max_marks, due_date, assignment_type, quiz_questions)
+                   VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
+                [class_id, subject_id, request.user.id, data.get("title"), data.get("description"), data.get("file_url"), data.get("max_marks") or 100, data.get("due_date"), assignment_type, quiz_questions],
             )
             aid = cursor.fetchone()[0]
         return Response({"id": aid, "detail": "Assignment created."})
+
+
+class AssignmentDetailView(TeacherMixin, APIView):
+    def patch(self, request, assignment_id):
+        if not table_exists("portal_assignment"):
+            return Response({"detail": "Portal schema has not been applied."}, status=400)
+        data = request.data
+        import json
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """UPDATE portal_assignment 
+                   SET title=%s, description=%s, file_url=%s, max_marks=%s, due_date=%s, assignment_type=%s, quiz_questions=%s
+                   WHERE id=%s""",
+                [
+                    data.get("title"),
+                    data.get("description"),
+                    data.get("file_url"),
+                    data.get("max_marks") or 100,
+                    data.get("due_date"),
+                    data.get("assignment_type", "File"),
+                    json.dumps(data.get("quiz_questions", [])),
+                    assignment_id
+                ]
+            )
+        return Response({"detail": "Assignment updated."})
+
+    def delete(self, request, assignment_id):
+        if not table_exists("portal_assignment"):
+            return Response({"detail": "Portal schema has not been applied."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM portal_assignment WHERE id=%s", [assignment_id])
+        return Response({"detail": "Assignment deleted."})
 
 
 class AssignmentSubmissionsView(TeacherMixin, APIView):
@@ -288,7 +323,7 @@ class AssignmentSubmissionsView(TeacherMixin, APIView):
             return Response([])
         return Response(serialise(rows(
             """
-            SELECT sub.id, sub.submission_url, sub.submitted_at, sub.marks_obtained, sub.teacher_feedback,
+            SELECT sub.id, sub.submission_url, sub.submitted_at, sub.marks_obtained, sub.teacher_feedback, sub.grade,
                    u.id AS student, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name,
                    sp.admission_number
             FROM portal_assignment_submission sub
@@ -301,10 +336,26 @@ class AssignmentSubmissionsView(TeacherMixin, APIView):
     def patch(self, request, assignment_id, submission_id):
         if not table_exists("portal_assignment_submission"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
+        
+        marks = request.data.get("marks_obtained")
+        assign = row("SELECT max_marks FROM portal_assignment WHERE id=%s", [assignment_id])
+        grade = None
+        if marks is not None and assign and assign.get("max_marks"):
+            try:
+                pct = (float(marks) / float(assign["max_marks"])) * 100
+                if pct >= 90: grade = 'A+'
+                elif pct >= 80: grade = 'A'
+                elif pct >= 70: grade = 'B'
+                elif pct >= 60: grade = 'C'
+                elif pct >= 50: grade = 'D'
+                else: grade = 'F'
+            except Exception:
+                pass
+
         with connection.cursor() as cursor:
             cursor.execute(
-                "UPDATE portal_assignment_submission SET marks_obtained=%s, teacher_feedback=%s WHERE id=%s AND assignment_id=%s",
-                [request.data.get("marks_obtained"), request.data.get("teacher_feedback", ""), submission_id, assignment_id],
+                "UPDATE portal_assignment_submission SET marks_obtained=%s, teacher_feedback=%s, grade=%s WHERE id=%s AND assignment_id=%s",
+                [marks, request.data.get("teacher_feedback", ""), grade, submission_id, assignment_id],
             )
         return Response({"detail": "Submission graded."})
 

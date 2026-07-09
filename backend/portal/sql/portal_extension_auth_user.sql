@@ -131,7 +131,9 @@ CREATE TABLE IF NOT EXISTS public.portal_assignment (
   description text NOT NULL,
   file_url text,
   max_marks integer NOT NULL DEFAULT 100,
-  due_date timestamptz NOT NULL
+  due_date timestamptz NOT NULL,
+  assignment_type varchar(20) NOT NULL DEFAULT 'File',
+  quiz_questions jsonb NOT NULL DEFAULT '[]'::jsonb
 );
 
 CREATE TABLE IF NOT EXISTS public.portal_assignment_submission (
@@ -142,6 +144,7 @@ CREATE TABLE IF NOT EXISTS public.portal_assignment_submission (
   submitted_at timestamptz NOT NULL DEFAULT now(),
   marks_obtained numeric,
   teacher_feedback text,
+  grade varchar(10),
   UNIQUE (assignment_id, student_id)
 );
 
