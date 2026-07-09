@@ -12,6 +12,7 @@ const NAV = [
   { to: "/admin/users", label: "Users & Roles", icon: Users },
   { to: "/admin/roles-permissions", label: "Roles & Permissions", icon: KeyRound },
   { to: "/admin/classes", label: "Classes & Subjects", icon: School },
+  { to: "/admin/lms", label: "LMS Monitor", icon: BookOpen },
   { to: "/admin/fees", label: "Fees", icon: Wallet },
   { to: "/admin/payroll", label: "Payroll", icon: Banknote },
   { to: "/admin/exam-results", label: "Rank Lists & Report Cards", icon: Trophy },

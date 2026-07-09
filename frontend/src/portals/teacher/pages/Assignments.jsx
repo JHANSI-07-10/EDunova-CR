@@ -1,4 +1,4 @@
-import { Plus, Trash2, Edit2, X, PlusCircle, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, Edit2, X, PlusCircle, CheckCircle2, FileUp, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
@@ -16,7 +16,9 @@ export default function Assignments() {
   }
   useEffect(() => {
     load();
-    api.get("/teacher/classes/").then(({ data }) => setClasses(data));
+    api.get("/teacher/classes/").then(({ data }) => {
+      setClasses(data.filter((c) => c.subject_id !== 0 && c.subject_id !== "0"));
+    });
   }, []);
 
   async function removeAssignment(id) {
@@ -142,7 +144,37 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
+
+  async function handleScanPdf(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    setScanning(true);
+    setError("");
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const { data } = await api.post("/teacher/assignments/scan-pdf/", formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+      if (data.questions && data.questions.length > 0) {
+        setForm((f) => ({
+          ...f,
+          quiz_questions: [
+            ...f.quiz_questions,
+            ...data.questions
+          ]
+        }));
+      } else {
+        setError("No questions could be extracted from the PDF. Please check the PDF format.");
+      }
+    } catch (err) {
+      setError(err?.response?.data?.detail || "Failed to scan PDF. Make sure it is a valid questions PDF.");
+    } finally {
+      setScanning(false);
+    }
+  }
 
   useEffect(() => {
     if (classes.length && !form.class_id) {
@@ -356,13 +388,31 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
             <div className="space-y-4 pt-3 border-t border-slate-100">
               <div className="flex items-center justify-between">
                 <p className="font-heading font-semibold text-slate-700">Quiz Questions Builder</p>
-                <button
-                  type="button"
-                  onClick={addQuestion}
-                  className="flex items-center gap-1 text-xs font-semibold text-academic-blue hover:text-academic-blue/80"
-                >
-                  <PlusCircle size={14} /> Add Question
-                </button>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="file"
+                    accept=".pdf"
+                    onChange={handleScanPdf}
+                    className="hidden"
+                    id="teacher-quiz-scan-pdf"
+                    disabled={scanning}
+                  />
+                  <label
+                    htmlFor="teacher-quiz-scan-pdf"
+                    className="flex items-center gap-1.5 bg-purple-50 border border-purple-200 text-purple-700 hover:bg-purple-100 rounded-xl px-3 py-1.5 text-xs font-semibold cursor-pointer select-none transition-all duration-200 disabled:opacity-50"
+                  >
+                    <Sparkles size={13} className="text-purple-600 animate-pulse" />
+                    {scanning ? "Scanning..." : "Scan PDF"}
+                  </label>
+                  
+                  <button
+                    type="button"
+                    onClick={addQuestion}
+                    className="flex items-center gap-1 text-xs font-semibold text-academic-blue hover:text-academic-blue/80"
+                  >
+                    <PlusCircle size={14} /> Add Question
+                  </button>
+                </div>
               </div>
 
               {form.quiz_questions.length === 0 ? (
@@ -495,10 +545,12 @@ function SubmissionRow({ sub, maxMarks, onGrade, assignmentType }) {
         <div>
           {assignmentType === "Quiz" ? (
             <Badge tone="purple">Auto-Graded</Badge>
-          ) : (
+          ) : sub.submission_url?.startsWith("http") ? (
             <a href={sub.submission_url} target="_blank" rel="noreferrer" className="text-xs text-academic-blue hover:underline">
               View submission file
             </a>
+          ) : (
+            <Badge tone="green">Online Response</Badge>
           )}
         </div>
       </div>
@@ -506,6 +558,13 @@ function SubmissionRow({ sub, maxMarks, onGrade, assignmentType }) {
       {assignmentType === "Quiz" && sub.submission_url && (
         <div className="text-xs text-ink-secondary bg-white p-2 rounded-lg border border-slate-100 mb-2 font-mono break-all max-h-[80px] overflow-y-auto">
           Answers: {sub.submission_url}
+        </div>
+      )}
+
+      {assignmentType !== "Quiz" && sub.submission_url && !sub.submission_url.startsWith("http") && (
+        <div className="text-xs text-slate-800 bg-slate-50 border border-slate-200 p-3 rounded-lg mb-2 whitespace-pre-wrap max-h-[150px] overflow-y-auto font-sans leading-relaxed">
+          <strong className="text-academic-blue text-[10px] uppercase block mb-1">Student Answer:</strong>
+          {sub.submission_url}
         </div>
       )}
 

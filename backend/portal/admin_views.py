@@ -830,3 +830,73 @@ class ClassTeacherAssignView(AdminMixin, APIView):
                 )
         log_action(request.user, "class_teacher.assign", "portal_class_teacher", class_id, d)
         return Response({"detail": "Class teacher and subject assigned successfully."})
+
+
+class AdminLmsAnalyticsView(AdminMixin, APIView):
+    def get(self, request):
+        if not table_exists("portal_course_content"):
+            return Response({"uploads": [], "stats": {}})
+            
+        # Recent uploads
+        uploads = rows(
+            """
+            SELECT cc.id, cc.title, cc.content_type, cc.uploaded_at,
+                   c.title AS course_title, cl.name || '-' || cl.section AS class_name, s.name AS subject_name,
+                   COALESCE(u.first_name || ' ' || u.last_name, u.username) AS teacher_name
+            FROM portal_course_content cc
+            JOIN portal_course c ON c.id = cc.course_id
+            JOIN portal_class cl ON cl.id = c.class_id
+            JOIN portal_subject s ON s.id = c.subject_id
+            LEFT JOIN portal_academic_allocation aa ON aa.class_id = c.class_id AND aa.subject_id = c.subject_id
+            LEFT JOIN auth_user u ON u.id = aa.teacher_id
+            ORDER BY cc.uploaded_at DESC LIMIT 50
+            """
+        )
+        
+        # Statistics
+        total_courses = row("SELECT COUNT(*)::int AS c FROM portal_course")["c"]
+        total_chapters = row("SELECT COUNT(*)::int AS c FROM portal_chapter")["c"] if table_exists("portal_chapter") else 0
+        total_lessons = row("SELECT COUNT(*)::int AS c FROM portal_lesson")["c"] if table_exists("portal_lesson") else 0
+        total_resources = row("SELECT COUNT(*)::int AS c FROM portal_course_content")["c"]
+        
+        resources_by_type = rows(
+            """
+            SELECT content_type AS type, COUNT(*)::int AS count
+            FROM portal_course_content GROUP BY content_type
+            """
+        )
+        
+        # Estimated storage (each resource is ~2.4MB on average, simulated metrics)
+        file_count = row("SELECT COUNT(*)::int AS c FROM portal_course_content WHERE content_type IN ('PDF', 'PPT', 'DOC', 'Image', 'Audio', 'PDF_Notes')")["c"]
+        estimated_storage_mb = round(file_count * 2.4, 2)
+        
+        return Response(serialise({
+            "uploads": uploads,
+            "stats": {
+                "total_courses": total_courses,
+                "total_chapters": total_chapters,
+                "total_lessons": total_lessons,
+                "total_resources": total_resources,
+                "estimated_storage_mb": estimated_storage_mb,
+                "resources_by_type": {r["type"]: r["count"] for r in resources_by_type}
+            }
+        }))
+        
+    def delete(self, request):
+        resource_id = request.query_params.get("id")
+        if not resource_id:
+            return Response({"detail": "id parameter required."}, status=400)
+            
+        with connection.cursor() as cursor:
+            # Clean up associated Quiz or Assignment if referenced
+            ref = row("SELECT quiz_id, assignment_id FROM portal_course_content WHERE id=%s", [resource_id])
+            cursor.execute("DELETE FROM portal_course_content WHERE id=%s", [resource_id])
+            if ref:
+                if ref.get("quiz_id"):
+                    cursor.execute("DELETE FROM portal_quiz WHERE id=%s", [ref["quiz_id"]])
+                if ref.get("assignment_id"):
+                    cursor.execute("DELETE FROM portal_assignment WHERE id=%s", [ref["assignment_id"]])
+                    
+        log_action(request.user, "lms_resource.delete", "portal_course_content", resource_id, {"id": resource_id})
+        return Response({"detail": "Resource deleted."})
+

@@ -272,6 +272,10 @@ class AssignmentView(TeacherMixin, APIView):
         data = request.data
         class_id = data.get("class_id")
         subject_id = data.get("subject_id")
+        if not class_id:
+            return Response({"detail": "class_id is required."}, status=400)
+        if not subject_id or str(subject_id) == "0":
+            return Response({"detail": "A valid subject is required. Assignments cannot be created for Class Administration."}, status=400)
         assignment_type = data.get("assignment_type", "File")
         import json
         quiz_questions = json.dumps(data.get("quiz_questions", []))
@@ -653,3 +657,480 @@ class TeacherAdmissionsReviewView(TeacherMixin, APIView):
             return Response({"detail": f"Application advanced to {nxt} based on interview recommendation.", "status": nxt})
 
         return Response({"detail": "Invalid action."}, status=400)
+
+
+class AssignmentScanPDFView(TeacherMixin, APIView):
+    def post(self, request):
+        uploaded_file = request.FILES.get("file")
+        if not uploaded_file:
+            return Response({"detail": "No file uploaded."}, status=400)
+
+        # 1. Extract text using pypdf
+        try:
+            from pypdf import PdfReader
+            reader = PdfReader(uploaded_file)
+            text = ""
+            for page in reader.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text += page_text + "\n"
+        except Exception as e:
+            return Response({"detail": f"Failed to read PDF file: {str(e)}"}, status=400)
+
+        if not text.strip():
+            return Response({"detail": "The PDF file is empty or contains no extractable text."}, status=400)
+
+        # 2. Try parsing with Gemini if API key is present
+        import os
+        gemini_key = os.environ.get("GEMINI_API_KEY")
+        questions = None
+
+        if gemini_key:
+            try:
+                import urllib.request
+                import json
+                
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
+                headers = {"Content-Type": "application/json"}
+                
+                prompt = (
+                    "You are an expert assessment parser. Extract multiple-choice questions from the following text. "
+                    "Return a JSON object with a single root key 'questions' containing an array of objects. "
+                    "Each question object MUST contain the following properties:\n"
+                    "1. 'question_text' (string): The text of the question.\n"
+                    "2. 'options' (array of exactly 4 strings): The options/choices.\n"
+                    "3. 'correct_answer' (string): The correct option value (must match one of the options exactly).\n"
+                    "If correct answers are not explicitly defined in the text, determine the correct answer yourself. "
+                    "Format the response strictly as valid JSON matching the specified schema. Output NO markdown formatting or text besides the raw JSON.\n\n"
+                    f"Text to parse:\n{text}"
+                )
+                
+                payload = {
+                    "contents": [{
+                        "parts": [{
+                            "text": prompt
+                        }]
+                    }],
+                    "generationConfig": {
+                        "responseMimeType": "application/json"
+                    }
+                }
+                
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode("utf-8"),
+                    headers=headers,
+                    method="POST"
+                )
+                
+                with urllib.request.urlopen(req, timeout=25) as response:
+                    res_body = json.loads(response.read().decode("utf-8"))
+                    content = res_body["candidates"][0]["content"]["parts"][0]["text"]
+                    
+                    content_clean = content.strip()
+                    if content_clean.startswith("```json"):
+                        content_clean = content_clean[7:]
+                    if content_clean.endswith("```"):
+                        content_clean = content_clean[:-3]
+                    content_clean = content_clean.strip()
+                    
+                    parsed = json.loads(content_clean)
+                    if "questions" in parsed and isinstance(parsed["questions"], list):
+                        questions = parsed["questions"]
+            except Exception as e:
+                print("Gemini parsing failed, falling back to rule-based parser. Error:", str(e))
+
+        # 3. Fallback to rule-based parsing if Gemini wasn't used or failed
+        if not questions:
+            questions = self.parse_questions_fallback(text)
+
+        return Response({"questions": questions})
+
+    def parse_questions_fallback(self, text):
+        import re
+        lines = [line.strip() for line in text.split("\n") if line.strip()]
+        questions = []
+        current_q = None
+        
+        q_re = re.compile(r'^(?:Q(?:uestion)?\s*\d+[\.:\)]|\d+[\.:\)])\s*(.*)', re.IGNORECASE)
+        opt_re = re.compile(r'^\s*[\(\[]?([A-Da-d])[\)\]\.]?\s+(.*)')
+        ans_re = re.compile(r'^\s*(?:Correct\s+Answer|Correct\s+Option|Correct|Answer|Ans|Option)\s*[:\.-]?\s*([A-Da-d]|\S+)', re.IGNORECASE)
+
+        for line in lines:
+            q_match = q_re.match(line)
+            if q_match:
+                if current_q:
+                    questions.append(current_q)
+                current_q = {
+                    "question_text": q_match.group(1).strip(),
+                    "options": ["", "", "", ""],
+                    "correct_answer": ""
+                }
+                continue
+
+            if not current_q:
+                continue
+
+            opt_match = opt_re.match(line)
+            if opt_match:
+                letter = opt_match.group(1).upper()
+                opt_text = opt_match.group(2).strip()
+                idx = ord(letter) - ord('A')
+                if 0 <= idx < 4:
+                    current_q["options"][idx] = opt_text
+                continue
+
+            ans_match = ans_re.match(line)
+            if ans_match:
+                ans_val = ans_match.group(1).strip().upper()
+                if len(ans_val) == 1 and 'A' <= ans_val <= 'D':
+                    idx = ord(ans_val) - ord('A')
+                    current_q["correct_answer"] = current_q["options"][idx]
+                else:
+                    current_q["correct_answer"] = ans_match.group(1).strip()
+                continue
+
+            if not any(current_q["options"]):
+                current_q["question_text"] += " " + line
+            else:
+                last_idx = -1
+                for idx in range(3, -1, -1):
+                    if current_q["options"][idx]:
+                        last_idx = idx
+                        break
+                if last_idx != -1:
+                    current_q["options"][last_idx] += " " + line
+
+        if current_q:
+            questions.append(current_q)
+
+        cleaned_questions = []
+        for q in questions:
+            if not q["question_text"].strip():
+                continue
+            
+            for idx in range(4):
+                if not q["options"][idx].strip():
+                    q["options"][idx] = f"Option {chr(65+idx)}"
+                    
+            o_clean = [o.strip().lower() for o in q["options"]]
+            ans_clean = q["correct_answer"].strip().lower()
+            
+            if ans_clean in o_clean:
+                q["correct_answer"] = q["options"][o_clean.index(ans_clean)]
+        return cleaned_questions
+
+
+class TeacherLmsCoursesView(TeacherMixin, APIView):
+    def get(self, request):
+        if not table_exists("portal_academic_allocation") or not table_exists("portal_course"):
+            return Response([])
+        
+        # Auto-create courses for any allocated subjects if they do not exist
+        allocations = rows(
+            """
+            SELECT aa.class_id, aa.subject_id, c.name || '-' || c.section AS class_name, s.name AS subject_name
+            FROM portal_academic_allocation aa
+            JOIN portal_class c ON c.id = aa.class_id
+            JOIN portal_subject s ON s.id = aa.subject_id
+            WHERE aa.teacher_id = %s
+            """, [request.user.id]
+        )
+        for a in allocations:
+            exist = row("SELECT id FROM portal_course WHERE class_id=%s AND subject_id=%s", [a["class_id"], a["subject_id"]])
+            if not exist:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO portal_course (class_id, subject_id, title, description) VALUES (%s,%s,%s,%s)",
+                        [a["class_id"], a["subject_id"], f"{a['subject_name']} - {a['class_name']}", f"Course materials for {a['subject_name']}"]
+                    )
+
+        # Return all allocated courses
+        courses = rows(
+            """
+            SELECT c.id, c.title, c.description, cl.name || '-' || cl.section AS class_name, s.name AS subject_name,
+                   cl.id AS class_id, s.id AS subject_id
+            FROM portal_course c
+            JOIN portal_class cl ON cl.id = c.class_id
+            JOIN portal_subject s ON s.id = c.subject_id
+            JOIN portal_academic_allocation aa ON aa.class_id = c.class_id AND aa.subject_id = c.subject_id
+            WHERE aa.teacher_id = %s ORDER BY cl.name, cl.section, s.name
+            """,
+            [request.user.id]
+        )
+        return Response(serialise(courses))
+
+
+class TeacherLmsChaptersView(TeacherMixin, APIView):
+    def get(self, request):
+        course_id = request.query_params.get("course_id")
+        if not course_id or not table_exists("portal_chapter"):
+            return Response([])
+        return Response(serialise(rows("SELECT id, title, description, sort_order FROM portal_chapter WHERE course_id=%s ORDER BY sort_order, id", [course_id])))
+
+    def post(self, request):
+        d = request.data
+        course_id = d.get("course_id")
+        class_id = d.get("class_id")
+        subject_id = d.get("subject_id")
+        title = d.get("title", "").strip()
+        description = d.get("description", "").strip()
+        sort_order = d.get("sort_order", 0)
+        pdf_url = d.get("pdf_url")
+
+        if not course_id and class_id and subject_id:
+            # Find course
+            exist = row("SELECT id FROM portal_course WHERE class_id=%s AND subject_id=%s", [class_id, subject_id])
+            if exist:
+                course_id = exist["id"]
+            else:
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO portal_course (class_id, subject_id, title) VALUES (%s,%s,%s) RETURNING id",
+                        [class_id, subject_id, "Subject Course"]
+                    )
+                    course_id = cursor.fetchone()[0]
+
+        if not course_id or not title:
+            return Response({"detail": "course_id (or class_id + subject_id) and title are required."}, status=400)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO portal_chapter (course_id, title, description, sort_order) VALUES (%s,%s,%s,%s) RETURNING id",
+                [course_id, title, description, sort_order]
+            )
+            cid = cursor.fetchone()[0]
+
+            if pdf_url:
+                cursor.execute(
+                    """
+                    INSERT INTO portal_course_content (course_id, chapter_id, content_type, title, resource_url, description)
+                    VALUES (%s,%s,'PDF',%s,%s,'Chapter syllabus/intro document')
+                    """,
+                    [course_id, cid, f"{title} PDF Notes", pdf_url]
+                )
+
+        return Response({"id": cid, "detail": "Chapter created."})
+
+    def put(self, request):
+        d = request.data
+        cid = d.get("id")
+        title = d.get("title", "").strip()
+        description = d.get("description", "").strip()
+        pdf_url = d.get("pdf_url")
+        
+        if not cid or not title:
+            return Response({"detail": "id and title are required."}, status=400)
+            
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE portal_chapter SET title=%s, description=%s WHERE id=%s",
+                [title, description, cid]
+            )
+            if pdf_url:
+                # Update chapter resource if it exists, otherwise create it
+                exist = row("SELECT id FROM portal_course_content WHERE chapter_id=%s AND lesson_id IS NULL", [cid])
+                if exist:
+                    cursor.execute(
+                        "UPDATE portal_course_content SET resource_url=%s, title=%s WHERE id=%s",
+                        [pdf_url, f"{title} PDF Notes", exist["id"]]
+                    )
+                else:
+                    # Fetch course_id first
+                    ch = row("SELECT course_id FROM portal_chapter WHERE id=%s", [cid])
+                    cursor.execute(
+                        """
+                        INSERT INTO portal_course_content (course_id, chapter_id, content_type, title, resource_url, description)
+                        VALUES (%s,%s,'PDF',%s,%s,'Chapter syllabus/intro document')
+                        """,
+                        [ch["course_id"], cid, f"{title} PDF Notes", pdf_url]
+                    )
+        return Response({"detail": "Chapter updated."})
+
+    def delete(self, request):
+        chapter_id = request.query_params.get("id")
+        if not chapter_id:
+            return Response({"detail": "id parameter required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM portal_chapter WHERE id=%s", [chapter_id])
+        return Response({"detail": "Chapter deleted."})
+
+
+class TeacherLmsLessonsView(TeacherMixin, APIView):
+    def get(self, request):
+        chapter_id = request.query_params.get("chapter_id")
+        if not chapter_id or not table_exists("portal_lesson"):
+            return Response([])
+        return Response(serialise(rows("SELECT id, title, description, sort_order FROM portal_lesson WHERE chapter_id=%s ORDER BY sort_order, id", [chapter_id])))
+
+    def post(self, request):
+        d = request.data
+        chapter_id = d.get("chapter_id")
+        title = d.get("title", "").strip()
+        description = d.get("description", "").strip()
+        sort_order = d.get("sort_order", 0)
+        if not chapter_id or not title:
+            return Response({"detail": "chapter_id and title are required."}, status=400)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO portal_lesson (chapter_id, title, description, sort_order) VALUES (%s,%s,%s,%s) RETURNING id",
+                [chapter_id, title, description, sort_order]
+            )
+            lid = cursor.fetchone()[0]
+        return Response({"id": lid, "detail": "Lesson created."})
+
+    def put(self, request):
+        d = request.data
+        lid = d.get("id")
+        title = d.get("title", "").strip()
+        description = d.get("description", "").strip()
+        if not lid or not title:
+            return Response({"detail": "id and title are required."}, status=400)
+            
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE portal_lesson SET title=%s, description=%s WHERE id=%s",
+                [title, description, lid]
+            )
+        return Response({"detail": "Lesson updated."})
+
+    def delete(self, request):
+        lesson_id = request.query_params.get("id")
+        if not lesson_id:
+            return Response({"detail": "id parameter required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM portal_lesson WHERE id=%s", [lesson_id])
+        return Response({"detail": "Lesson deleted."})
+
+
+class TeacherLmsResourcesView(TeacherMixin, APIView):
+    def get(self, request):
+        lesson_id = request.query_params.get("lesson_id")
+        if not lesson_id or not table_exists("portal_course_content"):
+            return Response([])
+        return Response(serialise(rows("SELECT id, content_type, title, resource_url, description, due_date, max_marks, quiz_id, assignment_id, visible_from FROM portal_course_content WHERE lesson_id=%s ORDER BY sort_order, id", [lesson_id])))
+
+    def post(self, request):
+        d = request.data
+        course_id = d.get("course_id")
+        lesson_id = d.get("lesson_id")
+        content_type = d.get("content_type", "PDF")
+        title = d.get("title", "").strip()
+        resource_url = d.get("resource_url", "").strip()
+        description = d.get("description", "").strip()
+        due_date = d.get("due_date")
+        max_marks = d.get("max_marks")
+        visible_from = d.get("visible_from")
+
+        if not course_id or not lesson_id or not title:
+            return Response({"detail": "course_id, lesson_id, and title are required."}, status=400)
+
+        course = row("SELECT class_id, subject_id FROM portal_course WHERE id=%s", [course_id])
+        if not course:
+            return Response({"detail": "Course not found."}, status=404)
+
+        quiz_id = None
+        assignment_id = None
+
+        with connection.cursor() as cursor:
+            # Check if this resource is an Assignment
+            if content_type == "Assignment":
+                # Create a record in portal_assignment
+                cursor.execute(
+                    """
+                    INSERT INTO portal_assignment (class_id, subject_id, teacher_id, title, description, file_url, max_marks, due_date)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                    """,
+                    [course["class_id"], course["subject_id"], request.user.id, title, description or "Course Assignment", resource_url, max_marks or 100, due_date or "2026-12-31T23:59:59Z"]
+                )
+                assignment_id = cursor.fetchone()[0]
+
+            # Check if this resource is a Quiz
+            elif content_type == "Quiz":
+                # Create a record in portal_quiz
+                cursor.execute(
+                    "INSERT INTO portal_quiz (course_id, title, duration_minutes, passing_score) VALUES (%s,%s,30,40) RETURNING id",
+                    [course_id, title]
+                )
+                quiz_id = cursor.fetchone()[0]
+                
+                # Insert questions if provided
+                questions = d.get("questions", [])
+                for q in questions:
+                    import json
+                    cursor.execute(
+                        "INSERT INTO portal_quiz_question (quiz_id, question_text, options, correct_answer) VALUES (%s,%s,%s,%s)",
+                        [quiz_id, q.get("question_text"), json.dumps(q.get("options", [])), q.get("correct_answer")]
+                    )
+
+            # Insert into portal_course_content
+            cursor.execute(
+                """
+                INSERT INTO portal_course_content (course_id, lesson_id, content_type, title, resource_url, description, due_date, max_marks, quiz_id, assignment_id, visible_from)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id
+                """,
+                [course_id, lesson_id, content_type, title, resource_url, description, due_date, max_marks, quiz_id, assignment_id, visible_from or "now()"]
+            )
+            rid = cursor.fetchone()[0]
+
+        return Response({"id": rid, "detail": "Resource uploaded and added to lesson."})
+
+    def put(self, request):
+        d = request.data
+        rid = d.get("id")
+        title = d.get("title", "").strip()
+        resource_url = d.get("resource_url", "").strip()
+        description = d.get("description", "").strip()
+        due_date = d.get("due_date")
+        max_marks = d.get("max_marks")
+        
+        if not rid or not title:
+            return Response({"detail": "id and title are required."}, status=400)
+            
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE portal_course_content 
+                SET title=%s, resource_url=COALESCE(NULLIF(%s, ''), resource_url), 
+                    description=%s, due_date=%s, max_marks=%s
+                WHERE id=%s
+                """,
+                [title, resource_url, description, due_date, max_marks, rid]
+            )
+            
+            # If this is linked to an assignment, update assignment details too!
+            ref = row("SELECT quiz_id, assignment_id FROM portal_course_content WHERE id=%s", [rid])
+            if ref and ref.get("assignment_id"):
+                cursor.execute(
+                    """
+                    UPDATE portal_assignment 
+                    SET title=%s, description=%s, file_url=COALESCE(NULLIF(%s, ''), file_url), 
+                        max_marks=%s, due_date=%s
+                    WHERE id=%s
+                    """,
+                    [title, description, resource_url, max_marks or 100, due_date or "2026-12-31T23:59:59Z", ref["assignment_id"]]
+                )
+            if ref and ref.get("quiz_id"):
+                cursor.execute(
+                    "UPDATE portal_quiz SET title=%s WHERE id=%s",
+                    [title, ref["quiz_id"]]
+                )
+        return Response({"detail": "Resource updated successfully."})
+
+    def delete(self, request):
+        resource_id = request.query_params.get("id")
+        if not resource_id:
+            return Response({"detail": "id parameter required."}, status=400)
+        with connection.cursor() as cursor:
+            # Fetch quiz_id/assignment_id if exists to clean up references
+            ref = row("SELECT quiz_id, assignment_id FROM portal_course_content WHERE id=%s", [resource_id])
+            cursor.execute("DELETE FROM portal_course_content WHERE id=%s", [resource_id])
+            if ref:
+                if ref.get("quiz_id"):
+                    cursor.execute("DELETE FROM portal_quiz WHERE id=%s", [ref["quiz_id"]])
+                if ref.get("assignment_id"):
+                    cursor.execute("DELETE FROM portal_assignment WHERE id=%s", [ref["assignment_id"]])
+        return Response({"detail": "Resource deleted."})
+
+

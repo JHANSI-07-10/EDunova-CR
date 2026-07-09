@@ -52,6 +52,7 @@ urlpatterns = [
     path("teacher/attendance/", teacher_views.AttendanceView.as_view()),
     path("teacher/homework/", teacher_views.HomeworkView.as_view()),
     path("teacher/assignments/", teacher_views.AssignmentView.as_view()),
+    path("teacher/assignments/scan-pdf/", teacher_views.AssignmentScanPDFView.as_view()),
     path("teacher/assignments/<int:assignment_id>/", teacher_views.AssignmentDetailView.as_view()),
     path("teacher/assignments/<int:assignment_id>/submissions/", teacher_views.AssignmentSubmissionsView.as_view()),
     path("teacher/assignments/<int:assignment_id>/submissions/<int:submission_id>/", teacher_views.AssignmentSubmissionsView.as_view()),
@@ -67,6 +68,10 @@ urlpatterns = [
     path("teacher/admissions-review/", teacher_views.TeacherAdmissionsReviewView.as_view()),
     path("teacher/timetable/", teacher_views.TeacherTimetableView.as_view()),
     path("teacher/documents/", teacher_views.TeacherDocumentsView.as_view()),
+    path("teacher/lms/courses/", teacher_views.TeacherLmsCoursesView.as_view()),
+    path("teacher/lms/chapters/", teacher_views.TeacherLmsChaptersView.as_view()),
+    path("teacher/lms/lessons/", teacher_views.TeacherLmsLessonsView.as_view()),
+    path("teacher/lms/resources/", teacher_views.TeacherLmsResourcesView.as_view()),
 
     # Parent portal
     path("parent/profile/", parent_views.ParentProfileView.as_view()),
@@ -86,6 +91,7 @@ urlpatterns = [
     path("parent/leaves/", parent_views.LeaveRequestView.as_view()),
     path("parent/ptm/", parent_views.PtmBookingView.as_view()),
     path("parent/feedback/", parent_views.FeedbackView.as_view()),
+    path("parent/lms/progress/", parent_views.ParentLmsProgressView.as_view()),
 
     # Admin portal
     path("admin-portal/dashboard/", admin_views.AdminDashboardView.as_view()),
@@ -113,6 +119,7 @@ urlpatterns = [
     path("admin-portal/reports/", admin_views.ReportsView.as_view()),
     path("admin-portal/audit-log/", admin_views.AuditLogListView.as_view()),
     path("admin-portal/backup/export/", admin_views.BackupExportView.as_view()),
+    path("admin-portal/lms/analytics/", admin_views.AdminLmsAnalyticsView.as_view()),
 
     # Hostel module
     path("admin-portal/hostels/", facilities_views.HostelView.as_view()),

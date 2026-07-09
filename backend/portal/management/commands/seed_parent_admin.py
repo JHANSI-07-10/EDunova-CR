@@ -39,7 +39,7 @@ class Command(BaseCommand):
         admin, _ = User.objects.get_or_create(
             username="jhansi.admin",
             defaults={
-                "email": "mandugulajhansilakshmi@gmail.com",
+                "email": "jhansilakshmi1004@gmail.com",
                 "first_name": "Jhansi",
                 "last_name": "Lakshmi",
                 "is_active": True,
@@ -48,7 +48,7 @@ class Command(BaseCommand):
             },
         )
 
-        admin.email = "mandugulajhansilakshmi@gmail.com"
+        admin.email = "jhansilakshmi1004@gmail.com"
         admin.first_name = "Jhansi"
         admin.last_name = "Lakshmi"
         admin.is_staff = True
@@ -126,6 +126,6 @@ class Command(BaseCommand):
         self.stdout.write("Password : EduNova@123")
         self.stdout.write("")
         self.stdout.write("Admin Login")
-        self.stdout.write("Email    : mandugulajhansilakshmi@gmail.com")
+        self.stdout.write("Email    : jhansilakshmi1004@gmail.com")
         self.stdout.write("Password : EduNova@123")
         self.stdout.write("======================================")

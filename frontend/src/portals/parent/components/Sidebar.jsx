@@ -1,7 +1,7 @@
 import {
   Bus, CalendarDays, FileText, Home, LogOut, MessageSquare,
   NotebookPen, Bell, ScrollText, Wallet, Users2, CalendarClock,
-  Heart, X, BedDouble,
+  Heart, X, BedDouble, BookOpen,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 const NAV = [
   { to: "/parent", label: "Dashboard", icon: Home, end: true },
   { to: "/parent/attendance", label: "Attendance", icon: CalendarDays },
+  { to: "/parent/lms", label: "Learning Progress", icon: BookOpen },
   { to: "/parent/homework", label: "Homework", icon: NotebookPen },
   { to: "/parent/results", label: "Results", icon: ScrollText },
   { to: "/parent/fees", label: "Fee Payments", icon: Wallet },

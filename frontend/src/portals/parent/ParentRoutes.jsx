@@ -19,6 +19,7 @@ import LeaveRequests from "./pages/LeaveRequests";
 import PtmBooking from "./pages/PtmBooking";
 import Feedback from "./pages/Feedback";
 import Profile from "./pages/Profile";
+import LmsProgress from "./pages/LmsProgress";
 
 export default function ParentRoutes() {
   return (
@@ -46,6 +47,7 @@ export default function ParentRoutes() {
           <Route path="ptm" element={<PtmBooking />} />
           <Route path="feedback" element={<Feedback />} />
           <Route path="profile" element={<Profile />} />
+          <Route path="lms" element={<LmsProgress />} />
           <Route path="*" element={<PortalNotFound homePath="/parent" />} />
         </Route>
       </Routes>

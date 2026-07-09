@@ -104,6 +104,8 @@ export default function Assignments() {
 
 function SubmitModal({ assignment, onClose, onSubmitted }) {
   const [url, setUrl] = useState("");
+  const [typedText, setTypedText] = useState("");
+  const [submissionMode, setSubmissionMode] = useState("type"); // 'type' or 'upload'
   const [answers, setAnswers] = useState({});
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -140,15 +142,21 @@ function SubmitModal({ assignment, onClose, onSubmitted }) {
       setError("Please answer all questions before submitting.");
       return;
     }
-    if (!isQuiz && !url) {
-      setError("Please select and upload your file first.");
-      return;
+    if (!isQuiz) {
+      if (submissionMode === "type" && !typedText.trim()) {
+        setError("Please type your response first.");
+        return;
+      }
+      if (submissionMode === "upload" && !url) {
+        setError("Please select and upload your file first.");
+        return;
+      }
     }
 
     setBusy(true);
     setError("");
     try {
-      const submissionVal = isQuiz ? JSON.stringify(answers) : url;
+      const submissionVal = isQuiz ? JSON.stringify(answers) : (submissionMode === "type" ? typedText : url);
       const { data } = await api.post(`/student/assignments/${assignment.id}/submit/`, { submission_url: submissionVal });
       onSubmitted(data);
     } catch (err) {
@@ -166,6 +174,15 @@ function SubmitModal({ assignment, onClose, onSubmitted }) {
           <button onClick={onClose} className="text-ink-secondary"><X size={18} /></button>
         </div>
         {error && <div className="mb-3 text-sm text-danger bg-red-50 rounded-xl px-3 py-2">{error}</div>}
+        
+        {/* Render questions/instructions */}
+        {assignment.description && (
+          <div className="mb-4 bg-slate-50 border border-slate-200/60 p-3 rounded-xl text-xs text-ink-primary leading-relaxed">
+            <span className="font-bold text-academic-blue block mb-1">Test Questions & Details:</span>
+            <p className="whitespace-pre-line">{assignment.description}</p>
+          </div>
+        )}
+
         <form onSubmit={submit} className="space-y-4">
           {isQuiz ? (
             <div className="space-y-4">
@@ -193,29 +210,63 @@ function SubmitModal({ assignment, onClose, onSubmitted }) {
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-xs text-ink-secondary">Select and upload your completed assignment document (PDF, TXT, DOCX):</p>
-              <div className="flex gap-2 items-center">
-                <input
-                  type="file"
-                  accept=".pdf,.txt,.docx"
-                  onChange={handleSubmissionUpload}
-                  className="hidden"
-                  id="student-submission-file"
-                />
-                <label
-                  htmlFor="student-submission-file"
-                  className="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-xl px-4 py-2.5 text-xs font-semibold cursor-pointer select-none transition-colors"
+              {/* Tab Selector */}
+              <div className="flex gap-2 p-1 bg-slate-100 rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setSubmissionMode("type")}
+                  className={`flex-1 text-xs py-1.5 font-semibold rounded-lg transition-all ${submissionMode === "type" ? 'bg-white text-ink-primary shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
                 >
-                  {uploading ? "Uploading..." : "Choose File"}
-                </label>
-                {url ? (
-                  <span className="text-xs text-academic-green font-semibold truncate max-w-[250px]" title={url}>
-                    ✓ File Uploaded: {url.split("/").pop()}
-                  </span>
-                ) : (
-                  <span className="text-xs text-slate-400">No file selected</span>
-                )}
+                  Write Answers Online
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSubmissionMode("upload")}
+                  className={`flex-1 text-xs py-1.5 font-semibold rounded-lg transition-all ${submissionMode === "upload" ? 'bg-white text-ink-primary shadow-sm' : 'text-slate-500 hover:text-slate-800'}`}
+                >
+                  Upload Document File
+                </button>
               </div>
+
+              {submissionMode === "type" ? (
+                <div className="space-y-2">
+                  <label className="text-xs font-semibold text-ink-secondary block">Type your answers/response below:</label>
+                  <textarea
+                    required
+                    rows={6}
+                    placeholder="Start typing your response here..."
+                    value={typedText}
+                    onChange={e => setTypedText(e.target.value)}
+                    className="w-full rounded-xl border border-slate-200 p-3 text-sm focus-ring outline-none h-40"
+                  />
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <p className="text-xs text-ink-secondary">Select and upload your completed assignment document (PDF, TXT, DOCX):</p>
+                  <div className="flex gap-2 items-center">
+                    <input
+                      type="file"
+                      accept=".pdf,.txt,.docx"
+                      onChange={handleSubmissionUpload}
+                      className="hidden"
+                      id="student-submission-file"
+                    />
+                    <label
+                      htmlFor="student-submission-file"
+                      className="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 rounded-xl px-4 py-2.5 text-xs font-semibold cursor-pointer select-none transition-colors"
+                    >
+                      {uploading ? "Uploading..." : "Choose File"}
+                    </label>
+                    {url ? (
+                      <span className="text-xs text-academic-green font-semibold truncate max-w-[250px]" title={url}>
+                        ✓ File Uploaded: {url.split("/").pop()}
+                      </span>
+                    ) : (
+                      <span className="text-xs text-slate-400">No file selected</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

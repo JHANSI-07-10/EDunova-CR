@@ -18,7 +18,7 @@ const NAV = [
   { to: "/teacher/marks-entry", label: "Marks Entry", icon: ClipboardList },
   { to: "/teacher/performance", label: "Student Performance", icon: GraduationCap },
   { to: "/teacher/messages", label: "Messages", icon: Mail },
-  { to: "/teacher/documents", label: "Documents", icon: FileStack },
+  { to: "/teacher/lms", label: "LMS Content", icon: FileStack },
   { to: "/teacher/timetable", label: "Timetable", icon: ClipboardList },
   { to: "/teacher/notices", label: "Notice Board", icon: Megaphone },
   { to: "/teacher/leave", label: "Leave Management", icon: Users },

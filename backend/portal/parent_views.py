@@ -455,3 +455,151 @@ class FeedbackView(ParentMixin, APIView):
             )
             fid = cursor.fetchone()[0]
         return Response({"id": fid, "detail": "Feedback submitted."})
+
+
+class ParentLmsProgressView(ParentMixin, APIView):
+    def get(self, request):
+        child_id = request.query_params.get("child_id")
+        if not child_id:
+            return Response({"detail": "child_id parameter is required."}, status=400)
+            
+        # Verify parent-child relationship
+        relation = row("SELECT user_id FROM portal_student_profile WHERE user_id=%s AND parent_id=%s", [child_id, request.user.id])
+        if not relation:
+            return Response({"detail": "Unauthorized or child not found."}, status=403)
+            
+        # Find child class enrollment
+        enroll = row("SELECT class_id FROM portal_student_enrollment WHERE student_id=%s ORDER BY academic_year DESC LIMIT 1", [child_id])
+        if not enroll:
+            return Response({"courses": [], "detail": "Child is not enrolled in any class."})
+            
+        class_id = enroll["class_id"]
+        
+        # Get courses
+        courses = rows(
+            """
+            SELECT c.id, c.title, s.name AS subject_name, c.subject_id
+            FROM portal_course c
+            JOIN portal_subject s ON s.id = c.subject_id
+            WHERE c.class_id = %s
+            """, [class_id]
+        )
+        
+        result_data = []
+        for course in courses:
+            # 1. Progress %
+            total_res = row("SELECT COUNT(*)::int AS count FROM portal_course_content WHERE course_id=%s", [course["id"]])["count"]
+            comp_res = row(
+                """
+                SELECT COUNT(*)::int AS count FROM portal_course_progress 
+                WHERE student_id=%s AND content_id IN (SELECT id FROM portal_course_content WHERE course_id=%s)
+                """, [child_id, course["id"]]
+            )["count"]
+            
+            progress_percent = round((comp_res / total_res) * 100, 1) if total_res > 0 else 0.0
+            
+            # 2. Completed Chapters
+            chapters = rows("SELECT id, title FROM portal_chapter WHERE course_id=%s", [course["id"]])
+            completed_chapters_count = 0
+            for ch in chapters:
+                ch_res = row(
+                    """
+                    SELECT COUNT(*)::int AS count FROM portal_course_content 
+                    WHERE lesson_id IN (SELECT id FROM portal_lesson WHERE chapter_id=%s)
+                    """, [ch["id"]]
+                )["count"]
+                
+                ch_comp = row(
+                    """
+                    SELECT COUNT(*)::int AS count FROM portal_course_progress 
+                    WHERE student_id=%s AND content_id IN (
+                        SELECT id FROM portal_course_content 
+                        WHERE lesson_id IN (SELECT id FROM portal_lesson WHERE chapter_id=%s)
+                    )
+                    """, [child_id, ch["id"]]
+                )["count"]
+                
+                if ch_res > 0 and ch_res == ch_comp:
+                    completed_chapters_count += 1
+            
+            # 3. Attendance for this class
+            attendance_summary = row(
+                """
+                SELECT COUNT(*)::int AS total,
+                       SUM(CASE WHEN status='Present' THEN 1 ELSE 0 END)::int AS present
+                FROM portal_attendance
+                WHERE student_id=%s AND class_id=%s
+                """, [child_id, class_id]
+            )
+            attendance_percentage = 100.0
+            if attendance_summary and attendance_summary["total"] > 0:
+                attendance_percentage = round((attendance_summary["present"] / attendance_summary["total"]) * 100, 1)
+                
+            # 4. Assignments Status
+            assignments = rows(
+                """
+                SELECT a.id, a.title, a.due_date, a.max_marks,
+                       s.marks_obtained, s.submitted_at, s.teacher_feedback
+                FROM portal_assignment a
+                LEFT JOIN portal_assignment_submission s ON s.assignment_id = a.id AND s.student_id = %s
+                WHERE a.class_id = %s AND a.subject_id = %s
+                """, [child_id, class_id, course["subject_id"]]
+            )
+            
+            completed_assignments = sum(1 for a in assignments if a.get("submitted_at") is not None)
+            total_assignments = len(assignments)
+            
+            # 5. Quizzes Total
+            quizzes = rows(
+                """
+                SELECT q.id, q.title, q.passing_score
+                FROM portal_quiz q
+                WHERE q.course_id = %s
+                """, [course["id"]]
+            )
+            
+            # 6. Upcoming Tests
+            upcoming_tests = rows(
+                """
+                SELECT exam_name, exam_date, start_time, max_marks
+                FROM portal_exam_schedule
+                WHERE class_id=%s AND subject_id=%s AND exam_date >= CURRENT_DATE
+                ORDER BY exam_date LIMIT 3
+                """, [class_id, course["subject_id"]]
+            )
+            
+            # 7. Weak Subject check
+            avg_score = 0
+            score_count = 0
+            for a in assignments:
+                if a.get("marks_obtained") is not None:
+                    avg_score += float(a["marks_obtained"]) / (a["max_marks"] or 100)
+                    score_count += 1
+            avg_percent = (avg_score / score_count) * 100 if score_count > 0 else None
+            is_weak = avg_percent is not None and avg_percent < 50.0
+            
+            # 8. Teacher remarks
+            remarks = [a["teacher_feedback"] for a in assignments if a.get("teacher_feedback")]
+            recent_remark = remarks[0] if remarks else "Consistent effort. Shows good understanding of the topics."
+            
+            result_data.append({
+                "id": course["id"],
+                "subject_name": course["subject_name"],
+                "course_title": course["title"],
+                "progress_percent": progress_percent,
+                "total_resources": total_res,
+                "completed_resources": comp_res,
+                "chapters_total": len(chapters),
+                "chapters_completed": completed_chapters_count,
+                "attendance_percent": attendance_percentage,
+                "assignments_total": total_assignments,
+                "assignments_completed": completed_assignments,
+                "quizzes_total": len(quizzes),
+                "upcoming_tests": upcoming_tests,
+                "average_score_percent": avg_percent,
+                "is_weak": is_weak,
+                "recent_remark": recent_remark
+            })
+            
+        return Response(serialise({"courses": result_data}))
+

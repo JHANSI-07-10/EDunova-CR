@@ -416,7 +416,65 @@ class CourseListView(StudentOnlyMixin, APIView):
             """, [cls["class_id"]]
         )
         for c in courses:
-            c["content"] = rows("SELECT id, content_type, title, resource_url, sort_order FROM portal_course_content WHERE course_id=%s ORDER BY sort_order", [c["id"]]) if table_exists("portal_course_content") else []
+            # 1. Fetch Chapters for this Course
+            chapters = rows(
+                "SELECT id, title, description, sort_order FROM portal_chapter WHERE course_id=%s ORDER BY sort_order, id",
+                [c["id"]]
+            ) if table_exists("portal_chapter") else []
+            
+            for ch in chapters:
+                # 1.5 Fetch Chapter-level Resources (directly attached)
+                ch["resources"] = rows(
+                    """
+                    SELECT r.id, r.content_type, r.title, r.resource_url, r.description,
+                           r.visible_from, r.uploaded_at, r.download_count, r.sort_order,
+                           EXISTS(SELECT 1 FROM portal_course_progress cp WHERE cp.student_id=%s AND cp.content_id=r.id) AS is_completed
+                    FROM portal_course_content r
+                    WHERE r.chapter_id=%s AND r.lesson_id IS NULL AND (r.visible_from IS NULL OR r.visible_from <= now())
+                    ORDER BY r.sort_order, r.id
+                    """, [request.user.id, ch["id"]]
+                ) if table_exists("portal_course_content") else []
+
+                # 2. Fetch Lessons for each Chapter
+                lessons = rows(
+                    "SELECT id, title, description, sort_order FROM portal_lesson WHERE chapter_id=%s ORDER BY sort_order, id",
+                    [ch["id"]]
+                ) if table_exists("portal_lesson") else []
+                
+                for les in lessons:
+                    # 3. Fetch Resources for each Lesson
+                    resources = rows(
+                        """
+                        SELECT r.id, r.content_type, r.title, r.resource_url, r.description,
+                               r.due_date, r.max_marks, r.quiz_id, r.assignment_id, r.visible_from,
+                               r.uploaded_at, r.download_count, r.sort_order,
+                               EXISTS(SELECT 1 FROM portal_course_progress cp WHERE cp.student_id=%s AND cp.content_id=r.id) AS is_completed
+                        FROM portal_course_content r
+                        WHERE r.lesson_id=%s AND (r.visible_from IS NULL OR r.visible_from <= now())
+                        ORDER BY r.sort_order, r.id
+                        """, [request.user.id, les["id"]]
+                    ) if table_exists("portal_course_content") else []
+                    
+                    # Check assignment status for resources
+                    for res in resources:
+                        if res.get("assignment_id"):
+                            sub = row(
+                                "SELECT submitted_at, marks_obtained, teacher_feedback, grade FROM portal_assignment_submission WHERE assignment_id=%s AND student_id=%s",
+                                [res["assignment_id"], request.user.id]
+                            )
+                            res["submission"] = sub if sub else None
+                    les["resources"] = resources
+                ch["lessons"] = lessons
+            c["chapters"] = chapters
+            # Fallback legacy content if any
+            c["legacy_content"] = rows(
+                """
+                SELECT r.id, r.content_type, r.title, r.resource_url, r.sort_order,
+                       EXISTS(SELECT 1 FROM portal_course_progress cp WHERE cp.student_id=%s AND cp.content_id=r.id) AS is_completed
+                FROM portal_course_content r WHERE r.course_id=%s AND r.lesson_id IS NULL
+                ORDER BY r.sort_order, r.id
+                """, [request.user.id, c["id"]]
+            ) if table_exists("portal_course_content") else []
             c["quizzes"] = rows("SELECT id, title, duration_minutes, passing_score FROM portal_quiz WHERE course_id=%s ORDER BY id", [c["id"]]) if table_exists("portal_quiz") else []
         return Response(serialise(courses))
 
@@ -661,7 +719,12 @@ class FileUploadView(APIView):
             file_url = client.storage.from_(bucket_name).get_public_url(unique_filename)
             return Response({"url": file_url})
         except Exception as e:
-            return Response({"detail": f"Upload failed: {str(e)}"}, status=500)
+            # Fallback to local storage if Supabase upload fails (e.g. connection error)
+            print(f"Supabase upload failed, falling back to local storage. Error: {str(e)}")
+            from django.core.files.storage import default_storage
+            filename = default_storage.save(f"uploads/{uuid.uuid4()}_{file_obj.name}", file_obj)
+            file_url = request.build_absolute_uri(default_storage.url(filename))
+            return Response({"url": file_url})
 
 
 class StudentAIChatView(StudentOnlyMixin, APIView):
