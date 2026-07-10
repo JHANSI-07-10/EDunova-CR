@@ -13,7 +13,7 @@
  */
 import axios from "axios";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000/api";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://localhost:8000";
 
 // Bare axios instance — no auth header needed for these public endpoints.
 const authClient = axios.create({ baseURL: BASE_URL });
