@@ -20,10 +20,7 @@ const authClient = axios.create({ baseURL: BASE_URL });
 
 authClient.interceptors.request.use((config) => {
   if (config.url && config.url.startsWith('/') && !config.url.startsWith('/api/')) {
-    const base = config.baseURL || "";
-    if (base.endsWith('/api') || base.endsWith('/api/')) {
-      config.url = '/api' + config.url;
-    }
+    config.url = '/api' + config.url;
   }
   return config;
 });

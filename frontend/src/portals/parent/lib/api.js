@@ -6,10 +6,7 @@ const api = axios.create({ baseURL: BASE_URL });
 
 api.interceptors.request.use((config) => {
   if (config.url && config.url.startsWith('/') && !config.url.startsWith('/api/')) {
-    const base = config.baseURL || "";
-    if (base.endsWith('/api') || base.endsWith('/api/')) {
-      config.url = '/api' + config.url;
-    }
+    config.url = '/api' + config.url;
   }
   const token = localStorage.getItem("edunova_parent_access");
   if (token) config.headers.Authorization = `Bearer ${token}`;
