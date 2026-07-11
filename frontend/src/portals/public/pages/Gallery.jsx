@@ -7,12 +7,12 @@ import FadeIn from '../../../components/FadeIn'
 const fallbackImages = [
   { id: '1', image: '/Campus.jpeg', caption: 'EduNova Campus' },
   { id: '2', image: '/building.jpeg', caption: 'Modern School Building' },
-  { id: '3', image: '/student.jpeg', caption: 'Student Learning Experience' },
+  { id: '3', image: '/tablet-learning.jpeg', caption: 'Student Learning Experience' },
   { id: '4', image: '/exterior.jpeg', caption: 'Campus Exterior' },
-  { id: '5', image: '/EduNova.jpeg', caption: 'EduNova Global Academy' },
-  { id: '6', image: '/Campus.jpeg', caption: 'Digital Campus' },
-  { id: '7', image: '/student.jpeg', caption: 'Student Life' },
-  { id: '8', image: '/building.jpeg', caption: 'Academic Infrastructure' },
+  { id: '5', image: '/library-1.jpeg', caption: 'Digital Library' },
+  { id: '6', image: '/physics-1.jpeg', caption: 'Innovation Symposium' },
+  { id: '7', image: '/trophy-1.jpeg', caption: 'Student Achievements' },
+  { id: '8', image: '/EduNova.jpeg', caption: 'EduNova Global Academy' },
 ]
 
 export default function Gallery() {
@@ -87,14 +87,14 @@ export default function Gallery() {
               <FadeIn key={img.id || index} delay={index * 40}>
                 <div
                   className={`group relative overflow-hidden rounded-3xl shadow-md border border-gray-100 ${
-                    index === 0 || index === 5 ? 'md:col-span-2 md:row-span-2' : ''
+                    index === 0 ? 'md:col-span-2 md:row-span-2' : ''
                   }`}
                 >
                   <img
                     src={img.image}
                     alt={img.caption || 'EduNova Gallery'}
                     className={`w-full object-cover group-hover:scale-110 transition-transform duration-500 ${
-                      index === 0 || index === 5
+                      index === 0
                         ? 'h-[260px] md:h-[430px]'
                         : 'h-[180px] md:h-[205px]'
                     }`}

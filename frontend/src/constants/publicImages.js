@@ -18,7 +18,6 @@ export const publicImages = {
   library3: '/images/library-3.jpeg',
 
   hostel1: '/images/hostel-1.jpeg',
-  hostel2: '/images/hostel-2.jpeg',
 
   bus1: '/images/bus-1.jpeg',
   bus2: '/images/bus-2.jpeg',

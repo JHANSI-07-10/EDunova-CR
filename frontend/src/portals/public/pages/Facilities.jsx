@@ -19,41 +19,49 @@ const FACILITIES = [
     title: 'Smart Classrooms',
     desc: 'Technology-enabled classrooms with digital boards, multimedia learning, and interactive teaching.',
     icon: Monitor,
+    image: '/tablet-learning.jpeg',
   },
   {
     title: 'Science Labs',
     desc: 'Modern laboratories for Physics, Chemistry, Biology, practical learning, and experimentation.',
     icon: FlaskConical,
+    image: '/physics-2.jpeg',
   },
   {
     title: 'Computer Labs',
     desc: 'Advanced computer labs supporting digital literacy, coding, online learning, and academic technology.',
     icon: Cpu,
+    image: '/student-1.jpeg',
   },
   {
     title: 'Innovation Centers',
     desc: 'Creative spaces for research, projects, STEM learning, and student innovation.',
     icon: Lightbulb,
+    image: '/physics-1.jpeg',
   },
   {
     title: 'Robotics Lab',
     desc: 'Hands-on robotics and STEM-based learning to develop problem-solving and technical skills.',
     icon: Bot,
+    image: '/physics-3.jpeg',
   },
   {
     title: 'Digital Library',
     desc: 'Physical and digital learning resources, e-books, reference materials, and academic support.',
     icon: BookOpenText,
+    image: '/library-1.jpeg',
   },
   {
     title: 'Sports Complex',
     desc: 'Facilities for indoor and outdoor sports, fitness, teamwork, discipline, and physical development.',
     icon: Dumbbell,
+    image: '/trophy-1.jpeg',
   },
   {
     title: 'Medical Center',
     desc: 'Student health support, wellness checks, basic medical assistance, and emergency care coordination.',
     icon: Stethoscope,
+    image: '/campus-building-4.jpeg',
   },
 ]
 
@@ -174,18 +182,28 @@ export default function Facilities() {
           </FadeIn>
 
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {FACILITIES.map(({ title, desc, icon: Icon }, index) => (
+            {FACILITIES.map(({ title, desc, icon: Icon, image }, index) => (
               <FadeIn key={title} delay={index * 50}>
-                <div className="group bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
-                  <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary transition-colors">
-                    <Icon size={26} className="text-primary group-hover:text-white transition-colors" />
+                <div className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
+                  <div className="relative h-36 overflow-hidden">
+                    <img
+                      src={image}
+                      alt={title}
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
                   </div>
-                  <h3 className="font-subheading font-bold text-primary text-lg mb-2">
-                    {title}
-                  </h3>
-                  <p className="font-body text-sm text-text-secondary leading-relaxed">
-                    {desc}
-                  </p>
+                  <div className="p-6">
+                    <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 -mt-11 relative z-10 border-4 border-white group-hover:bg-primary transition-colors">
+                      <Icon size={26} className="text-primary group-hover:text-white transition-colors" />
+                    </div>
+                    <h3 className="font-subheading font-bold text-primary text-lg mb-2">
+                      {title}
+                    </h3>
+                    <p className="font-body text-sm text-text-secondary leading-relaxed">
+                      {desc}
+                    </p>
+                  </div>
                 </div>
               </FadeIn>
             ))}

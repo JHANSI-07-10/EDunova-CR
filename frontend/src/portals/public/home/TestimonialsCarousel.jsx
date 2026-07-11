@@ -34,6 +34,24 @@ export default function TestimonialsCarousel() {
               <p className="font-body text-lg text-text-primary italic mb-6">
                 "{testimonials[index].message}"
               </p>
+
+              {testimonials[index].photo ? (
+                <img
+                  src={testimonials[index].photo}
+                  alt={testimonials[index].author_name}
+                  className="w-14 h-14 rounded-full object-cover mx-auto mb-3"
+                />
+              ) : (
+                <div className="w-14 h-14 rounded-full bg-secondary/15 text-secondary font-heading font-bold text-lg flex items-center justify-center mx-auto mb-3">
+                  {testimonials[index].author_name
+                    .split(' ')
+                    .map((part) => part[0])
+                    .slice(0, 2)
+                    .join('')
+                    .toUpperCase()}
+                </div>
+              )}
+
               <p className="font-subheading font-bold">{testimonials[index].author_name}</p>
               <p className="text-sm text-text-secondary">{testimonials[index].role}</p>
             </div>

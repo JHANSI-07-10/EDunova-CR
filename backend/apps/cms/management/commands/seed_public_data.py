@@ -1,8 +1,25 @@
+from pathlib import Path
+
+from django.core.files import File
 from django.core.management.base import BaseCommand
 from apps.cms.models import (
     SchoolSettings, AcademicProgram, Department, SchoolStat, WhyChooseItem,
     TechnologyPartner, CMSPage, FAQ, ScholarshipInfo,
 )
+
+# Real campus/event photos already checked into frontend/public — reused here
+# so seeded News/Events have contextually relevant cover images instead of
+# rendering blank.
+FRONTEND_PUBLIC_DIR = Path(__file__).resolve().parents[5] / "frontend" / "public"
+
+
+def _attach_image(instance, field_name, filename):
+    """Copy an existing frontend/public asset into the model's ImageField."""
+    src = FRONTEND_PUBLIC_DIR / filename
+    if not src.exists() or getattr(instance, field_name):
+        return
+    with open(src, "rb") as f:
+        getattr(instance, field_name).save(filename, File(f), save=True)
 
 
 class Command(BaseCommand):
@@ -119,21 +136,25 @@ class Command(BaseCommand):
 
         today = datetime.date.today()
         sample_news = [
-            ("EduNova Wins State-Level Robotics Championship", "Our senior robotics team secured first place at the state-level competition, showcasing months of work in the Innovation Lab."),
-            ("New AI-Powered Learning Analytics Dashboard Launched", "Parents and teachers can now track personalized learning progress through our new analytics dashboard."),
+            ("EduNova Wins State-Level Robotics Championship", "Our senior robotics team secured first place at the state-level competition, showcasing months of work in the Innovation Lab.", "physics-3.jpeg"),
+            ("New AI-Powered Learning Analytics Dashboard Launched", "Parents and teachers can now track personalized learning progress through our new analytics dashboard.", "student-1.jpeg"),
+            ("Students Shine at the Academic Innovation Symposium", "EduNova students presented smart-city and sustainability projects to a panel of judges and industry guests.", "physics-1.jpeg"),
         ]
-        for i, (title, content) in enumerate(sample_news):
-            NewsPost.objects.update_or_create(
+        for i, (title, content, image) in enumerate(sample_news):
+            post, _ = NewsPost.objects.update_or_create(
                 slug=title.lower().replace(" ", "-")[:50],
                 defaults={"title": title, "content": content, "published_date": today - datetime.timedelta(days=i * 5)},
             )
+            _attach_image(post, "cover_image", image)
 
         sample_events = [
-            ("Annual Sports Day", "Inter-house athletics and team sports competitions.", today + datetime.timedelta(days=20), "EduNova Sports Complex"),
-            ("Science & Innovation Fair", "Student-led exhibitions from the Innovation Lab and Science Labs.", today + datetime.timedelta(days=35), "Main Auditorium"),
+            ("Annual Sports Day", "Inter-house athletics and team sports competitions.", today + datetime.timedelta(days=20), "EduNova Sports Complex", "trophy-1.jpeg"),
+            ("Science & Innovation Fair", "Student-led exhibitions from the Innovation Lab and Science Labs.", today + datetime.timedelta(days=35), "Main Auditorium", "physics-2.jpeg"),
+            ("Digital Library Open House", "A guided tour of the digital library's e-book collection and study spaces.", today + datetime.timedelta(days=10), "EduNova Digital Library", "library-1.jpeg"),
         ]
-        for title, desc, edate, venue in sample_events:
-            Event.objects.update_or_create(title=title, defaults={"description": desc, "event_date": edate, "venue": venue})
+        for title, desc, edate, venue, image in sample_events:
+            event, _ = Event.objects.update_or_create(title=title, defaults={"description": desc, "event_date": edate, "venue": venue})
+            _attach_image(event, "cover_image", image)
 
         sample_achievements = [
             ("98% Board Examination Results", "Highest-ever pass percentage achieved this academic year.", today - datetime.timedelta(days=60)),

@@ -21,29 +21,29 @@ const fallbackImages = [
     caption: 'Campus Exterior',
   },
   {
-    id: 'students',
-    image: '/student.jpeg',
-    caption: 'Students at EduNova',
+    id: 'classroom',
+    image: '/tablet-learning.jpeg',
+    caption: 'Digital Classroom',
+  },
+  {
+    id: 'library',
+    image: '/library-1.jpeg',
+    caption: 'Digital Library',
+  },
+  {
+    id: 'innovation',
+    image: '/physics-1.jpeg',
+    caption: 'Innovation Symposium',
+  },
+  {
+    id: 'sports',
+    image: '/trophy-1.jpeg',
+    caption: 'Student Achievements',
   },
   {
     id: 'edunova',
     image: '/EduNova.jpeg',
     caption: 'EduNova Global Academy',
-  },
-  {
-    id: 'classroom',
-    image: '/classroom.jpeg',
-    caption: 'Interactive Classroom',
-  },
-  {
-    id: 'learning',
-    image: '/classroom.jpeg',
-    caption: 'Digital Learning Lab',
-  },
-  {
-    id: 'infrastructure',
-    image: '/building.jpeg',
-    caption: 'Modern Infrastructure',
   },
 ]
 
@@ -92,7 +92,7 @@ export default function CampusGallery() {
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {imagesToShow.map((img, index) => {
-              const spanClass = index === 0 || index === 5 ? 'md:col-span-2 md:row-span-2 h-full' : 'h-full';
+              const spanClass = index === 0 ? 'md:col-span-2 md:row-span-2 h-full' : 'h-full';
               return (
                 <FadeIn key={img.id || index} delay={index * 40} className={spanClass}>
                   <div className="group relative overflow-hidden rounded-2xl shadow-md border border-gray-100 h-full w-full">
@@ -100,7 +100,7 @@ export default function CampusGallery() {
                       src={img.image}
                       alt={img.caption || 'EduNova Campus Gallery'}
                       className="w-full object-cover group-hover:scale-110 transition-transform duration-500 h-full"
-                      style={{ minHeight: index === 0 || index === 5 ? '260px' : '180px' }}
+                      style={{ minHeight: index === 0 ? '260px' : '180px' }}
                     />
 
                     <div className="absolute inset-0 bg-gradient-to-t from-primary/75 via-primary/10 to-transparent opacity-80 group-hover:opacity-95 transition-opacity" />

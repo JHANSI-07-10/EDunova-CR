@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Read(//c/Program Files/Google/Chrome/Application//**)",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Google/Chrome/**)",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/Microsoft/Edge/Application//**)",
+      "Bash(npm install *)",
+      "Bash(timeout 40 bash -c 'until curl -sf http://localhost:5173 >/dev/null; do sleep 1; done')",
+      "Bash(cp \"C:\\\\Users\\\\ARSHIY~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Arshiya-tarrnum-ED-EDunova-CR\\\\9f87497e-5117-49aa-9553-687d85133c93\\\\scratchpad\\\\audit.js\" \"c:/Users/Arshiya tarrnum/ED/EDunova-CR/frontend/__audit.cjs\")",
+      "Bash(sed -i \"s#path.resolve\\(__dirname, 'screenshots'\\)#'C:\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\Users\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\ARSHIY~1\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\AppData\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\Local\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\Temp\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\claude\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\c--Users-Arshiya-tarrnum-ED-EDunova-CR\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\9f87497e-5117-49aa-9553-687d85133c93\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\scratchpad\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\screenshots'#\" __audit.cjs)",
+      "Bash(node __audit.cjs)",
+      "Bash(timeout 40 bash -c 'until curl -sf http://localhost:8000/api/cms/stats/ >/dev/null 2>&1; do sleep 1; done')",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8000/api/cms/stats/)",
+      "Bash(curl -s http://localhost:8000/api/cms/stats/)",
+      "Bash(curl -s http://localhost:8000/api/cms/why-choose/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP:%{http_code}\\\\n\" http://localhost:8000/api/cms/academic-programs/)",
+      "Bash(node __audit2.cjs)",
+      "Bash(node __audit3.cjs)",
+      "Bash(python manage.py seed_public_data)",
+      "Bash(curl -s http://localhost:8000/api/cms/news/)",
+      "Bash(python -c \"import json,sys; d=json.load\\(sys.stdin\\); [print\\(r['title'], '->', r['cover_image']\\) for r in d['results']]\")",
+      "Bash(curl -s http://localhost:8000/api/cms/events/)",
+      "Bash(rm -f \"c:/Users/Arshiya tarrnum/ED/EDunova-CR/frontend/__audit.cjs\" \"c:/Users/Arshiya tarrnum/ED/EDunova-CR/frontend/__audit2.cjs\" \"c:/Users/Arshiya tarrnum/ED/EDunova-CR/frontend/__audit3.cjs\")",
+      "Bash(rm -rf \"c:/Users/Arshiya tarrnum/ED/EDunova-CR/frontend/dist\")",
+      "Bash(npm uninstall *)"
+    ]
+  }
+}

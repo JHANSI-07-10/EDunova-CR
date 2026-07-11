@@ -13,14 +13,14 @@ import { Link } from 'react-router-dom'
 import FadeIn from '../../../components/FadeIn'
 
 const FACILITIES = [
-  { name: 'Smart Classrooms', icon: Monitor, desc: 'Technology-enabled digital classrooms for interactive learning.' },
-  { name: 'Science Labs', icon: FlaskConical, desc: 'Modern science labs for practical experiments and innovation.' },
-  { name: 'Computer Labs', icon: Cpu, desc: 'Advanced computer labs supporting digital learning and coding.' },
-  { name: 'Innovation Centers', icon: Lightbulb, desc: 'Creative spaces for research, projects, and future-ready learning.' },
-  { name: 'Robotics Lab', icon: Bot, desc: 'Robotics and STEM learning for problem-solving skills.' },
-  { name: 'Digital Library', icon: BookOpenText, desc: 'Digital resources, e-books, and academic learning support.' },
-  { name: 'Sports Complex', icon: Dumbbell, desc: 'Sports facilities for physical development and discipline.' },
-  { name: 'Medical Center', icon: Stethoscope, desc: 'Health support and student wellness facilities on campus.' },
+  { name: 'Smart Classrooms', icon: Monitor, desc: 'Technology-enabled digital classrooms for interactive learning.', image: '/tablet-learning.jpeg' },
+  { name: 'Science Labs', icon: FlaskConical, desc: 'Modern science labs for practical experiments and innovation.', image: '/physics-2.jpeg' },
+  { name: 'Computer Labs', icon: Cpu, desc: 'Advanced computer labs supporting digital learning and coding.', image: '/student-1.jpeg' },
+  { name: 'Innovation Centers', icon: Lightbulb, desc: 'Creative spaces for research, projects, and future-ready learning.', image: '/physics-1.jpeg' },
+  { name: 'Robotics Lab', icon: Bot, desc: 'Robotics and STEM learning for problem-solving skills.', image: '/physics-3.jpeg' },
+  { name: 'Digital Library', icon: BookOpenText, desc: 'Digital resources, e-books, and academic learning support.', image: '/library-1.jpeg' },
+  { name: 'Sports Complex', icon: Dumbbell, desc: 'Sports facilities for physical development and discipline.', image: '/trophy-1.jpeg' },
+  { name: 'Medical Center', icon: Stethoscope, desc: 'Health support and student wellness facilities on campus.', image: '/campus-building-4.jpeg' },
 ]
 
 export default function FacilitiesGrid() {
@@ -85,23 +85,30 @@ export default function FacilitiesGrid() {
 
         {/* Facility Cards */}
         <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-5">
-          {FACILITIES.map(({ name, icon: Icon, desc }, i) => (
+          {FACILITIES.map(({ name, icon: Icon, desc, image }, i) => (
             <FadeIn key={name} delay={i * 50} className="h-full">
-              <div className="group bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
-                <div className="w-13 h-13 rounded-2xl bg-secondary/10 flex items-center justify-center mb-4 group-hover:bg-secondary transition-colors">
-                  <Icon
-                    size={24}
-                    className="text-secondary group-hover:text-white transition-colors"
+              <div className="group bg-white rounded-2xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
+                <div className="relative h-32 overflow-hidden">
+                  <img
+                    src={image}
+                    alt={name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  <div className="absolute bottom-2 left-2 w-10 h-10 rounded-xl bg-white/90 backdrop-blur flex items-center justify-center">
+                    <Icon size={20} className="text-secondary" />
+                  </div>
                 </div>
 
-                <h3 className="font-subheading font-bold text-primary mb-2">
-                  {name}
-                </h3>
+                <div className="p-6 pt-4">
+                  <h3 className="font-subheading font-bold text-primary mb-2">
+                    {name}
+                  </h3>
 
-                <p className="font-body text-sm text-text-secondary leading-relaxed">
-                  {desc}
-                </p>
+                  <p className="font-body text-sm text-text-secondary leading-relaxed">
+                    {desc}
+                  </p>
+                </div>
               </div>
             </FadeIn>
           ))}

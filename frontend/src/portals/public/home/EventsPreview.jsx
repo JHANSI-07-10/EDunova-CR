@@ -21,7 +21,12 @@ export default function EventsPreview() {
         <div className="grid md:grid-cols-3 gap-4">
           {upcoming.map((e, i) => (
             <FadeIn key={e.id} delay={i * 50} className="h-full">
-              <div className="card h-full hover:shadow-md transition-shadow">
+              <div className="card h-full overflow-hidden hover:shadow-md transition-shadow">
+                {e.cover_image && (
+                  <div className="-mx-6 -mt-6 mb-4 h-36 overflow-hidden">
+                    <img src={e.cover_image} alt={e.title} className="w-full h-full object-cover" />
+                  </div>
+                )}
                 <p className="font-subheading text-sm text-secondary font-semibold">{e.event_date}</p>
                 <h3 className="font-heading font-bold mt-1 text-primary">{e.title}</h3>
                 <p className="text-sm text-text-secondary mt-2 line-clamp-2">{e.description}</p>

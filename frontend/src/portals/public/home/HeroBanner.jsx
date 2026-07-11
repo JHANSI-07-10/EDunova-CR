@@ -12,13 +12,10 @@ export default function HeroBanner() {
 
   return (
     <section className="relative overflow-hidden text-white min-h-[88vh] flex items-center bg-primary">
-      <video
+      <img
+        src="/campus-building-1.jpeg"
+        alt="EduNova Global Academy campus"
         className="absolute inset-0 w-full h-full object-cover brightness-110 contrast-110 saturate-125"
-        src="/videos/school-bg.mp4"
-        autoPlay
-        muted
-        loop
-        playsInline
       />
       <div className="absolute inset-0 bg-gradient-to-r from-primary/82 via-primary/45 to-transparent" />
       <div className="absolute inset-0 bg-gradient-to-t from-bg-dark/60 via-transparent to-white/5" />
