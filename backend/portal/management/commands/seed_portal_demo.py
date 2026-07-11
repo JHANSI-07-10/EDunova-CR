@@ -16,23 +16,23 @@ class Command(BaseCommand):
 
         teacher, created = User.objects.get_or_create(
             username="teacher.demo",
-            defaults={"email": "teacher@edunova.edu", "first_name": "Aarav", "last_name": "Mehta", "is_active": True},
+            defaults={"email": "manoharmanuu1027@gmail.com", "first_name": "Manohar", "last_name": "Manuu", "is_active": True},
         )
-        teacher.email = "teacher@edunova.edu"
-        teacher.first_name = "Aarav"
-        teacher.last_name = "Mehta"
-        teacher.set_password("EduNova@123")
+        teacher.email = "manoharmanuu1027@gmail.com"
+        teacher.first_name = "Manohar"
+        teacher.last_name = "Manuu"
+        teacher.set_password("Edunova@123")
         teacher.save()
         teacher.groups.add(teacher_group)
 
         student, created = User.objects.get_or_create(
             username="student.demo",
-            defaults={"email": "student@edunova.edu", "first_name": "Sara", "last_name": "Khan", "is_active": True},
+            defaults={"email": "tarannumarshiya489@gmail.com", "first_name": "Arshiya", "last_name": "Tarannum", "is_active": True},
         )
-        student.email = "student@edunova.edu"
-        student.first_name = "Sara"
-        student.last_name = "Khan"
-        student.set_password("EduNova@123")
+        student.email = "tarannumarshiya489@gmail.com"
+        student.first_name = "Arshiya"
+        student.last_name = "Tarannum"
+        student.set_password("Edunova@123")
         student.save()
         student.groups.add(student_group)
 
@@ -130,5 +130,5 @@ class Command(BaseCommand):
             """)
 
         self.stdout.write(self.style.SUCCESS("Demo portal data seeded."))
-        self.stdout.write("Student login: student@edunova.edu / EduNova@123 / OTP 123456")
-        self.stdout.write("Teacher login: teacher@edunova.edu / EduNova@123 / OTP 123456")
+        self.stdout.write("Student login: tarannumarshiya489@gmail.com / Edunova@123 / OTP 123456")
+        self.stdout.write("Teacher login: manoharmanuu1027@gmail.com / Edunova@123 / OTP 123456")

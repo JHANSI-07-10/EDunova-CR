@@ -19,17 +19,17 @@ class Command(BaseCommand):
         parent, _ = User.objects.get_or_create(
             username="parent.demo",
             defaults={
-                "email": "parent@edunova.edu",
-                "first_name": "Ravi",
-                "last_name": "Khan",
+                "email": "ravitejamandugula57@gmail.com",
+                "first_name": "Teja",
+                "last_name": "Mandugula",
                 "is_active": True,
             },
         )
 
-        parent.email = "parent@edunova.edu"
-        parent.first_name = "Ravi"
-        parent.last_name = "Khan"
-        parent.set_password("EduNova@123")
+        parent.email = "ravitejamandugula57@gmail.com"
+        parent.first_name = "Teja"
+        parent.last_name = "Mandugula"
+        parent.set_password("Edunova@123")
         parent.save()
         parent.groups.add(parent_group)
 
@@ -39,7 +39,7 @@ class Command(BaseCommand):
         admin, _ = User.objects.get_or_create(
             username="jhansi.admin",
             defaults={
-                "email": "ravitejamandugula57@gmail.com",
+                "email": "jhansilakshmi1004@gmail.com",
                 "first_name": "Jhansi",
                 "last_name": "Lakshmi",
                 "is_active": True,
@@ -48,12 +48,12 @@ class Command(BaseCommand):
             },
         )
 
-        admin.email = "ravitejamandugula57@gmail.com"
+        admin.email = "jhansilakshmi1004@gmail.com"
         admin.first_name = "Jhansi"
         admin.last_name = "Lakshmi"
         admin.is_staff = True
         admin.is_superuser = True
-        admin.set_password("EduNova@123")
+        admin.set_password("Edunova@123")
         admin.save()
         admin.groups.add(admin_group)
 
@@ -81,7 +81,7 @@ class Command(BaseCommand):
                 INSERT INTO portal_parent_profile
                     (user_id, father_name, emergency_contact, is_verified)
                 VALUES
-                    (%s,'Ravi Khan','9000000003',true)
+                    (%s,'Teja Mandugula','9000000003',true)
                 ON CONFLICT (user_id)
                 DO UPDATE
                 SET
@@ -122,10 +122,10 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write("======================================")
         self.stdout.write("Parent Login")
-        self.stdout.write("Email    : parent@edunova.edu")
-        self.stdout.write("Password : EduNova@123")
+        self.stdout.write("Email    : ravitejamandugula57@gmail.com")
+        self.stdout.write("Password : Edunova@123")
         self.stdout.write("")
         self.stdout.write("Admin Login")
-        self.stdout.write("Email    : ravitejamandugula57@gmail.com")
-        self.stdout.write("Password : EduNova@123")
+        self.stdout.write("Email    : jhansilakshmi1004@gmail.com")
+        self.stdout.write("Password : Edunova@123")
         self.stdout.write("======================================")
