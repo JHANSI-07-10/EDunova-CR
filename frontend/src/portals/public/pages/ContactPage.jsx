@@ -258,7 +258,7 @@ export default function ContactPage() {
                 <input 
                   placeholder="Phone" 
                   value={contactForm.phone} 
-                  onChange={(e) => setForm({ ...contactForm, phone: e.target.value })}
+                  onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
                   className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15" 
                 />
               </div>
