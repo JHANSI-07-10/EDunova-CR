@@ -151,33 +151,26 @@ def login_step1(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if getattr(settings, "DEV_STATIC_OTP", False):
-        otp = "123456"
-    else:
-        otp = _generate_otp()
-
+    otp = _generate_otp()
     _store_otp(user.id, otp)
 
-    if getattr(settings, "DEV_STATIC_OTP", False):
-        pass
-    else:
-        try:
-            send_login_otp_email(user, otp)
-        except Exception as e:
-            logger.exception("Failed to send OTP email")
-            if settings.DEBUG:
-                print("\n" + "="*50)
-                print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
-                print("="*50 + "\n")
-                return Response({
-                    "user_id": user.id,
-                    "user_type": get_user_role(user),
-                    "detail": f"OTP generated in debug mode (check console: {otp}).",
-                })
-            return Response(
-                {"detail": "Unable to send verification email."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+    try:
+        send_login_otp_email(user, otp)
+    except Exception as e:
+        logger.exception("Failed to send OTP email")
+        if settings.DEBUG:
+            print("\n" + "="*50)
+            print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
+            print("="*50 + "\n")
+            return Response({
+                "user_id": user.id,
+                "user_type": get_user_role(user),
+                "detail": "OTP generated in debug mode (check console).",
+            })
+        return Response(
+            {"detail": "Unable to send verification email."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     return Response({
         "user_id": user.id,
@@ -200,10 +193,8 @@ def login_step2_verify_otp(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    is_static = getattr(settings, "DEV_STATIC_OTP", False) and otp == "123456"
-
     cached = cache.get(f"portal_login_otp:{user_id}")
-    if not is_static and (not cached or otp != str(cached)):
+    if not cached or otp != str(cached):
         return Response(
             {"detail": "Invalid or expired OTP."},
             status=status.HTTP_400_BAD_REQUEST,
@@ -237,24 +228,20 @@ def resend_otp(request):
 
     cache.delete(f"portal_login_otp:{user.id}")
 
-    if getattr(settings, "DEV_STATIC_OTP", False):
-        otp = "123456"
-        _store_otp(user.id, otp)
-    else:
-        otp = _generate_otp()
-        _store_otp(user.id, otp)
-        try:
-            send_login_otp_email(user, otp)
-        except Exception:
-            logger.exception("Failed to send OTP email")
-            if settings.DEBUG:
-                print("\n" + "="*50)
-                print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
-                print("="*50 + "\n")
-                return Response({"detail": "OTP resent successfully (check console)."})
-            return Response(
-                {"detail": "Unable to send verification email."},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+    otp = _generate_otp()
+    _store_otp(user.id, otp)
+    try:
+        send_login_otp_email(user, otp)
+    except Exception:
+        logger.exception("Failed to send OTP email")
+        if settings.DEBUG:
+            print("\n" + "="*50)
+            print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
+            print("="*50 + "\n")
+            return Response({"detail": "OTP resent successfully (check console)."})
+        return Response(
+            {"detail": "Unable to send verification email."},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        )
 
     return Response({"detail": "OTP resent successfully."})

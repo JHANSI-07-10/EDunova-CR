@@ -197,5 +197,3 @@ DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="EduNova Academy <mand
 
 OTP_EXPIRY_SECONDS = 300
 OTP_LENGTH = 6
-DEV_STATIC_OTP = config("DEV_STATIC_OTP", default=False, cast=bool)
-
