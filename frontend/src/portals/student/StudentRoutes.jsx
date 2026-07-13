@@ -12,6 +12,7 @@ import Downloads from "./pages/Downloads";
 import Events from "./pages/Events";
 import Exams from "./pages/Exams";
 import Fees from "./pages/Fees";
+import Scholarships from "./pages/Scholarships";
 import Homework from "./pages/Homework";
 import Hostel from "./pages/Hostel";
 import MedicalRecords from "./pages/MedicalRecords";
@@ -46,6 +47,7 @@ export default function StudentRoutes() {
           <Route path="exams" element={<Exams />} />
           <Route path="results" element={<Results />} />
           <Route path="fees" element={<Fees />} />
+          <Route path="scholarships" element={<Scholarships />} />
           <Route path="library" element={<Library />} />
           <Route path="hostel" element={<Hostel />} />
           <Route path="transport" element={<Transport />} />

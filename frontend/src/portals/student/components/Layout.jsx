@@ -14,6 +14,7 @@ const TITLES = {
   "/exams": "Exams & Hall Tickets",
   "/results": "Results & Report Cards",
   "/fees": "Fee Payments",
+  "/scholarships": "Scholarships",
   "/library": "Library",
   "/hostel": "Hostel",
   "/transport": "Transport Tracking",
