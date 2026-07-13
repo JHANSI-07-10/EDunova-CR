@@ -1,7 +1,18 @@
 import { Quote, GraduationCap } from 'lucide-react'
+import { cmsApi } from '../../../api/cmsApi'
+import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
+import { getMediaUrl } from '../../../utils/media'
 
 export default function PrincipalMessage() {
+  const { data: leadership } = useFetch(cmsApi.getLeadership, [])
+  const principal = leadership?.find(m => m.designation.toLowerCase().includes('principal'))
+
+  const name = principal?.name || 'Dr. Meera Sharma'
+  const designation = principal?.designation || 'Principal, EduNova Global Academy'
+  const bio = principal?.bio || 'Our mission is to nurture curious, confident learners equipped for a rapidly changing world — through academic rigor, technology, and genuine care for every student.'
+  const photo = principal?.photo ? getMediaUrl(principal.photo) : '/EduNova.jpeg'
+
   return (
     <section className="bg-bg-light">
       <div className="section">
@@ -14,8 +25,8 @@ export default function PrincipalMessage() {
 
               <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white bg-white">
                 <img
-                  src="/EduNova.jpeg"
-                  alt="Principal of EduNova Global Academy"
+                  src={photo}
+                  alt={`${name} — ${designation}`}
                   className="w-full h-[390px] object-cover"
                 />
 
@@ -29,10 +40,10 @@ export default function PrincipalMessage() {
 
                     <div>
                       <p className="font-subheading font-bold text-primary">
-                        Dr. Meera Sharma
+                        {name}
                       </p>
                       <p className="font-body text-sm text-text-secondary">
-                        Principal, EduNova Global Academy
+                        {designation}
                       </p>
                     </div>
                   </div>
@@ -53,9 +64,7 @@ export default function PrincipalMessage() {
               </p>
 
               <blockquote className="font-heading text-2xl md:text-3xl text-text-primary leading-snug mb-6">
-                “Our mission is to nurture curious, confident learners equipped
-                for a rapidly changing world — through academic rigor,
-                technology, and genuine care for every student.”
+                “{bio}”
               </blockquote>
 
               <p className="font-body text-text-secondary leading-relaxed mb-6">
@@ -68,10 +77,10 @@ export default function PrincipalMessage() {
 
               <div className="border-l-4 border-accent pl-5">
                 <p className="font-subheading font-bold text-text-primary text-lg">
-                  Dr. Meera Sharma
+                  {name}
                 </p>
                 <p className="font-body text-sm text-text-secondary">
-                  Principal, EduNova Global Academy
+                  {designation}
                 </p>
               </div>
             </div>
