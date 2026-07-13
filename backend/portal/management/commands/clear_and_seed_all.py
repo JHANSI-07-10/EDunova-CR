@@ -136,6 +136,20 @@ class Command(BaseCommand):
         teacher.save()
         teacher.groups.add(teacher_group)
 
+        # 4b. TEACHER 2 (Mobeena Afroz)
+        teacher2, _ = User.objects.get_or_create(
+            username="mobeena.teacher",
+            defaults={
+                "email": "mobeenaafroz@gmail.com",
+                "first_name": "Mobeena",
+                "last_name": "Afroz",
+                "is_active": True,
+            },
+        )
+        teacher2.set_password("Edunova@123")
+        teacher2.save()
+        teacher2.groups.add(teacher_group)
+
         # -------------------------
         # Seed Profile Details and Relationships
         # -------------------------
@@ -148,9 +162,10 @@ class Command(BaseCommand):
                     (%s,'Admin','9000000004'),
                     (%s,'Parent','9000000003'),
                     (%s,'Student','9000000002'),
-                    (%s,'Teacher','9000000001')
+                    (%s,'Teacher','9000000001'),
+                    (%s,'Teacher','9000000005')
                 ON CONFLICT (user_id) DO UPDATE SET user_type=EXCLUDED.user_type, phone_number=EXCLUDED.phone_number
-            """, [admin.id, parent.id, student.id, teacher.id])
+            """, [admin.id, parent.id, student.id, teacher.id, teacher2.id])
 
             # Employee/Admin record
             c.execute("""
@@ -180,6 +195,12 @@ class Command(BaseCommand):
                 ON CONFLICT (user_id) DO NOTHING
             """, [teacher.id])
 
+            c.execute("""
+                INSERT INTO portal_teacher_profile (user_id, employee_code, qualification, specialization, date_of_joining)
+                VALUES (%s,'TCH-DEMO-002','B.Sc., B.Ed.','Science', current_date - interval '2 years')
+                ON CONFLICT (user_id) DO NOTHING
+            """, [teacher2.id])
+
             # Class, Subject, and Teacher Allocations
             c.execute("""
                 INSERT INTO portal_class (name, section, curriculum, room_number)
@@ -198,6 +219,14 @@ class Command(BaseCommand):
             subject_id = c.fetchone()[0]
 
             c.execute("""
+                INSERT INTO portal_subject (name, subject_code, type)
+                VALUES ('Science','SCI-8','Theory')
+                ON CONFLICT (subject_code) DO NOTHING
+                RETURNING id
+            """)
+            subject_id2 = c.fetchone()[0]
+
+            c.execute("""
                 INSERT INTO portal_student_enrollment (student_id, class_id, academic_year, roll_number)
                 VALUES (%s,%s,'2026-27',12)
                 ON CONFLICT (student_id, class_id, academic_year) DO NOTHING
@@ -205,10 +234,11 @@ class Command(BaseCommand):
 
             c.execute("""
                 INSERT INTO portal_academic_allocation (class_id, subject_id, teacher_id)
-                VALUES (%s,%s,%s)
+                VALUES (%s,%s,%s), (%s,%s,%s)
                 ON CONFLICT (class_id, subject_id, teacher_id) DO NOTHING
-            """, [class_id, subject_id, teacher.id])
+            """, [class_id, subject_id, teacher.id, class_id, subject_id2, teacher2.id])
 
+            # Course for Teacher 1 (Math)
             c.execute("""
                 INSERT INTO portal_course (subject_id, class_id, title, description)
                 VALUES (%s,%s,'Mathematics Grade 8','Demo course for Grade 8 Mathematics')
@@ -221,12 +251,31 @@ class Command(BaseCommand):
                 VALUES (%s,'PDF_Notes','Chapter 1 — Linear Equations','https://example.com/demo-notes.pdf',1)
             """, [course_id])
 
-            # Classroom Timetable
+            # Course for Teacher 2 (Science)
+            c.execute("""
+                INSERT INTO portal_course (subject_id, class_id, title, description)
+                VALUES (%s,%s,'Science Grade 8','Demo course for Grade 8 Science')
+                RETURNING id
+            """, [subject_id2, class_id])
+            course_id2 = c.fetchone()[0]
+
+            c.execute("""
+                INSERT INTO portal_course_content (course_id, content_type, title, resource_url, sort_order)
+                VALUES (%s,'PDF_Notes','Chapter 1 — Cell Structure','https://example.com/cell-notes.pdf',1)
+            """, [course_id2])
+
+            # Classroom Timetables
             for i, day in enumerate(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]):
                 c.execute("""
                     INSERT INTO portal_timetable (class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room_number)
                     VALUES (%s,%s,%s,%s,'09:00','09:45','B-204')
                 """, [class_id, subject_id, teacher.id, day])
+
+            for i, day in enumerate(["Monday", "Wednesday", "Friday"]):
+                c.execute("""
+                    INSERT INTO portal_timetable (class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room_number)
+                    VALUES (%s,%s,%s,%s,'10:00','10:45','B-204')
+                """, [class_id, subject_id2, teacher2.id, day])
 
             # Attendance records
             for offset, status in enumerate(["Present", "Present", "Late", "Present", "Absent"]):
@@ -235,7 +284,7 @@ class Command(BaseCommand):
                     VALUES (%s,%s,%s,%s,%s,'Demo record')
                 """, [student.id, class_id, date.today() - timedelta(days=offset), status, teacher.id])
 
-            # Homework, Assignments & Exams
+            # Homework, Assignments & Exams for Teacher 1 (Math)
             c.execute("""
                 INSERT INTO portal_homework (class_id, subject_id, teacher_id, title, description, due_date)
                 VALUES (%s,%s,%s,'Algebra Worksheet','Complete questions 1 to 15 from the worksheet.', current_date + interval '3 days')
@@ -250,6 +299,22 @@ class Command(BaseCommand):
                 INSERT INTO portal_exam_schedule (class_id, subject_id, teacher_id, exam_name, exam_type, exam_date, max_marks)
                 VALUES (%s,%s,%s,'Unit_Test_1','Unit_Test', current_date + interval '10 days', 50)
             """, [class_id, subject_id, teacher.id])
+
+            # Homework, Assignments & Exams for Teacher 2 (Science)
+            c.execute("""
+                INSERT INTO portal_homework (class_id, subject_id, teacher_id, title, description, due_date)
+                VALUES (%s,%s,%s,'Cell Diagram Homework','Draw and label the cell structure diagram.', current_date + interval '4 days')
+            """, [class_id, subject_id2, teacher2.id])
+
+            c.execute("""
+                INSERT INTO portal_assignment (class_id, subject_id, teacher_id, title, description, max_marks, due_date)
+                VALUES (%s,%s,%s,'Cell Organelles Assignment','Submit your written report.', 50, now() + interval '6 days')
+            """, [class_id, subject_id2, teacher2.id])
+
+            c.execute("""
+                INSERT INTO portal_exam_schedule (class_id, subject_id, teacher_id, exam_name, exam_type, exam_date, max_marks)
+                VALUES (%s,%s,%s,'Unit_Test_1','Unit_Test', current_date + interval '12 days', 50)
+            """, [class_id, subject_id2, teacher2.id])
 
             # Fee Structure
             c.execute("""
