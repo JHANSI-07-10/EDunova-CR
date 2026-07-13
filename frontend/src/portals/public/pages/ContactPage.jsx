@@ -76,37 +76,101 @@ export default function ContactPage() {
     fetchCampuses()
   }, [])
 
+  const haversineDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371.0 // kilometers
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2)
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a))
+    return R * c
+  }
+
   // Geolocation trigger
   const handleDetectLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser.')
+    const targetCampus = selectedCampus || campuses[0]
+    if (!targetCampus) {
+      alert('No campuses registered in database.')
       return
     }
+
+    if (!navigator.geolocation) {
+      // Geolocation not supported: fallback to Head Office to target campus metrics calculation
+      const baseLat = 28.5921
+      const baseLng = 77.0460
+      const dist = haversineDistance(baseLat, baseLng, parseFloat(targetCampus.latitude), parseFloat(targetCampus.longitude))
+      const estTime = Math.ceil((dist / 30.0) * 60.0)
+      setNearestCampusInfo({
+        nearest_campus: targetCampus.name,
+        campus_id: targetCampus.id,
+        distance_km: dist.toFixed(1),
+        estimated_travel_time_mins: estTime
+      })
+      setSelectedCampus(targetCampus)
+      setSelectedState(targetCampus.state)
+      setSelectedCity(targetCampus.city)
+      return
+    }
+
     setGeolocating(true)
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords
         setDetectedLocation({ lat: latitude, lng: longitude })
-        try {
-          const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')
-          const res = await fetch(`${BASE_URL}/api/campuses/nearest/?lat=${latitude}&lng=${longitude}`)
-          if (res.ok) {
-            const data = await res.json()
-            setNearestCampusInfo(data)
-            // Auto-select the nearest campus on the UI
-            const match = campuses.find(c => c.id === data.campus_id)
-            if (match) setSelectedCampus(match)
+        
+        let finalCampus = selectedCampus
+        if (!finalCampus) {
+          try {
+            const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')
+            const res = await fetch(`${BASE_URL}/api/campuses/nearest/?lat=${latitude}&lng=${longitude}`)
+            if (res.ok) {
+              const data = await res.json()
+              const match = campuses.find(c => c.id === data.campus_id)
+              if (match) finalCampus = match
+            }
+          } catch (err) {
+            console.error('Error getting nearest campus:', err)
           }
-        } catch (err) {
-          console.error('Error getting nearest campus:', err)
-        } finally {
-          setGeolocating(false)
         }
+
+        if (!finalCampus) {
+          finalCampus = campuses[0]
+        }
+
+        if (finalCampus) {
+          const dist = haversineDistance(latitude, longitude, parseFloat(finalCampus.latitude), parseFloat(finalCampus.longitude))
+          const estTime = Math.ceil((dist / 30.0) * 60.0)
+          setNearestCampusInfo({
+            nearest_campus: finalCampus.name,
+            campus_id: finalCampus.id,
+            distance_km: dist.toFixed(1),
+            estimated_travel_time_mins: estTime
+          })
+          setSelectedCampus(finalCampus)
+          setSelectedState(finalCampus.state)
+          setSelectedCity(finalCampus.city)
+        }
+        setGeolocating(false)
       },
       (error) => {
         console.warn('Geolocation permission denied or error:', error)
+        // Fallback: calculate from headquarters (Dwarka) to selected campus
+        const baseLat = 28.5921
+        const baseLng = 77.0460
+        const dist = haversineDistance(baseLat, baseLng, parseFloat(targetCampus.latitude), parseFloat(targetCampus.longitude))
+        const estTime = Math.ceil((dist / 30.0) * 60.0)
+        setNearestCampusInfo({
+          nearest_campus: targetCampus.name,
+          campus_id: targetCampus.id,
+          distance_km: dist.toFixed(1),
+          estimated_travel_time_mins: estTime
+        })
+        setSelectedCampus(targetCampus)
+        setSelectedState(targetCampus.state)
+        setSelectedCity(targetCampus.city)
         setGeolocating(false)
-        alert('Could not determine your location. Please select manually.')
       }
     )
   }
@@ -428,7 +492,12 @@ export default function ContactPage() {
                 <label className="block text-[10px] uppercase font-semibold tracking-wider text-slate-300 mb-1">State</label>
                 <select 
                   value={selectedState} 
-                  onChange={(e) => { setSelectedState(e.target.value); setSelectedCity(''); }}
+                  onChange={(e) => { 
+                    const state = e.target.value;
+                    setSelectedState(state); 
+                    setSelectedCity(''); 
+                    setSelectedCampus(null);
+                  }}
                   className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 text-white"
                 >
                   <option value="" className="text-slate-900">All States</option>
@@ -440,7 +509,17 @@ export default function ContactPage() {
                 <label className="block text-[10px] uppercase font-semibold tracking-wider text-slate-300 mb-1">City</label>
                 <select 
                   value={selectedCity} 
-                  onChange={(e) => setSelectedCity(e.target.value)}
+                  onChange={(e) => {
+                    const city = e.target.value;
+                    setSelectedCity(city);
+                    if (city) {
+                      const match = campuses.find(c => c.city === city);
+                      if (match) {
+                        setSelectedState(match.state);
+                      }
+                    }
+                    setSelectedCampus(null);
+                  }}
                   className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 text-white"
                 >
                   <option value="" className="text-slate-900">All Cities</option>
@@ -460,6 +539,8 @@ export default function ContactPage() {
                       setSelectedCity(match.city)
                     } else {
                       setSelectedCampus(null)
+                      setSelectedState('')
+                      setSelectedCity('')
                     }
                   }}
                   className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 text-white"
