@@ -9,6 +9,7 @@ const TITLES = {
   "/homework": "Homework",
   "/results": "Results",
   "/fees": "Fee Payments",
+  "/scholarships": "Scholarships",
   "/transport": "Bus Tracking",
   "/messages": "Teacher Messages",
   "/notifications": "Notifications",

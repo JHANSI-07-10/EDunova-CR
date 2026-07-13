@@ -20,6 +20,7 @@ import PtmBooking from "./pages/PtmBooking";
 import Feedback from "./pages/Feedback";
 import Profile from "./pages/Profile";
 import LmsProgress from "./pages/LmsProgress";
+import Scholarships from "./pages/Scholarships";
 
 export default function ParentRoutes() {
   return (
@@ -38,6 +39,7 @@ export default function ParentRoutes() {
           <Route path="homework" element={<Homework />} />
           <Route path="results" element={<Results />} />
           <Route path="fees" element={<Fees />} />
+          <Route path="scholarships" element={<Scholarships />} />
           <Route path="transport" element={<Transport />} />
           <Route path="hostel" element={<Hostel />} />
           <Route path="messages" element={<Messages />} />
