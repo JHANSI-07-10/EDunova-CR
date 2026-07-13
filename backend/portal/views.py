@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from functools import lru_cache
 from uuid import uuid4
 
 from django.db import connection
@@ -10,6 +11,7 @@ from rest_framework import status
 from .roles import IsStudent
 
 
+@lru_cache(maxsize=128)
 def table_exists(table_name):
     try:
         with connection.cursor() as cursor:
