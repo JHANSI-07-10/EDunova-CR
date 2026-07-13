@@ -13,6 +13,7 @@ import {
 import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
+import { getMediaUrl } from '../../../utils/media'
 
 const FALLBACK_LEADERSHIP = [
   {
@@ -268,7 +269,7 @@ export default function Faculty() {
                 <div className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
                   <div className="relative h-72 overflow-hidden">
                     <img
-                      src={member.photo}
+                      src={getMediaUrl(member.photo)}
                       alt={member.name}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />

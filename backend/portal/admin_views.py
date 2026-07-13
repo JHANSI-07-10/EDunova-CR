@@ -24,26 +24,49 @@ class AdminMixin:
 # ---------------------------------------------------------------------------
 class AdminDashboardView(AdminMixin, APIView):
     def get(self, request):
-        def count(table, where=""):
-            if not table_exists(table):
-                return 0
-            r = row(f"SELECT COUNT(*)::int AS c FROM {table} {where}")
-            return r["c"] if r else 0
-
         pending_admissions = AdmissionEnquiry.objects.exclude(status__in=["Confirmed", "Rejected"]).count()
-        total_students = count("portal_student_profile")
-        total_teachers = count("portal_teacher_profile")
-        total_parents = count("portal_parent_profile")
-        total_employees = count("portal_employee")
-        open_leaves = count("portal_leave", "WHERE status='Pending'")
-        fee_collected_month = 0
-        if table_exists("portal_payment"):
-            r = row(
-                "SELECT COALESCE(SUM(amount_paid),0)::float AS total FROM portal_payment "
-                "WHERE status='Success' AND date_trunc('month', paid_at) = date_trunc('month', now())"
-            )
-            fee_collected_month = r["total"] if r else 0
-        library_out = count("portal_library_transaction", "WHERE return_date IS NULL")
+        
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT 
+                        (SELECT COUNT(*)::int FROM portal_student_profile) AS students,
+                        (SELECT COUNT(*)::int FROM portal_teacher_profile) AS teachers,
+                        (SELECT COUNT(*)::int FROM portal_parent_profile) AS parents,
+                        (SELECT COUNT(*)::int FROM portal_employee) AS employees,
+                        (SELECT COUNT(*)::int FROM portal_leave WHERE status='Pending') AS leaves,
+                        (SELECT COALESCE(SUM(amount_paid), 0)::float FROM portal_payment WHERE status='Success' AND date_trunc('month', paid_at) = date_trunc('month', now())) AS fees,
+                        (SELECT COUNT(*)::int FROM portal_library_transaction WHERE return_date IS NULL) AS library
+                """)
+                counts = cursor.fetchone()
+                total_students = counts[0]
+                total_teachers = counts[1]
+                total_parents = counts[2]
+                total_employees = counts[3]
+                open_leaves = counts[4]
+                fee_collected_month = counts[5]
+                library_out = counts[6]
+        except Exception:
+            def count(table, where=""):
+                if not table_exists(table):
+                    return 0
+                r = row(f"SELECT COUNT(*)::int AS c FROM {table} {where}")
+                return r["c"] if r else 0
+
+            total_students = count("portal_student_profile")
+            total_teachers = count("portal_teacher_profile")
+            total_parents = count("portal_parent_profile")
+            total_employees = count("portal_employee")
+            open_leaves = count("portal_leave", "WHERE status='Pending'")
+            fee_collected_month = 0
+            if table_exists("portal_payment"):
+                r = row(
+                    "SELECT COALESCE(SUM(amount_paid),0)::float AS total FROM portal_payment "
+                    "WHERE status='Success' AND date_trunc('month', paid_at) = date_trunc('month', now())"
+                )
+                fee_collected_month = r["total"] if r else 0
+            library_out = count("portal_library_transaction", "WHERE return_date IS NULL")
+
         recent_admissions = list(
             AdmissionEnquiry.objects.order_by("-submitted_at").values(
                 "registration_number", "applicant_name", "target_class", "status", "submitted_at"
@@ -254,8 +277,17 @@ class UserListView(AdminMixin, APIView):
         role_filter = request.query_params.get("role")
         
         users = User.objects.all().prefetch_related("groups").order_by("-date_joined")
+        
+        user_types = {}
+        if table_exists("portal_user_profile"):
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT user_id, user_type FROM portal_user_profile")
+                for uid, utype in cursor.fetchall():
+                    user_types[uid] = utype
+                    
         data = []
         for u in users:
+            role = user_types.get(u.id) or get_role(u)
             data.append({
                 "id": u.id,
                 "username": u.username,
@@ -263,7 +295,7 @@ class UserListView(AdminMixin, APIView):
                 "name": u.get_full_name() or u.username,
                 "is_active": u.is_active,
                 "date_joined": u.date_joined,
-                "role": get_role(u)
+                "role": role
             })
 
         if role_filter:
@@ -385,6 +417,12 @@ class UserDetailView(AdminMixin, APIView):
             target.is_active = bool(request.data["is_active"])
             target.save(update_fields=["is_active"])
             log_action(request.user, f"Audit {role} Toggled", "user", user_id, {"is_active": target.is_active})
+            try:
+                from .services.email_service import send_account_status_email
+                send_account_status_email(target, target.is_active)
+            except Exception:
+                import logging
+                logging.getLogger(__name__).exception("Failed to send status toggle email")
         if "role" in request.data:
             new_role = request.data["role"]
             if new_role not in ("Student", "Teacher", "Parent", "Admin", "Employee"):

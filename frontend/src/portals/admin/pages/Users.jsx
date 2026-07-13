@@ -185,7 +185,7 @@ export default function Users() {
               <div key={u.id} className="py-3 flex items-center justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-medium text-ink-primary truncate">{u.name}</p>
-                  <p className="text-xs text-ink-secondary truncate">{u.email}</p>
+                  <p className="text-xs text-ink-secondary truncate">{u.username} · {u.email}</p>
                 </div>
                 <div className="flex items-center gap-2 shrink-0">
                   <Badge tone={ROLE_TONE[u.role] || "slate"}>{u.role}</Badge>

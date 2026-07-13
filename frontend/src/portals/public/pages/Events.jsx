@@ -3,6 +3,7 @@ import { CalendarDays, MapPin, Clock, Users, ArrowRight, Sparkles } from 'lucide
 import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
+import { getMediaUrl } from '../../../utils/media'
 
 const fetchEvents = cmsApi.getEvents
 
@@ -98,7 +99,7 @@ export default function Events() {
                 <article className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
                   <div className="relative h-64 overflow-hidden">
                     <img
-                      src={event.cover_image || event.image || '/Campus.jpeg'}
+                      src={getMediaUrl(event.cover_image || event.image) || '/Campus.jpeg'}
                       alt={event.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />

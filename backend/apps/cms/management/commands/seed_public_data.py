@@ -123,7 +123,7 @@ class Command(BaseCommand):
         # --- Sample content below is placeholder — replace via /admin/ once
         # real testimonials/news/events/achievements are available. It
         # exists only so the homepage doesn't render empty during dev. ---
-        from apps.cms.models import Testimonial, NewsPost, Event, Achievement
+        from apps.cms.models import Testimonial, NewsPost, Event, Achievement, LeadershipMember
         import datetime
 
         sample_testimonials = [
@@ -157,10 +157,25 @@ class Command(BaseCommand):
             _attach_image(event, "cover_image", image)
 
         sample_achievements = [
-            ("98% Board Examination Results", "Highest-ever pass percentage achieved this academic year.", today - datetime.timedelta(days=60)),
-            ("National Science Olympiad — 12 Medals", "Students brought home 12 medals across categories.", today - datetime.timedelta(days=90)),
+            ("98% Board Examination Results", "Highest-ever pass percentage achieved this academic year.", today - datetime.timedelta(days=60), "trophy-1.jpeg"),
+            ("National Science Olympiad — 12 Medals", "Students brought home 12 medals across categories.", today - datetime.timedelta(days=90), "trophy-2.jpeg"),
+            ("STEM Innovation Recognition", "Students were recognized for robotics, science projects, creativity, and innovation-based learning.", today - datetime.timedelta(days=30), "physics-1.jpeg"),
         ]
-        for title, desc, adate in sample_achievements:
-            Achievement.objects.update_or_create(title=title, defaults={"description": desc, "achievement_date": adate})
+        for title, desc, adate, image in sample_achievements:
+            achievement, _ = Achievement.objects.update_or_create(title=title, defaults={"description": desc, "achievement_date": adate})
+            _attach_image(achievement, "cover_image", image)
+
+        sample_leadership = [
+            ("Dr. Meera Sharma", "Principal", "Academic leader focused on digital education, student excellence, innovation, and holistic learning.", "EduNova.jpeg"),
+            ("Mr. Arvind Rao", "Academic Director", "Leads curriculum planning, academic quality, assessment strategy, and teacher development programs.", "student.jpeg"),
+            ("Ms. Nandita Iyer", "Cambridge Coordinator", "Supports international curriculum delivery, inquiry-based learning, and global academic standards.", "Campus.jpeg"),
+            ("Mr. Rohan Kapoor", "Head of STEM & Innovation", "Guides robotics, STEM education, innovation projects, student research, and future skills.", "building.jpeg"),
+        ]
+        for i, (name, designation, bio, photo) in enumerate(sample_leadership):
+            member, _ = LeadershipMember.objects.update_or_create(
+                name=name,
+                defaults={"designation": designation, "bio": bio, "sort_order": i}
+            )
+            _attach_image(member, "photo", photo)
 
         self.stdout.write(self.style.SUCCESS("Public portal seed data loaded."))

@@ -3,6 +3,7 @@ import { Newspaper, CalendarDays, ArrowRight, Bell, Sparkles } from 'lucide-reac
 import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
+import { getMediaUrl } from '../../../utils/media'
 
 const fetchNews = cmsApi.getNews
 
@@ -78,7 +79,7 @@ export default function News() {
               <div className="grid lg:grid-cols-2 gap-10 items-center mb-14">
                 <div className="relative rounded-3xl overflow-hidden shadow-2xl">
                   <img
-                    src={featured.cover_image || featured.image || '/Campus.jpeg'}
+                    src={getMediaUrl(featured.cover_image || featured.image) || '/Campus.jpeg'}
                     alt={featured.title}
                     className="w-full h-[420px] object-cover"
                   />
@@ -124,7 +125,7 @@ export default function News() {
                   <article className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
                     <div className="relative h-56 overflow-hidden">
                       <img
-                        src={post.cover_image || post.image || '/student.jpeg'}
+                        src={getMediaUrl(post.cover_image || post.image) || '/student.jpeg'}
                         alt={post.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />

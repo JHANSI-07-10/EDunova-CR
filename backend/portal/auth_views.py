@@ -154,14 +154,16 @@ def login_step1(request):
     otp = _generate_otp()
     _store_otp(user.id, otp)
 
+    if settings.DEBUG:
+        print("\n" + "="*50)
+        print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
+        print("="*50 + "\n")
+
     try:
         send_login_otp_email(user, otp)
     except Exception as e:
         logger.exception("Failed to send OTP email")
         if settings.DEBUG:
-            print("\n" + "="*50)
-            print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
-            print("="*50 + "\n")
             return Response({
                 "user_id": user.id,
                 "user_type": get_user_role(user),
@@ -230,14 +232,17 @@ def resend_otp(request):
 
     otp = _generate_otp()
     _store_otp(user.id, otp)
+
+    if settings.DEBUG:
+        print("\n" + "="*50)
+        print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
+        print("="*50 + "\n")
+
     try:
         send_login_otp_email(user, otp)
     except Exception:
         logger.exception("Failed to send OTP email")
         if settings.DEBUG:
-            print("\n" + "="*50)
-            print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
-            print("="*50 + "\n")
             return Response({"detail": "OTP resent successfully (check console)."})
         return Response(
             {"detail": "Unable to send verification email."},

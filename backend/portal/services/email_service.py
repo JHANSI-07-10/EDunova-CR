@@ -81,3 +81,35 @@ def send_reset_password_email(user: "AbstractBaseUser", temp_password: str) -> N
     except Exception as exc:
         logger.exception("Password reset email delivery failed for user_id=%s", user.pk)  # type: ignore[attr-defined]
         raise RuntimeError("Unable to send password reset email.") from exc
+
+
+def send_account_status_email(user: "AbstractBaseUser", is_active: bool) -> None:
+    """
+    Send account activation/deactivation email to user.email via SMTP.
+    """
+    full_name: str = user.get_full_name().strip() or user.username  # type: ignore[attr-defined]
+
+    context = {
+        "name": full_name,
+        "username": user.username,  # type: ignore[attr-defined]
+        "is_active": is_active,
+        "status": "Active" if is_active else "Deactivated",
+        "school_name": "EduNova Global Academy",
+    }
+
+    subject = f"EduNova Account Status: {'Activated' if is_active else 'Deactivated'}"
+    from_email = settings.DEFAULT_FROM_EMAIL
+    to = [user.email]  # type: ignore[attr-defined]
+
+    text_body = render_to_string("emails/account_status.txt", context)
+    html_body = render_to_string("emails/account_status.html", context)
+
+    msg = EmailMultiAlternatives(subject, text_body, from_email, to)
+    msg.attach_alternative(html_body, "text/html")
+
+    try:
+        msg.send(fail_silently=False)
+    except Exception as exc:
+        logger.exception("Account status email delivery failed for user_id=%s", user.pk)  # type: ignore[attr-defined]
+        raise RuntimeError("Unable to send status email.") from exc
+

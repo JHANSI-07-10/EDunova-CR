@@ -4,6 +4,7 @@ import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
 import { publicImages } from '../../../constants/publicImages'
+import { getMediaUrl } from '../../../utils/media'
 
 const fetchAchievements = cmsApi.getAchievements || (async () => [])
 
@@ -121,7 +122,7 @@ export default function Achievements() {
                 <article className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
                   <div className="relative h-64 overflow-hidden">
                     <img
-                      src={item.cover_image || item.image || '/student.jpeg'}
+                      src={getMediaUrl(item.cover_image || item.image) || '/student.jpeg'}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />

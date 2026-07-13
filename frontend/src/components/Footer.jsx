@@ -34,7 +34,7 @@ const COLUMNS = [
 export default function Footer() {
   return (
     <footer className="bg-bg-dark text-gray-300 mt-20">
-      <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-5 gap-8">
+      <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-6 gap-8">
         <div className="col-span-2">
           <div className="font-heading font-bold text-xl text-white mb-2">EduNova Global Academy</div>
           <p className="font-subheading text-sm text-gray-400 mb-1">Inspiring Minds. Building Futures.</p>

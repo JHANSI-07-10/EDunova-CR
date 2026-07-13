@@ -175,7 +175,7 @@ export default function Downloads() {
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {DOWNLOADS.map(({ title, desc, type, icon: Icon, ...item }, index) => (
               <FadeIn key={title} delay={index * 50}>
-                <div className="group bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
+                <div className="group bg-white rounded-3xl p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full flex flex-col">
                   <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mb-5 group-hover:bg-primary transition-colors">
                     <Icon size={26} className="text-primary group-hover:text-white transition-colors" />
                   </div>
@@ -195,7 +195,7 @@ export default function Downloads() {
                   <button
                     type="button"
                     onClick={() => downloadFile({ title, desc, type, icon: Icon, ...item })}
-                    className="inline-flex items-center justify-center gap-2 btn-primary w-full"
+                    className="inline-flex items-center justify-center gap-2 btn-primary w-full mt-auto"
                   >
                     Download <Download size={16} />
                   </button>
