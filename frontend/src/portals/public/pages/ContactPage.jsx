@@ -6,10 +6,109 @@ import {
 import CampusVisitModal from './CampusVisitModal'
 import { isValidEmail, isValidPhone, isNonEmptyString } from '../../../utils/validation'
 
+const DEFAULT_CAMPUSES = [
+  {
+    id: 1,
+    name: 'Head Office (Dwarka)',
+    address: 'EduNova Education Campus, Sector 21, Dwarka',
+    city: 'New Delhi',
+    state: 'Delhi',
+    country: 'India',
+    postal_code: '110075',
+    latitude: 28.5921,
+    longitude: 77.0460,
+    phone: '+91-11-4567890',
+    email: 'info@edunovaacademy.edu.in',
+    website: 'www.edunovaacademy.edu.in',
+    office_hours: '9:00 AM - 5:00 PM',
+    status: 'Active'
+  },
+  {
+    id: 2,
+    name: 'Noida Campus',
+    address: 'Plot No. 12, Sector 62',
+    city: 'Noida',
+    state: 'Uttar Pradesh',
+    country: 'India',
+    postal_code: '201301',
+    latitude: 28.5355,
+    longitude: 77.3910,
+    phone: '+91-120-6543210',
+    email: 'noida@edunovaacademy.edu.in',
+    website: 'www.edunovaacademy.edu.in/noida',
+    office_hours: '8:00 AM - 4:00 PM',
+    status: 'Active'
+  },
+  {
+    id: 3,
+    name: 'Gurugram Campus',
+    address: 'Sector 45, Near Huda City Centre',
+    city: 'Gurugram',
+    state: 'Haryana',
+    country: 'India',
+    postal_code: '122003',
+    latitude: 28.4595,
+    longitude: 77.0266,
+    phone: '+91-124-7890123',
+    email: 'gurugram@edunovaacademy.edu.in',
+    website: 'www.edunovaacademy.edu.in/gurugram',
+    office_hours: '8:00 AM - 4:00 PM',
+    status: 'Active'
+  },
+  {
+    id: 4,
+    name: 'Faridabad Campus',
+    address: 'Mathura Road, Sector 31',
+    city: 'Faridabad',
+    state: 'Haryana',
+    country: 'India',
+    postal_code: '121003',
+    latitude: 28.4089,
+    longitude: 77.3178,
+    phone: '+91-129-4561230',
+    email: 'faridabad@edunovaacademy.edu.in',
+    website: 'www.edunovaacademy.edu.in/faridabad',
+    office_hours: '8:00 AM - 4:00 PM',
+    status: 'Active'
+  },
+  {
+    id: 5,
+    name: 'Jaipur Campus',
+    address: 'Mansarovar, Shipra Path',
+    city: 'Jaipur',
+    state: 'Rajasthan',
+    country: 'India',
+    postal_code: '302020',
+    latitude: 26.9124,
+    longitude: 75.7873,
+    phone: '+91-141-8904561',
+    email: 'jaipur@edunovaacademy.edu.in',
+    website: 'www.edunovaacademy.edu.in/jaipur',
+    office_hours: '8:00 AM - 4:00 PM',
+    status: 'Active'
+  },
+  {
+    id: 6,
+    name: 'Lucknow Campus',
+    address: 'Gomti Nagar, Bypass Road',
+    city: 'Lucknow',
+    state: 'Uttar Pradesh',
+    country: 'India',
+    postal_code: '226010',
+    latitude: 26.8467,
+    longitude: 80.9462,
+    phone: '+91-522-7890124',
+    email: 'lucknow@edunovaacademy.edu.in',
+    website: 'www.edunovaacademy.edu.in/lucknow',
+    office_hours: '8:00 AM - 4:00 PM',
+    status: 'Active'
+  }
+]
+
 export default function ContactPage() {
-  const [campuses, setCampuses] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [selectedCampus, setSelectedCampus] = useState(null)
+  const [campuses, setCampuses] = useState(DEFAULT_CAMPUSES)
+  const [loading, setLoading] = useState(false)
+  const [selectedCampus, setSelectedCampus] = useState(DEFAULT_CAMPUSES[0])
   
   // Location Finder states
   const [selectedState, setSelectedState] = useState('')
@@ -62,9 +161,8 @@ export default function ContactPage() {
         const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')
         const res = await fetch(`${BASE_URL}/api/campuses/`)
         const data = await res.json()
-        setCampuses(data)
-        if (data.length > 0) {
-          // Exclude Head Office from default branch list selected status if needed
+        if (data && data.length > 0) {
+          setCampuses(data)
           setSelectedCampus(data[0])
         }
       } catch (err) {
