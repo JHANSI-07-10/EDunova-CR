@@ -2,6 +2,8 @@ import { AlertCircle, Bus, CheckCircle2, MapPin, Navigation, Phone, RefreshCw, U
 import { useEffect, useState } from "react";
 import { Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString } from "../../../utils/validation";
+
 
 export default function Transport() {
   const [transport, setTransport] = useState(null);
@@ -10,6 +12,8 @@ export default function Transport() {
   const [requestType, setRequestType] = useState("Route Change");
   const [requestDetails, setRequestDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [validationErrors, setValidationErrors] = useState({});
+
 
   function load() {
     setLoading(true);
@@ -25,7 +29,11 @@ export default function Transport() {
 
   async function handleRequest(e) {
     e.preventDefault();
-    if (!requestDetails.trim()) return;
+    if (!isNonEmptyString(requestDetails)) {
+      setValidationErrors({ requestDetails: "Details cannot be empty." });
+      return;
+    }
+    setValidationErrors({});
     setSubmitting(true);
     try {
       await api.post("/teacher/messages/", {
@@ -67,14 +75,21 @@ export default function Transport() {
                 </label>
               ))}
             </div>
-            <textarea
-              required
-              rows={3}
-              value={requestDetails}
-              onChange={(e) => setRequestDetails(e.target.value)}
-              placeholder="Provide details (e.g. nearest pickup landmark, address)..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring resize-none"
-            />
+            <div>
+              <textarea
+                required
+                rows={3}
+                value={requestDetails}
+                onChange={(e) => setRequestDetails(e.target.value)}
+                placeholder="Provide details (e.g. nearest pickup landmark, address)..."
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus-ring resize-none ${
+                  validationErrors.requestDetails ? "border-danger" : "border-slate-200"
+                }`}
+              />
+              {validationErrors.requestDetails && (
+                <p className="text-xs text-danger mt-1">{validationErrors.requestDetails}</p>
+              )}
+            </div>
             <button
               disabled={submitting}
               className="bg-academic-blue text-white rounded-xl px-5 py-2 font-medium text-sm hover:bg-academic-blue/90"
@@ -215,14 +230,21 @@ export default function Transport() {
                 </label>
               ))}
             </div>
-            <textarea
-              required
-              rows={3}
-              value={requestDetails}
-              onChange={(e) => setRequestDetails(e.target.value)}
-              placeholder="Describe your requested change (e.g. change pickup point to Sector-5 Stop)..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus-ring resize-none"
-            />
+            <div>
+              <textarea
+                required
+                rows={3}
+                value={requestDetails}
+                onChange={(e) => setRequestDetails(e.target.value)}
+                placeholder="Describe your requested change (e.g. change pickup point to Sector-5 Stop)..."
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus-ring resize-none ${
+                  validationErrors.requestDetails ? "border-danger" : "border-slate-200"
+                }`}
+              />
+              {validationErrors.requestDetails && (
+                <p className="text-xs text-danger mt-1">{validationErrors.requestDetails}</p>
+              )}
+            </div>
             <button
               disabled={submitting}
               className="bg-academic-blue text-white rounded-xl px-5 py-2 font-medium text-sm hover:bg-academic-blue/90"
@@ -252,14 +274,21 @@ export default function Transport() {
                 </label>
               ))}
             </div>
-            <textarea
-              required
-              rows={3}
-              value={requestDetails}
-              onChange={(e) => setRequestDetails(e.target.value)}
-              placeholder="Explain the issue in detail..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus-ring resize-none"
-            />
+            <div>
+              <textarea
+                required
+                rows={3}
+                value={requestDetails}
+                onChange={(e) => setRequestDetails(e.target.value)}
+                placeholder="Write your complaint or query in detail here..."
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus-ring resize-none ${
+                  validationErrors.requestDetails ? "border-danger" : "border-slate-200"
+                }`}
+              />
+              {validationErrors.requestDetails && (
+                <p className="text-xs text-danger mt-1">{validationErrors.requestDetails}</p>
+              )}
+            </div>
             <button
               disabled={submitting}
               className="bg-rose-600 text-white rounded-xl px-5 py-2 font-medium text-sm hover:bg-rose-700"

@@ -33,6 +33,9 @@ export default function Lms() {
   const [completed, setCompleted] = useState({});
   const [toast, setToast] = useState("");
   
+  const [hasPendingFees, setHasPendingFees] = useState(false);
+  const [feesLoading, setFeesLoading] = useState(true);
+
   // Selection Flow States
   const [enrollments, setEnrollments] = useState([]);
   const [selectedAcademicYear, setSelectedAcademicYear] = useState("");
@@ -53,8 +56,32 @@ export default function Lms() {
   const [errorText, setErrorText] = useState("");
 
   useEffect(() => {
+    setFeesLoading(true);
+    api.get("/student/fees/")
+      .then(({ data }) => {
+        setHasPendingFees(data.pending && data.pending.length > 0);
+      })
+      .catch(() => {})
+      .finally(() => setFeesLoading(false));
     loadCourses();
   }, []);
+
+  if (feesLoading) return <Loader rows={5} />;
+
+  if (hasPendingFees) {
+    return (
+      <Card className="max-w-md mx-auto mt-12 p-8 text-center border-t-4 border-danger">
+        <Lock size={48} className="text-danger mx-auto mb-4 animate-bounce" />
+        <h3 className="font-heading text-lg font-bold text-ink-primary mb-2">Learning Management System Locked</h3>
+        <p className="text-sm text-ink-secondary mb-6 leading-relaxed">
+          Access to courses, lectures, quizzes, and digital notes is locked due to pending fee balance. Please clear your outstanding fees to restore access.
+        </p>
+        <a href="/student/fees" className="inline-flex items-center justify-center bg-academic-blue text-white rounded-xl py-2.5 px-6 text-sm font-semibold hover:bg-academic-blue/90 transition-colors shadow-md">
+          Pay Pending Fees
+        </a>
+      </Card>
+    );
+  }
 
   function loadCourses(targetClassId = null) {
     const url = targetClassId ? `/student/courses/?class_id=${targetClassId}` : "/student/courses/";

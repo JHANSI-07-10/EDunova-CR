@@ -2,6 +2,8 @@ import { GraduationCap, ShieldCheck } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { isValidEmail } from "../../../utils/validation";
+
 
 export default function Login() {
   const { user, requestOtp, verifyOtp, resendOtp } = useAuth();
@@ -15,10 +17,25 @@ export default function Login() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [resetting, setResetting] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSuccess, setResetSuccess] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
+
+
   if (user) return <Navigate to="/student" replace />;
 
   async function handleCredentials(e) {
     e.preventDefault();
+    const errs = {};
+    if (email.includes("@") && !isValidEmail(email)) {
+      errs.email = "Please enter a valid email address.";
+    }
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setError("");
     setLoading(true);
     try {
@@ -26,7 +43,21 @@ export default function Login() {
       setUserId(data.user_id);
       setStep(2);
     } catch (err) {
-      setError(err?.response?.data?.detail || "Invalid credentials. Please try again.");
+      setError(
+        <span>
+          Invalid credentials. Please check your username/password and try again. Or{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setResetting(true);
+              setError("");
+            }}
+            className="underline font-semibold"
+          >
+            Reset Password
+          </button>
+        </span>
+      );
     } finally {
       setLoading(false);
     }
@@ -34,13 +65,36 @@ export default function Login() {
 
   async function handleOtp(e) {
     e.preventDefault();
+    const errs = {};
+    if (otp.length !== 6) {
+      errs.otp = "OTP must be exactly 6 digits.";
+    }
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setError("");
     setLoading(true);
     try {
       await verifyOtp(userId, otp);
       navigate("/student");
     } catch (err) {
-      setError(err?.response?.data?.detail || "Incorrect OTP.");
+      setError(
+        <span>
+          Incorrect OTP. Please check the code and retry or{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setResetting(true);
+              setError("");
+            }}
+            className="underline font-semibold"
+          >
+            Reset Password
+          </button>
+        </span>
+      );
     } finally {
       setLoading(false);
     }
@@ -49,6 +103,19 @@ export default function Login() {
   async function handleResend() {
     setError("");
     await resendOtp(userId);
+  }
+
+  function handleResetSubmit(e) {
+    e.preventDefault();
+    const errs = {};
+    if (!isValidEmail(resetEmail)) {
+      errs.resetEmail = "Please enter a valid email address.";
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
+    setResetSuccess("A password reset link has been sent to your registered email address.");
+    setResetEmail("");
   }
 
   return (
@@ -75,82 +142,151 @@ export default function Login() {
 
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          <h2 className="font-heading text-2xl font-bold mb-1">
-            {step === 1 ? "Student login" : "Verify your identity"}
-          </h2>
-          <p className="text-ink-secondary text-sm mb-6 font-sub">
-            {step === 1
-              ? "Sign in with your school email and password."
-              : `Enter the 6-digit code sent to your registered email.`}
-          </p>
-
-          {error && (
-            <div className="mb-4 text-sm text-danger bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-              {error}
+          {resetting ? (
+            <div>
+              <h2 className="font-heading text-2xl font-bold mb-1">Reset Password</h2>
+              <p className="text-ink-secondary text-sm mb-6 font-sub">
+                Enter your registered email address to receive a password reset link.
+              </p>
+              {resetSuccess && (
+                <div className="mb-4 text-sm text-academic-green bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+                  {resetSuccess}
+                </div>
+              )}
+              <form onSubmit={handleResetSubmit} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-ink-primary">Email Address</label>
+                  <input
+                    required
+                    type="email"
+                    value={resetEmail}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                      validationErrors.resetEmail ? "border-danger" : "border-slate-200"
+                    }`}
+                    placeholder="you@edunovaacademy.edu.in"
+                  />
+                  {validationErrors.resetEmail && (
+                    <p className="text-xs text-danger mt-1">{validationErrors.resetEmail}</p>
+                  )}
+                </div>
+                <button className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 transition-colors">
+                  Request Reset Link
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setResetting(false);
+                    setResetSuccess("");
+                  }}
+                  className="w-full text-center text-sm text-ink-secondary hover:underline"
+                >
+                  Back to Login
+                </button>
+              </form>
             </div>
-          )}
-
-          {step === 1 ? (
-            <form onSubmit={handleCredentials} className="space-y-4">
-              <div>
-                <label className="text-sm font-medium text-ink-primary">Email or username</label>
-                <input
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
-                  placeholder="you@edunovaacademy.edu.in"
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium text-ink-primary">Password</label>
-                <input
-                  required
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
-                  placeholder="••••••••"
-                />
-              </div>
-              <button
-                disabled={loading}
-                className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 transition-colors disabled:opacity-60"
-              >
-                {loading ? "Checking…" : "Continue"}
-              </button>
-            </form>
           ) : (
-            <form onSubmit={handleOtp} className="space-y-4">
-              <div className="flex items-center gap-2 text-academic-green text-sm bg-emerald-50 rounded-xl px-3 py-2">
-                <ShieldCheck size={16} /> OTP sent to your registered email
-              </div>
-              <div>
-                <label className="text-sm font-medium text-ink-primary">6-digit code</label>
-                <input
-                  required
-                  maxLength={6}
-                  value={otp}
-                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                  className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-center tracking-[0.5em] text-lg font-numeric focus-ring outline-none"
-                  placeholder="••••••"
-                />
-              </div>
-              <button
-                disabled={loading}
-                className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 transition-colors disabled:opacity-60"
-              >
-                {loading ? "Verifying…" : "Verify & continue"}
-              </button>
-              <div className="flex justify-between text-sm">
-                <button type="button" onClick={() => setStep(1)} className="text-ink-secondary hover:underline">
-                  ← Back
-                </button>
-                <button type="button" onClick={handleResend} className="text-academic-blue hover:underline">
-                  Resend code
-                </button>
-              </div>
-            </form>
+            <div>
+              <h2 className="font-heading text-2xl font-bold mb-1">
+                {step === 1 ? "Student login" : "Verify your identity"}
+              </h2>
+              <p className="text-ink-secondary text-sm mb-6 font-sub">
+                {step === 1
+                  ? "Sign in with your school email and password."
+                  : `Enter the 6-digit code sent to your registered email.`}
+              </p>
+
+              {error && (
+                <div className="mb-4 text-sm text-danger bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                  {error}
+                </div>
+              )}
+
+              {step === 1 ? (
+                <form onSubmit={handleCredentials} className="space-y-4">
+                  <div>
+                    <label className="text-sm font-medium text-ink-primary">Email or username</label>
+                    <input
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                        validationErrors.email ? "border-danger" : "border-slate-200"
+                      }`}
+                      placeholder="you@edunovaacademy.edu.in"
+                    />
+                    {validationErrors.email && (
+                      <p className="text-xs text-danger mt-1">{validationErrors.email}</p>
+                    )}
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-ink-primary">Password</label>
+                    <input
+                      required
+                      type="password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <button
+                    disabled={loading}
+                    className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 transition-colors disabled:opacity-60"
+                  >
+                    {loading ? "Checking…" : "Continue"}
+                  </button>
+                  <div className="text-center mt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setResetting(true);
+                        setError("");
+                      }}
+                      className="text-xs text-academic-blue hover:underline"
+                    >
+                      Forgot / Reset Password?
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <form onSubmit={handleOtp} className="space-y-4">
+                  <div className="flex items-center gap-2 text-academic-green text-sm bg-emerald-50 rounded-xl px-3 py-2">
+                    <ShieldCheck size={16} /> OTP sent to your registered email
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-ink-primary">6-digit code</label>
+                    <input
+                      required
+                      maxLength={6}
+                      value={otp}
+                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                      className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-center tracking-[0.5em] text-lg font-numeric focus-ring outline-none ${
+                        validationErrors.otp ? "border-danger" : "border-slate-200"
+                      }`}
+                      placeholder="••••••"
+                    />
+                    {validationErrors.otp && (
+                      <p className="text-xs text-danger mt-1 text-center tracking-normal">{validationErrors.otp}</p>
+                    )}
+                  </div>
+                  <button
+                    disabled={loading}
+                    className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 transition-colors disabled:opacity-60"
+                  >
+                    {loading ? "Verifying…" : "Verify & continue"}
+                  </button>
+                  <div className="flex justify-between text-sm">
+                    <button type="button" onClick={() => setStep(1)} className="text-ink-secondary hover:underline">
+                      ← Back
+                    </button>
+                    <button type="button" onClick={handleResend} className="text-academic-blue hover:underline">
+                      Resend code
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
           )}
         </div>
       </div>

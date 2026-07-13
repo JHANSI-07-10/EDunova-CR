@@ -1,12 +1,15 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { isPositiveNumber } from "../../../utils/validation";
+
 
 export default function Alumni() {
   const [alumni, setAlumni] = useState(null);
   const [year, setYear] = useState("");
   const [form, setForm] = useState({ student_id: "", graduation_year: "", current_occupation: "", higher_studies_details: "" });
   const [toast, setToast] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   function load() {
     api.get(`/admin-portal/alumni/${year ? `?graduation_year=${year}` : ""}`).then(({ data }) => setAlumni(data)).catch(() => setAlumni([]));
@@ -15,6 +18,25 @@ export default function Alumni() {
 
   async function save(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isPositiveNumber(form.student_id)) {
+      errs.student_id = "Student ID must be a positive number.";
+    }
+    if (!isPositiveNumber(form.graduation_year)) {
+      errs.graduation_year = "Graduation year must be a positive number.";
+    } else {
+      const gYear = Number(form.graduation_year);
+      if (gYear < 1900 || gYear > 2100) {
+        errs.graduation_year = "Graduation year must be between 1900 and 2100.";
+      }
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
+
     try {
       await api.post("/admin-portal/alumni/", form);
       setForm({ student_id: "", graduation_year: "", current_occupation: "", higher_studies_details: "" });
@@ -28,10 +50,30 @@ export default function Alumni() {
       <Card>
         <SectionTitle>Add / update alumni record</SectionTitle>
         <form onSubmit={save} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <input required placeholder="Former student user ID" value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input required type="number" placeholder="Graduation year" value={form.graduation_year} onChange={(e) => setForm({ ...form, graduation_year: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input placeholder="Current occupation" value={form.current_occupation} onChange={(e) => setForm({ ...form, current_occupation: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input placeholder="Higher studies details" value={form.higher_studies_details} onChange={(e) => setForm({ ...form, higher_studies_details: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+          <div>
+            <input required placeholder="Former student user ID" value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })}
+              className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                validationErrors.student_id ? "border-danger" : "border-slate-200"
+              }`} />
+            {validationErrors.student_id && (
+              <p className="text-xs text-danger mt-1">{validationErrors.student_id}</p>
+            )}
+          </div>
+          <div>
+            <input required type="number" placeholder="Graduation year" value={form.graduation_year} onChange={(e) => setForm({ ...form, graduation_year: e.target.value })}
+              className={`w-full rounded-xl border px-3 py-2 text-sm ${
+                validationErrors.graduation_year ? "border-danger" : "border-slate-200"
+              }`} />
+            {validationErrors.graduation_year && (
+              <p className="text-xs text-danger mt-1">{validationErrors.graduation_year}</p>
+            )}
+          </div>
+          <div>
+            <input placeholder="Current occupation" value={form.current_occupation} onChange={(e) => setForm({ ...form, current_occupation: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+          </div>
+          <div>
+            <input placeholder="Higher studies details" value={form.higher_studies_details} onChange={(e) => setForm({ ...form, higher_studies_details: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+          </div>
           <button className="sm:col-span-2 lg:col-span-4 bg-academic-blue text-white rounded-xl py-2 font-medium">Save record</button>
         </form>
       </Card>

@@ -50,7 +50,11 @@ export default function MarksEntry() {
         })),
         submit,
       });
-      setToast(data.detail);
+      if (!submit) {
+        setToast("Marks saved as draft. System notice: A reminder has been sent to complete the marks entry.");
+      } else {
+        setToast(data.detail);
+      }
       if (submit) {
         const refreshed = await api.get("/teacher/marks-entry/", { params: { exam_schedule_id: examId } });
         setRows(refreshed.data.rows);

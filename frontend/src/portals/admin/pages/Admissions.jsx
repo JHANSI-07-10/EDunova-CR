@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
+import { isNonEmptyString, isValidEmail, isValidPhone } from "../../../utils/validation";
 import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
 import { Plus, X, UserPlus } from "lucide-react";
+
 
 const TONE = {
   Registered: "slate", Verification: "blue", Screening: "gold",
@@ -152,9 +154,40 @@ function ManualAdmissionForm({ onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   async function submit(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(form.applicant_name)) {
+      errs.applicant_name = "Applicant name is required.";
+    }
+    if (!form.date_of_birth) {
+      errs.date_of_birth = "Date of birth is required.";
+    } else {
+      const dob = new Date(form.date_of_birth);
+      if (dob > new Date()) {
+        errs.date_of_birth = "Date of birth cannot be in the future.";
+      }
+    }
+    if (!isNonEmptyString(form.parent_name)) {
+      errs.parent_name = "Parent name is required.";
+    }
+    if (!isValidPhone(form.parent_phone)) {
+      errs.parent_phone = "Please enter a valid phone number (7-15 digits).";
+    }
+    if (!isValidEmail(form.parent_email)) {
+      errs.parent_email = "Please enter a valid email address.";
+    }
+    if (!isNonEmptyString(form.address)) {
+      errs.address = "Address is required.";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setBusy(true);
     setError("");
     try {
@@ -190,8 +223,13 @@ function ManualAdmissionForm({ onClose, onSaved }) {
                 value={form.applicant_name}
                 onChange={(e) => setForm({ ...form, applicant_name: e.target.value })}
                 placeholder="Full Name"
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring"
+                className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus-ring ${
+                  validationErrors.applicant_name ? "border-danger" : "border-slate-200"
+                }`}
               />
+              {validationErrors.applicant_name && (
+                <p className="text-xs text-danger">{validationErrors.applicant_name}</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -201,8 +239,13 @@ function ManualAdmissionForm({ onClose, onSaved }) {
                 type="date"
                 value={form.date_of_birth}
                 onChange={(e) => setForm({ ...form, date_of_birth: e.target.value })}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring"
+                className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus-ring ${
+                  validationErrors.date_of_birth ? "border-danger" : "border-slate-200"
+                }`}
               />
+              {validationErrors.date_of_birth && (
+                <p className="text-xs text-danger">{validationErrors.date_of_birth}</p>
+              )}
             </div>
 
             <div className="flex flex-col gap-1">
@@ -243,8 +286,13 @@ function ManualAdmissionForm({ onClose, onSaved }) {
                   value={form.parent_name}
                   onChange={(e) => setForm({ ...form, parent_name: e.target.value })}
                   placeholder="Parent/Guardian Full Name"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring"
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus-ring ${
+                    validationErrors.parent_name ? "border-danger" : "border-slate-200"
+                  }`}
                 />
+                {validationErrors.parent_name && (
+                  <p className="text-xs text-danger">{validationErrors.parent_name}</p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1">
@@ -255,8 +303,13 @@ function ManualAdmissionForm({ onClose, onSaved }) {
                   value={form.parent_phone}
                   onChange={(e) => setForm({ ...form, parent_phone: e.target.value })}
                   placeholder="e.g. +91 9876543210"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring"
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus-ring ${
+                    validationErrors.parent_phone ? "border-danger" : "border-slate-200"
+                  }`}
                 />
+                {validationErrors.parent_phone && (
+                  <p className="text-xs text-danger">{validationErrors.parent_phone}</p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1">
@@ -267,8 +320,13 @@ function ManualAdmissionForm({ onClose, onSaved }) {
                   value={form.parent_email}
                   onChange={(e) => setForm({ ...form, parent_email: e.target.value })}
                   placeholder="email@example.com"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring"
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus-ring ${
+                    validationErrors.parent_email ? "border-danger" : "border-slate-200"
+                  }`}
                 />
+                {validationErrors.parent_email && (
+                  <p className="text-xs text-danger">{validationErrors.parent_email}</p>
+                )}
               </div>
 
               <div className="flex flex-col gap-1 col-span-2">
@@ -279,8 +337,13 @@ function ManualAdmissionForm({ onClose, onSaved }) {
                   value={form.address}
                   onChange={(e) => setForm({ ...form, address: e.target.value })}
                   placeholder="Complete Address"
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring resize-none"
+                  className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus-ring resize-none ${
+                    validationErrors.address ? "border-danger" : "border-slate-200"
+                  }`}
                 />
+                {validationErrors.address && (
+                  <p className="text-xs text-danger">{validationErrors.address}</p>
+                )}
               </div>
 
               <div className="col-span-2 flex items-center gap-2 mt-1">

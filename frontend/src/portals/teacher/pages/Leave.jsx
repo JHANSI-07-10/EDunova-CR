@@ -2,6 +2,8 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString, isValidDateRange } from "../../../utils/validation";
+
 
 const STATUS_TONE = { Pending: "gold", Approved: "green", Rejected: "red" };
 
@@ -69,9 +71,23 @@ function LeaveForm({ onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   async function submit(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(form.reason)) {
+      errs.reason = "Reason is required and cannot be empty.";
+    }
+    if (!isValidDateRange(form.start_date, form.end_date)) {
+      errs.end_date = "End date must be on or after the start date.";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setBusy(true);
     setError("");
     try {
@@ -101,14 +117,32 @@ function LeaveForm({ onClose, onSaved }) {
             <option>Academic</option>
           </select>
           <div className="grid grid-cols-2 gap-3">
-            <input type="date" value={form.start_date} onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
-            <input type="date" value={form.end_date} onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+            <div>
+              <label className="text-xs text-ink-secondary">Start date</label>
+              <input type="date" value={form.start_date} onChange={(e) => setForm((f) => ({ ...f, start_date: e.target.value }))}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+            </div>
+            <div>
+              <label className="text-xs text-ink-secondary">End date</label>
+              <input type="date" value={form.end_date} onChange={(e) => setForm((f) => ({ ...f, end_date: e.target.value }))}
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${
+                  validationErrors.end_date ? "border-danger" : "border-slate-200"
+                }`} />
+              {validationErrors.end_date && (
+                <p className="text-xs text-danger mt-1">{validationErrors.end_date}</p>
+              )}
+            </div>
           </div>
-          <textarea required rows={3} placeholder="Reason" value={form.reason}
-            onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none resize-none" />
+          <div>
+            <textarea required rows={3} placeholder="Reason" value={form.reason}
+              onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${
+                validationErrors.reason ? "border-danger" : "border-slate-200"
+              }`} />
+            {validationErrors.reason && (
+              <p className="text-xs text-danger mt-1">{validationErrors.reason}</p>
+            )}
+          </div>
           <button disabled={busy} className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 disabled:opacity-60">
             {busy ? "Submitting…" : "Submit request"}
           </button>

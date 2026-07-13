@@ -439,14 +439,14 @@ class MarksEntryView(TeacherMixin, APIView):
         exam_id = request.query_params.get("exam_schedule_id")
         if not exam_id or not table_exists("portal_exam_schedule"):
             return Response({"exam": None, "rows": []})
-        exam = row("SELECT e.id, e.exam_name, e.max_marks, c.name || '-' || c.section AS class_name, s.name AS subject_name FROM portal_exam_schedule e JOIN portal_class c ON c.id=e.class_id JOIN portal_subject s ON s.id=e.subject_id WHERE e.id=%s", [exam_id])
+        exam = row("SELECT e.id, e.exam_name, e.max_marks, e.status, c.name || '-' || c.section AS class_name, s.name AS subject_name FROM portal_exam_schedule e JOIN portal_class c ON c.id=e.class_id JOIN portal_subject s ON s.id=e.subject_id WHERE e.id=%s", [exam_id])
         if not exam:
             return Response({"exam": None, "rows": []})
         data = rows(
             """
             SELECT u.id AS student, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name,
                    sp.admission_number, r.marks_obtained, r.grade_letter, r.remarks,
-                   CASE WHEN r.id IS NULL THEN false ELSE true END AS published
+                   CASE WHEN e.status IN ('Published', 'Submitted') THEN true ELSE false END AS published
             FROM portal_student_enrollment se
             JOIN portal_exam_schedule e ON e.class_id=se.class_id
             JOIN auth_user u ON u.id=se.student_id
@@ -461,11 +461,15 @@ class MarksEntryView(TeacherMixin, APIView):
         if not table_exists("portal_result"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
         exam_id = request.data.get("exam_schedule_id")
-        # Accept both 'entries' (frontend key) and 'rows' (legacy)
         marks_rows = request.data.get("entries") or request.data.get("rows", [])
         submit = request.data.get("submit", True)
-        exam = row("SELECT max_marks FROM portal_exam_schedule WHERE id=%s", [exam_id])
-        max_marks = exam["max_marks"] if exam else 100
+        
+        # Verify current status is not Published or Submitted to prevent unauthorized edits
+        current = row("SELECT status, max_marks FROM portal_exam_schedule WHERE id=%s", [exam_id])
+        if current and current.get("status") in ("Published", "Submitted"):
+            return Response({"detail": "Cannot modify marks after they are submitted or published."}, status=400)
+
+        max_marks = current["max_marks"] if current else 100
         with connection.cursor() as cursor:
             for r in marks_rows:
                 raw = r.get("marks_obtained")
@@ -482,6 +486,10 @@ class MarksEntryView(TeacherMixin, APIView):
                     DO UPDATE SET marks_obtained=EXCLUDED.marks_obtained, grade_letter=EXCLUDED.grade_letter, grade_points=EXCLUDED.grade_points, remarks=EXCLUDED.remarks
                     """, [r.get("student"), exam_id, marks, grade, round(pct/10, 2), r.get("remarks", "")]
                 )
+            # Update exam schedule status
+            new_status = "Submitted" if submit else "Draft"
+            cursor.execute("UPDATE portal_exam_schedule SET status=%s WHERE id=%s", [new_status, exam_id])
+            
         detail = "Marks submitted for publication." if submit else "Marks saved as draft."
         return Response({"detail": detail})
 

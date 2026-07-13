@@ -98,7 +98,7 @@ class OverallRankListView(AdminMixin, APIView):
             JOIN portal_exam_schedule e ON e.id = r.exam_schedule_id
             JOIN auth_user u ON u.id = r.student_id
             LEFT JOIN portal_student_enrollment se ON se.student_id = r.student_id AND se.class_id = e.class_id
-            WHERE e.class_id = %s AND e.exam_name = %s
+            WHERE e.class_id = %s AND e.exam_name = %s AND e.status = 'Published'
             GROUP BY r.student_id, u.first_name, u.last_name, u.username, se.roll_number
             ORDER BY overall_rank
             """,
@@ -118,7 +118,7 @@ def _report_card_data(student_id, exam_name):
         FROM portal_result r
         JOIN portal_exam_schedule e ON e.id = r.exam_schedule_id
         JOIN portal_subject s ON s.id = e.subject_id
-        WHERE r.student_id = %s AND e.exam_name = %s
+        WHERE r.student_id = %s AND e.exam_name = %s AND e.status = 'Published'
         ORDER BY s.name
         """,
         [student_id, exam_name],
@@ -179,3 +179,39 @@ class StudentReportCardView(StudentOnlyMixin, APIView):
             return Response({"detail": "exam_name is required."}, status=400)
         data = _report_card_data(request.user.id, exam_name)
         return Response(serialise(data))
+
+
+class AdminExamActionView(AdminMixin, APIView):
+    """GET to list all exams with status.
+    POST /admin-portal/exams/<int:exam_id>/action/
+    Body: {action: 'Publish' | 'Return'}"""
+    def get(self, request):
+        if not table_exists("portal_exam_schedule"):
+            return Response([])
+        data = rows(
+            """
+            SELECT e.id, e.exam_name, e.exam_type, e.exam_date, e.max_marks, e.status,
+                   c.name || '-' || c.section AS class_name, s.name AS subject_name,
+                   COALESCE(u.first_name || ' ' || u.last_name, u.username) AS teacher_name
+            FROM portal_exam_schedule e
+            JOIN portal_class c ON c.id = e.class_id
+            JOIN portal_subject s ON s.id = e.subject_id
+            LEFT JOIN auth_user u ON u.id = e.teacher_id
+            ORDER BY e.exam_date DESC
+            """
+        )
+        return Response(serialise(data))
+
+    def post(self, request, exam_id):
+        if not table_exists("portal_exam_schedule"):
+            return Response({"detail": "Exam schedule table not found."}, status=400)
+        action = request.data.get("action")
+        if action not in ("Publish", "Return"):
+            return Response({"detail": "Invalid action. Must be 'Publish' or 'Return'."}, status=400)
+        
+        new_status = "Published" if action == "Publish" else "Returned"
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE portal_exam_schedule SET status=%s WHERE id=%s", [new_status, exam_id])
+            
+        log_action(request.user, f"exams.status.{action.lower()}", "portal_exam_schedule", exam_id, {"status": new_status})
+        return Response({"detail": f"Exam status updated to {new_status}."})

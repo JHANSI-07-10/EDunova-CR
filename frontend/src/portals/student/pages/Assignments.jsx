@@ -2,6 +2,8 @@ import { CheckCircle2, UploadCloud, X, HelpCircle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString } from "../../../utils/validation";
+
 
 export default function Assignments() {
   const [items, setItems] = useState(null);
@@ -23,6 +25,7 @@ export default function Assignments() {
           {items.map((a) => {
             const submitted = !!a.my_submission;
             const overdue = new Date(a.due_date) < new Date();
+            const submittedLate = submitted && new Date(a.my_submission.submitted_at) > new Date(a.due_date);
             return (
               <Card key={a.id} className="flex flex-col justify-between">
                 <div>
@@ -34,7 +37,11 @@ export default function Assignments() {
                       </Badge>
                     </div>
                     {submitted ? (
-                      <Badge tone="green">Submitted</Badge>
+                      submittedLate ? (
+                        <Badge tone="orange">Marked Late</Badge>
+                      ) : (
+                        <Badge tone="green">Submitted on Time</Badge>
+                      )
                     ) : overdue ? (
                       <Badge tone="red">Overdue</Badge>
                     ) : (
@@ -43,6 +50,13 @@ export default function Assignments() {
                   </div>
                   <p className="text-xs text-ink-secondary mb-2">{a.subject_name} · {a.max_marks} marks</p>
                   <p className="text-sm text-ink-primary/90 mb-3">{a.description}</p>
+                  {submitted && (
+                    <p className="text-xs font-semibold mt-2 text-slate-500">
+                      {submittedLate 
+                        ? "⚠ Submission recorded after deadline. Marked late and flagged to teacher." 
+                        : "✓ Submission recorded. Teacher has been notified."}
+                    </p>
+                  )}
                 </div>
                 
                 <div className="flex items-center justify-between pt-3 border-t border-slate-100">
@@ -110,6 +124,8 @@ function SubmitModal({ assignment, onClose, onSubmitted }) {
   const [busy, setBusy] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
+
 
   const isQuiz = assignment.assignment_type === "Quiz";
   const questions = isQuiz
@@ -138,21 +154,31 @@ function SubmitModal({ assignment, onClose, onSubmitted }) {
 
   async function submit(e) {
     e.preventDefault();
-    if (isQuiz && Object.keys(answers).length < questions.length) {
-      setError("Please answer all questions before submitting.");
-      return;
-    }
-    if (!isQuiz) {
-      if (submissionMode === "type" && !typedText.trim()) {
-        setError("Please type your response first.");
-        return;
+    const errs = {};
+    if (isQuiz) {
+      const unanswered = [];
+      questions.forEach((q, idx) => {
+        if (!answers[idx]) {
+          unanswered.push(idx + 1);
+        }
+      });
+      if (unanswered.length > 0) {
+        errs.quiz = `Please answer all questions before submitting. Unanswered questions: ${unanswered.join(", ")}`;
       }
-      if (submissionMode === "upload" && !url) {
-        setError("Please select and upload your file first.");
-        return;
+    } else {
+      if (submissionMode === "type" && !isNonEmptyString(typedText)) {
+        errs.typedText = "Please write a response before submitting.";
+      }
+      if (submissionMode === "upload" && !isNonEmptyString(url)) {
+        errs.url = "Please upload a completed assignment file before submitting.";
       }
     }
 
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setBusy(true);
     setError("");
     try {
@@ -237,8 +263,13 @@ function SubmitModal({ assignment, onClose, onSubmitted }) {
                     placeholder="Start typing your response here..."
                     value={typedText}
                     onChange={e => setTypedText(e.target.value)}
-                    className="w-full rounded-xl border border-slate-200 p-3 text-sm focus-ring outline-none h-40"
+                    className={`w-full rounded-xl border p-3 text-sm focus-ring outline-none h-40 ${
+                      validationErrors.typedText ? "border-danger" : "border-slate-200"
+                    }`}
                   />
+                  {validationErrors.typedText && (
+                    <p className="text-xs text-danger mt-1">{validationErrors.typedText}</p>
+                  )}
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -265,8 +296,16 @@ function SubmitModal({ assignment, onClose, onSubmitted }) {
                       <span className="text-xs text-slate-400">No file selected</span>
                     )}
                   </div>
+                  {validationErrors.url && (
+                    <p className="text-xs text-danger mt-1">{validationErrors.url}</p>
+                  )}
                 </div>
               )}
+            </div>
+          )}
+          {validationErrors.quiz && (
+            <div className="mb-3 text-sm text-danger bg-red-50 border border-danger/30 rounded-xl px-3 py-2">
+              {validationErrors.quiz}
             </div>
           )}
 

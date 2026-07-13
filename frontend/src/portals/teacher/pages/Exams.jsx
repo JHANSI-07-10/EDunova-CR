@@ -2,6 +2,8 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isPositiveNumber } from "../../../utils/validation";
+
 
 export default function Exams() {
   const [items, setItems] = useState(null);
@@ -89,6 +91,7 @@ function ExamForm({ classes, onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     if (classes.length && !form.class_id) {
@@ -107,6 +110,25 @@ function ExamForm({ classes, onClose, onSaved }) {
 
   async function submit(e) {
     e.preventDefault();
+    const errs = {};
+    if (!form.class_id || !form.subject_id) {
+      errs.class_subject = "Please select a target class & subject.";
+    }
+    if (!isPositiveNumber(form.duration_minutes)) {
+      errs.duration_minutes = "Duration must be a positive number.";
+    }
+    if (!isPositiveNumber(form.max_marks)) {
+      errs.max_marks = "Max marks must be a positive number.";
+    }
+    if (!form.exam_date) {
+      errs.exam_date = "Exam date is required.";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setBusy(true);
     setError("");
     try {
@@ -128,16 +150,24 @@ function ExamForm({ classes, onClose, onSaved }) {
         </div>
         {error && <div className="mb-3 text-sm text-danger bg-red-50 rounded-xl px-3 py-2">{error}</div>}
         <form onSubmit={submit} className="space-y-3">
-          <select
-            value={form.class_id && form.subject_id ? `${form.class_id}-${form.subject_id}` : ""}
-            onChange={(e) => pickClassSubject(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
-          >
-            <option value="">Select Class & Subject</option>
-            {classes.map((c) => (
-              <option key={c.id} value={`${c.class_id}-${c.subject_id}`}>{c.class_name} — {c.subject_name}</option>
-            ))}
-          </select>
+          <div>
+            <select
+              value={form.class_id && form.subject_id ? `${form.class_id}-${form.subject_id}` : ""}
+              onChange={(e) => pickClassSubject(e.target.value)}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.class_subject ? "border-danger" : "border-slate-200"
+              }`}
+            >
+              <option value="">Select Class & Subject</option>
+              {classes.map((c) => (
+                <option key={c.id} value={`${c.class_id}-${c.subject_id}`}>{c.class_name} — {c.subject_name}</option>
+              ))}
+            </select>
+            {validationErrors.class_subject && (
+              <p className="text-xs text-danger mt-1">{validationErrors.class_subject}</p>
+            )}
+          </div>
+
           <select
             required
             value={form.exam_name}
@@ -158,21 +188,38 @@ function ExamForm({ classes, onClose, onSaved }) {
             <option>OMR</option>
           </select>
           <div className="grid grid-cols-2 gap-3">
-            <input type="date" value={form.exam_date} onChange={(e) => setForm((f) => ({ ...f, exam_date: e.target.value }))}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+            <div>
+              <input type="date" value={form.exam_date} onChange={(e) => setForm((f) => ({ ...f, exam_date: e.target.value }))}
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${
+                  validationErrors.exam_date ? "border-danger" : "border-slate-200"
+                }`} />
+              {validationErrors.exam_date && (
+                <p className="text-xs text-danger mt-1">{validationErrors.exam_date}</p>
+              )}
+            </div>
             <input type="time" value={form.start_time} onChange={(e) => setForm((f) => ({ ...f, start_time: e.target.value }))}
               className="rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-ink-secondary">Duration (min)</label>
-              <input type="number" value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+              <input type="number" value={form.duration_minutes} onChange={(e) => setForm((f) => ({ ...f, duration_minutes: Number(e.target.value) }))}
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${
+                  validationErrors.duration_minutes ? "border-danger" : "border-slate-200"
+                }`} />
+              {validationErrors.duration_minutes && (
+                <p className="text-xs text-danger mt-1">{validationErrors.duration_minutes}</p>
+              )}
             </div>
             <div>
               <label className="text-xs text-ink-secondary">Max marks</label>
-              <input type="number" value={form.max_marks} onChange={(e) => setForm((f) => ({ ...f, max_marks: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+              <input type="number" value={form.max_marks} onChange={(e) => setForm((f) => ({ ...f, max_marks: Number(e.target.value) }))}
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${
+                  validationErrors.max_marks ? "border-danger" : "border-slate-200"
+                }`} />
+              {validationErrors.max_marks && (
+                <p className="text-xs text-danger mt-1">{validationErrors.max_marks}</p>
+              )}
             </div>
           </div>
           <button

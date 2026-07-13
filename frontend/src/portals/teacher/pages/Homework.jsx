@@ -2,6 +2,8 @@ import { Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString, isValidDateRange } from "../../../utils/validation";
+
 
 export default function Homework() {
   const [items, setItems] = useState(null);
@@ -81,6 +83,7 @@ function HomeworkForm({ classes, onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   useEffect(() => {
     if (classes.length && !form.class_id) {
@@ -99,6 +102,25 @@ function HomeworkForm({ classes, onClose, onSaved }) {
 
   async function submit(e) {
     e.preventDefault();
+    const errs = {};
+    if (!form.class_id || !form.subject_id) {
+      errs.class_subject = "Please select a class and subject.";
+    }
+    if (!isNonEmptyString(form.title)) {
+      errs.title = "Title is required and cannot be empty.";
+    }
+    if (!isNonEmptyString(form.description)) {
+      errs.description = "Description is required and cannot be empty.";
+    }
+    if (!isValidDateRange(form.assigned_date, form.due_date)) {
+      errs.due_date = "Due date must be on or after the assigned date.";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setBusy(true);
     setError("");
     try {
@@ -120,31 +142,55 @@ function HomeworkForm({ classes, onClose, onSaved }) {
         </div>
         {error && <div className="mb-3 text-sm text-danger bg-red-50 rounded-xl px-3 py-2">{error}</div>}
         <form onSubmit={submit} className="space-y-3">
-          <select
-            value={form.class_id && form.subject_id ? `${form.class_id}-${form.subject_id}` : ""}
-            onChange={(e) => pickClassSubject(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
-          >
-            <option value="">Select Class & Subject</option>
-            {classes.map((c) => (
-              <option key={c.id} value={`${c.class_id}-${c.subject_id}`}>{c.class_name} — {c.subject_name}</option>
-            ))}
-          </select>
-          <input
-            required
-            placeholder="Title"
-            value={form.title}
-            onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
-          />
-          <textarea
-            required
-            rows={3}
-            placeholder="Description"
-            value={form.description}
-            onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none resize-none"
-          />
+          <div>
+            <select
+              value={form.class_id && form.subject_id ? `${form.class_id}-${form.subject_id}` : ""}
+              onChange={(e) => pickClassSubject(e.target.value)}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.class_subject ? "border-danger" : "border-slate-200"
+              }`}
+            >
+              <option value="">Select Class & Subject</option>
+              {classes.map((c) => (
+                <option key={c.id} value={`${c.class_id}-${c.subject_id}`}>{c.class_name} — {c.subject_name}</option>
+              ))}
+            </select>
+            {validationErrors.class_subject && (
+              <p className="text-xs text-danger mt-1">{validationErrors.class_subject}</p>
+            )}
+          </div>
+
+          <div>
+            <input
+              required
+              placeholder="Title"
+              value={form.title}
+              onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.title ? "border-danger" : "border-slate-200"
+              }`}
+            />
+            {validationErrors.title && (
+              <p className="text-xs text-danger mt-1">{validationErrors.title}</p>
+            )}
+          </div>
+
+          <div>
+            <textarea
+              required
+              rows={3}
+              placeholder="Description"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${
+                validationErrors.description ? "border-danger" : "border-slate-200"
+              }`}
+            />
+            {validationErrors.description && (
+              <p className="text-xs text-danger mt-1">{validationErrors.description}</p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs text-ink-secondary">Assigned date</label>
@@ -161,8 +207,13 @@ function HomeworkForm({ classes, onClose, onSaved }) {
                 type="date"
                 value={form.due_date}
                 onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none"
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${
+                  validationErrors.due_date ? "border-danger" : "border-slate-200"
+                }`}
               />
+              {validationErrors.due_date && (
+                <p className="text-xs text-danger mt-1">{validationErrors.due_date}</p>
+              )}
             </div>
           </div>
           <button

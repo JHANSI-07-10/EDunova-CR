@@ -2,6 +2,8 @@ import { Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString } from "../../../utils/validation";
+
 
 const DIFF_TONE = { Easy: "green", Medium: "gold", Hard: "red" };
 
@@ -77,23 +79,35 @@ export default function QuestionBank() {
 
 function QuestionForm({ subjects, onClose, onSaved }) {
   const [subject, setSubject] = useState(subjects[0]?.subject_id || "");
-  const [difficulty, setDifficulty] = useState("Medium");
+  const [difficulty, setDifficulty] = useState("Easy");
   const [text, setText] = useState("");
   const [answer, setAnswer] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   async function submit(e) {
     e.preventDefault();
+    const errs = {};
+    if (!subject) {
+      errs.subject = "Please select a subject.";
+    }
+    if (!isNonEmptyString(text)) {
+      errs.text = "Question text is required.";
+    }
+    if (!isNonEmptyString(answer)) {
+      errs.answer = "Expected answer is required.";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setBusy(true);
     setError("");
     try {
-      await api.post("/teacher/question-bank/", {
-        subject_id: subject,
-        difficulty_level: difficulty,
-        question_text: text,
-        answer_schema: { expected_answer: answer },
-      });
+      await api.post("/teacher/question-bank/", { subject_id: Number(subject), difficulty_level: difficulty, question_text: text, expected_answer: answer });
       onSaved();
     } catch (err) {
       setError(err?.response?.data?.detail || "Couldn't save question.");
@@ -111,15 +125,23 @@ function QuestionForm({ subjects, onClose, onSaved }) {
         </div>
         {error && <div className="mb-3 text-sm text-danger bg-red-50 rounded-xl px-3 py-2">{error}</div>}
         <form onSubmit={submit} className="space-y-3">
-          <select
-            value={subject}
-            onChange={(e) => setSubject(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
-          >
-            {subjects.map((s) => (
-              <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
-            ))}
-          </select>
+          <div>
+            <select
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.subject ? "border-danger" : "border-slate-200"
+              }`}
+            >
+              <option value="">Select Subject</option>
+              {subjects.map((s) => (
+                <option key={s.subject_id} value={s.subject_id}>{s.subject_name}</option>
+              ))}
+            </select>
+            {validationErrors.subject && (
+              <p className="text-xs text-danger mt-1">{validationErrors.subject}</p>
+            )}
+          </div>
           <select
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value)}
@@ -129,21 +151,35 @@ function QuestionForm({ subjects, onClose, onSaved }) {
             <option>Medium</option>
             <option>Hard</option>
           </select>
-          <textarea
-            required
-            rows={3}
-            placeholder="Question text"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none resize-none"
-          />
-          <input
-            required
-            placeholder="Expected answer"
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
-          />
+          <div>
+            <textarea
+              required
+              rows={3}
+              placeholder="Question text"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${
+                validationErrors.text ? "border-danger" : "border-slate-200"
+              }`}
+            />
+            {validationErrors.text && (
+              <p className="text-xs text-danger mt-1">{validationErrors.text}</p>
+            )}
+          </div>
+          <div>
+            <input
+              required
+              placeholder="Expected answer"
+              value={answer}
+              onChange={(e) => setAnswer(e.target.value)}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.answer ? "border-danger" : "border-slate-200"
+              }`}
+            />
+            {validationErrors.answer && (
+              <p className="text-xs text-danger mt-1">{validationErrors.answer}</p>
+            )}
+          </div>
           <button
             disabled={busy}
             className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 disabled:opacity-60"

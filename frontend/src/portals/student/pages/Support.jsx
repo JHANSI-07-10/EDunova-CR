@@ -2,15 +2,24 @@ import { LifeBuoy, Mail, Phone } from "lucide-react";
 import { useState } from "react";
 import { Card, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString } from "../../../utils/validation";
+
 
 export default function Support() {
   const [sent, setSent] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
+
 
   async function submit(e) {
     e.preventDefault();
     setError("");
+    if (!isNonEmptyString(message)) {
+      setValidationErrors({ message: "Message cannot be empty." });
+      return;
+    }
+    setValidationErrors({});
     try {
       // Post to the teacher messages endpoint — sends to user id 1 (admin/support)
       // Replace receiver id with your actual support staff user id
@@ -30,14 +39,21 @@ export default function Support() {
           Send a message and the support team will get back to you within 24 hours.
         </p>
         <form onSubmit={submit} className="space-y-3">
-          <textarea
-            required
-            rows={5}
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            placeholder="Describe your issue…"
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none resize-none"
-          />
+          <div>
+            <textarea
+              required
+              rows={5}
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              placeholder="Describe your issue…"
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${
+                validationErrors.message ? "border-danger" : "border-slate-200"
+              }`}
+            />
+            {validationErrors.message && (
+              <p className="text-xs text-danger mt-1">{validationErrors.message}</p>
+            )}
+          </div>
           <button className="bg-academic-blue text-white rounded-xl px-5 py-2.5 text-sm font-medium hover:bg-academic-blue/90">
             Send message
           </button>

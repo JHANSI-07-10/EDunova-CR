@@ -1,4 +1,4 @@
-import { AlertCircle, Bus, CheckCircle2, MapPin, Navigation, Phone, RefreshCw, User } from "lucide-react";
+import { AlertCircle, Bus, CheckCircle2, MapPin, Navigation, Phone, RefreshCw, User, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
@@ -8,6 +8,8 @@ export default function Transport() {
   const { activeChildId } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [feesLoading, setFeesLoading] = useState(true);
+  const [hasPendingFees, setHasPendingFees] = useState(false);
   const [toast, setToast] = useState("");
   const [requestType, setRequestType] = useState("Route Change");
   const [requestDetails, setRequestDetails] = useState("");
@@ -16,10 +18,18 @@ export default function Transport() {
   function load() {
     if (!activeChildId) return;
     setLoading(true);
+    setFeesLoading(true);
     api.get(`/parent/transport/?child_id=${activeChildId}`)
       .then(({ data }) => setData(data))
       .catch(() => setData({ allocation: null, last_location: null }))
       .finally(() => setLoading(false));
+
+    api.get(`/parent/fees/?child_id=${activeChildId}`)
+      .then(({ data }) => {
+        setHasPendingFees(data.pending && data.pending.length > 0);
+      })
+      .catch(() => {})
+      .finally(() => setFeesLoading(false));
   }
 
   useEffect(() => {
@@ -48,7 +58,22 @@ export default function Transport() {
     return <EmptyState label="Select a child from the top bar to view transport info." />;
   }
 
-  if (loading) return <Loader rows={3} />;
+  if (loading || feesLoading) return <Loader rows={3} />;
+
+  if (hasPendingFees) {
+    return (
+      <Card className="max-w-md mx-auto mt-12 p-8 text-center border-t-4 border-danger">
+        <Lock size={48} className="text-danger mx-auto mb-4" />
+        <h3 className="font-heading text-lg font-bold text-ink-primary mb-2">School Bus Tracking Locked</h3>
+        <p className="text-sm text-ink-secondary mb-6 leading-relaxed">
+          Access to live GPS school bus tracking and transport route requests is locked due to pending fees for your child. Please clear the outstanding balance to restore access.
+        </p>
+        <a href="/parent/fees" className="inline-flex items-center justify-center bg-academic-green text-white rounded-xl py-2.5 px-6 text-sm font-semibold hover:bg-academic-green/90 transition-colors shadow-md">
+          Pay Pending Fees
+        </a>
+      </Card>
+    );
+  }
   if (!data || !data.allocation) {
     return (
       <div className="space-y-6">

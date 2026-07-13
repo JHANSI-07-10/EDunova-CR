@@ -1,16 +1,41 @@
-import { Download, ScrollText } from "lucide-react";
+import { Download, ScrollText, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, EmptyState, Loader } from "../components/Common";
 import api from "../lib/api";
 
 export default function Certificates() {
   const [items, setItems] = useState(null);
+  const [hasPendingFees, setHasPendingFees] = useState(false);
+  const [feesLoading, setFeesLoading] = useState(true);
 
   useEffect(() => {
+    setFeesLoading(true);
+    api.get("/student/fees/")
+      .then(({ data }) => {
+        setHasPendingFees(data.pending && data.pending.length > 0);
+      })
+      .catch(() => {})
+      .finally(() => setFeesLoading(false));
+
     api.get("/student/certificates/").then(({ data }) => setItems(data)).catch(() => setItems([]));
   }, []);
 
-  if (!items) return <Loader rows={3} />;
+  if (feesLoading || !items) return <Loader rows={3} />;
+
+  if (hasPendingFees) {
+    return (
+      <Card className="max-w-md mx-auto mt-12 p-8 text-center border-t-4 border-danger">
+        <Lock size={48} className="text-danger mx-auto mb-4" />
+        <h3 className="font-heading text-lg font-bold text-ink-primary mb-2">Certificates Downloads Locked</h3>
+        <p className="text-sm text-ink-secondary mb-6 leading-relaxed">
+          Access to downloading student certificates is locked due to pending fees. Please clear your outstanding balance to unlock downloads.
+        </p>
+        <a href="/student/fees" className="inline-flex items-center justify-center bg-academic-blue text-white rounded-xl py-2.5 px-6 text-sm font-semibold hover:bg-academic-blue/90 transition-colors shadow-md">
+          Pay Pending Fees
+        </a>
+      </Card>
+    );
+  }
   if (!items.length) return <EmptyState label="No certificates issued yet." />;
 
   return (

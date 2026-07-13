@@ -20,6 +20,7 @@ export default function Attendance() {
   const [rows, setRows] = useState(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState("");
+  const [error, setError] = useState("");
 
   useEffect(() => {
     api.get("/teacher/classes/").then(({ data }) => {
@@ -31,12 +32,14 @@ export default function Attendance() {
   useEffect(() => {
     if (!classId) return;
     setRows(null);
+    setError("");
     api
       .get("/teacher/attendance/", { params: { class_id: classId, date } })
       .then(({ data }) => setRows(data.records));
   }, [classId, date]);
 
   function cycle(idx) {
+    setError("");
     setRows((prev) => {
       const copy = [...prev];
       const current = copy[idx].status;
@@ -47,24 +50,31 @@ export default function Attendance() {
   }
 
   function markAllPresent() {
+    setError("");
     setRows((prev) => prev.map((r) => ({ ...r, status: "Present" })));
   }
 
+  const allMarked = rows && rows.every((r) => r.status);
+
   async function save() {
+    if (!allMarked) {
+      setError("System Flag: Incomplete Attendance. All students must be marked with a status before saving attendance.");
+      setToast("System Flag: Incomplete Attendance.");
+      return;
+    }
+    setError("");
     setSaving(true);
     try {
       const { data } = await api.post("/teacher/attendance/", {
         class_id: classId,
         date,
-        records: rows.map((r) => ({ student: r.student, status: r.status || "Present", remarks: r.remarks })),
+        records: rows.map((r) => ({ student: r.student, status: r.status, remarks: r.remarks })),
       });
       setToast(data.detail);
     } finally {
       setSaving(false);
     }
   }
-
-  const allMarked = rows && rows.every((r) => r.status);
 
   return (
     <div className="space-y-4">
@@ -92,6 +102,11 @@ export default function Attendance() {
       </div>
 
       <Card>
+        {error && (
+          <div className="mb-4 text-sm text-danger bg-red-50 border border-red-100 rounded-xl px-4 py-2.5 font-medium animate-pulse">
+            {error}
+          </div>
+        )}
         <SectionTitle
           action={
             <Badge tone={allMarked ? "green" : "gold"}>

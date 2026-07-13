@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString, isValidDateRange } from "../../../utils/validation";
+
 
 const STATUS_TONE = { Present: "green", Absent: "red", Late: "gold", Medical_Leave: "blue" };
 const COLORS = { Present: "#10B981", Absent: "#DC2626", Late: "#FBBF24", "Medical Leave": "#1E3A8A" };
@@ -18,6 +20,8 @@ export default function Attendance() {
   const [leaveForm, setLeaveForm] = useState({ leave_type: "Sick Leave", start_date: "", end_date: "", reason: "" });
   const [submittingLeave, setSubmittingLeave] = useState(false);
   const [toast, setToast] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
+
 
   function loadAttendance() {
     setLoading(true);
@@ -47,6 +51,19 @@ export default function Attendance() {
 
   async function submitLeave(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(leaveForm.reason)) {
+      errs.reason = "Reason is required.";
+    }
+    if (!isValidDateRange(leaveForm.start_date, leaveForm.end_date)) {
+      errs.end_date = "End date must be on or after the start date.";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setSubmittingLeave(true);
     try {
       await api.post("/student/leaves/", leaveForm);
@@ -195,8 +212,13 @@ export default function Attendance() {
                     type="date"
                     value={leaveForm.end_date}
                     onChange={(e) => setLeaveForm({ ...leaveForm, end_date: e.target.value })}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none"
+                    className={`w-full border rounded-xl px-3 py-2 text-sm outline-none ${
+                      validationErrors.end_date ? "border-danger" : "border-slate-200"
+                    }`}
                   />
+                  {validationErrors.end_date && (
+                    <p className="text-xs text-danger mt-1">{validationErrors.end_date}</p>
+                  )}
                 </div>
               </div>
 
@@ -208,8 +230,13 @@ export default function Attendance() {
                   value={leaveForm.reason}
                   onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
                   placeholder="Explain the reason for leave..."
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none resize-none"
+                  className={`w-full border rounded-xl px-3 py-2 text-sm outline-none resize-none ${
+                    validationErrors.reason ? "border-danger" : "border-slate-200"
+                  }`}
                 />
+                {validationErrors.reason && (
+                  <p className="text-xs text-danger mt-1">{validationErrors.reason}</p>
+                )}
               </div>
 
               <button

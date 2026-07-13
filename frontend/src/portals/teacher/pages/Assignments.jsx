@@ -2,6 +2,8 @@ import { Plus, Trash2, Edit2, X, PlusCircle, CheckCircle2, FileUp, Sparkles } fr
 import { useEffect, useState } from "react";
 import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString, isPositiveNumber } from "../../../utils/validation";
+
 
 export default function Assignments() {
   const [items, setItems] = useState(null);
@@ -146,6 +148,7 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
   const [uploading, setUploading] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   async function handleScanPdf(e) {
     const file = e.target.files[0];
@@ -248,18 +251,39 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
 
   async function submit(e) {
     e.preventDefault();
-    if (form.assignment_type === "Quiz" && form.quiz_questions.length === 0) {
-      setError("Please add at least one question to the Quiz.");
-      return;
+    const errs = {};
+    if (!form.class_id || !form.subject_id) {
+      errs.class_subject = "Please select a target class & subject.";
     }
-    // Verify all questions have correct answers fixed
+    if (!isNonEmptyString(form.title)) {
+      errs.title = "Title is required.";
+    }
+    if (!isNonEmptyString(form.description)) {
+      errs.description = "Description is required.";
+    }
+    if (!isPositiveNumber(form.max_marks)) {
+      errs.max_marks = "Max marks must be a positive number.";
+    }
+    if (!form.due_date) {
+      errs.due_date = "Due date is required.";
+    }
+
     if (form.assignment_type === "Quiz") {
-      const missing = form.quiz_questions.some(q => !q.question_text || !q.correct_answer || q.options.some(o => !o));
-      if (missing) {
-        setError("All questions, options, and fixed correct answers must be filled out.");
-        return;
+      if (form.quiz_questions.length === 0) {
+        errs.quiz = "Please add at least one question to the Quiz.";
+      } else {
+        const missing = form.quiz_questions.some(q => !q.question_text || !q.correct_answer || q.options.some(o => !o));
+        if (missing) {
+          errs.quiz = "All questions, options, and correct answers must be filled out.";
+        }
       }
     }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
 
     setBusy(true);
     setError("");
@@ -292,13 +316,18 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
               <select
                 value={form.class_id && form.subject_id ? `${form.class_id}-${form.subject_id}` : ""}
                 onChange={(e) => pickClassSubject(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                  validationErrors.class_subject ? "border-danger" : "border-slate-200"
+                }`}
               >
                 <option value="">Select Class & Subject</option>
                 {classes.map((c) => (
                   <option key={c.id} value={`${c.class_id}-${c.subject_id}`}>{c.class_name} — {c.subject_name}</option>
                 ))}
               </select>
+              {validationErrors.class_subject && (
+                <p className="text-xs text-danger mt-1">{validationErrors.class_subject}</p>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-ink-secondary uppercase">Assignment Type</label>
@@ -320,8 +349,13 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
               placeholder="e.g. Chapter 3 Integration Test"
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.title ? "border-danger" : "border-slate-200"
+              }`}
             />
+            {validationErrors.title && (
+              <p className="text-xs text-danger mt-1">{validationErrors.title}</p>
+            )}
           </div>
 
           <div>
@@ -332,8 +366,13 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
               placeholder="Instructions or guidelines..."
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none resize-none"
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${
+                validationErrors.description ? "border-danger" : "border-slate-200"
+              }`}
             />
+            {validationErrors.description && (
+              <p className="text-xs text-danger mt-1">{validationErrors.description}</p>
+            )}
           </div>
 
           {form.assignment_type === "File" && (
@@ -371,8 +410,13 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
                 type="number"
                 value={form.max_marks}
                 onChange={(e) => setForm((f) => ({ ...f, max_marks: Number(e.target.value) }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none"
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${
+                  validationErrors.max_marks ? "border-danger" : "border-slate-200"
+                }`}
               />
+              {validationErrors.max_marks && (
+                <p className="text-xs text-danger mt-1">{validationErrors.max_marks}</p>
+              )}
             </div>
             <div>
               <label className="text-xs font-semibold text-ink-secondary uppercase">Due Date & Time</label>
@@ -380,10 +424,19 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
                 type="datetime-local"
                 value={form.due_date}
                 onChange={(e) => setForm((f) => ({ ...f, due_date: e.target.value }))}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none"
+                className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${
+                  validationErrors.due_date ? "border-danger" : "border-slate-200"
+                }`}
               />
+              {validationErrors.due_date && (
+                <p className="text-xs text-danger mt-1">{validationErrors.due_date}</p>
+              )}
             </div>
           </div>
+
+          {validationErrors.quiz && (
+            <div className="text-sm text-danger bg-red-50 rounded-xl px-3 py-2 border border-danger/35">{validationErrors.quiz}</div>
+          )}
 
           {form.assignment_type === "Quiz" && (
             <div className="space-y-4 pt-3 border-t border-slate-100">

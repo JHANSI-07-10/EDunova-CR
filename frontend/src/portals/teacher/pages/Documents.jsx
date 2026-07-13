@@ -2,6 +2,8 @@ import { FileText, PlayCircle, Plus, Radio, Video, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, EmptyState, Loader, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString } from "../../../utils/validation";
+
 
 const ICONS = { Video_Link: PlayCircle, Recorded_Video_File: Video, PDF_Notes: FileText, Live_Class_URL: Radio };
 
@@ -74,6 +76,7 @@ function DocForm({ classes, onClose, onSaved }) {
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   function pickClass(classId) {
     const match = classes.find((c) => String(c.class_id) === classId);
@@ -82,6 +85,24 @@ function DocForm({ classes, onClose, onSaved }) {
 
   async function submit(e) {
     e.preventDefault();
+    const errs = {};
+    if (!form.class_id) {
+      errs.class_id = "Please select a target class.";
+    }
+    if (!isNonEmptyString(form.title)) {
+      errs.title = "Title is required.";
+    }
+    if (!isNonEmptyString(form.resource_url)) {
+      errs.resource_url = "Resource URL is required.";
+    } else if (!form.resource_url.startsWith("http://") && !form.resource_url.startsWith("https://") && !form.resource_url.startsWith("/")) {
+      errs.resource_url = "Please enter a valid URL or path (e.g. starts with http://, https://, or /).";
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     setBusy(true);
     setError("");
     try {
@@ -103,22 +124,49 @@ function DocForm({ classes, onClose, onSaved }) {
         </div>
         {error && <div className="mb-3 text-sm text-danger bg-red-50 rounded-xl px-3 py-2">{error}</div>}
         <form onSubmit={submit} className="space-y-3">
-          <select value={form.class_id} onChange={(e) => pickClass(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none">
-            {classes.map((c) => <option key={c.id} value={c.class_id}>{c.class_name} — {c.subject_name}</option>)}
-          </select>
-          <select value={form.content_type} onChange={(e) => setForm((f) => ({ ...f, content_type: e.target.value }))}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none">
-            <option value="PDF_Notes">PDF notes</option>
-            <option value="Video_Link">Video link</option>
-            <option value="Recorded_Video_File">Recorded video file</option>
-            <option value="Live_Class_URL">Live class URL</option>
-          </select>
-          <input required placeholder="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none" />
-          <input required placeholder="Resource URL (upload to lms-resources bucket first)" value={form.resource_url}
-            onChange={(e) => setForm((f) => ({ ...f, resource_url: e.target.value }))}
-            className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none" />
+          <div>
+            <select value={form.class_id} onChange={(e) => pickClass(e.target.value)}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.class_id ? "border-danger" : "border-slate-200"
+              }`}>
+              {classes.map((c) => <option key={c.id} value={c.class_id}>{c.class_name} — {c.subject_name}</option>)}
+            </select>
+            {validationErrors.class_id && (
+              <p className="text-xs text-danger mt-1">{validationErrors.class_id}</p>
+            )}
+          </div>
+
+          <div>
+            <select value={form.content_type} onChange={(e) => setForm((f) => ({ ...f, content_type: e.target.value }))}
+              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none">
+              <option value="PDF_Notes">PDF notes</option>
+              <option value="Video_Link">Video link</option>
+              <option value="Recorded_Video_File">Recorded video file</option>
+              <option value="Live_Class_URL">Live class URL</option>
+            </select>
+          </div>
+
+          <div>
+            <input required placeholder="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.title ? "border-danger" : "border-slate-200"
+              }`} />
+            {validationErrors.title && (
+              <p className="text-xs text-danger mt-1">{validationErrors.title}</p>
+            )}
+          </div>
+
+          <div>
+            <input required placeholder="Resource URL (upload to lms-resources bucket first)" value={form.resource_url}
+              onChange={(e) => setForm((f) => ({ ...f, resource_url: e.target.value }))}
+              className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                validationErrors.resource_url ? "border-danger" : "border-slate-200"
+              }`} />
+            {validationErrors.resource_url && (
+              <p className="text-xs text-danger mt-1">{validationErrors.resource_url}</p>
+            )}
+          </div>
+
           <button disabled={busy} className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 disabled:opacity-60">
             {busy ? "Saving…" : "Publish to class"}
           </button>

@@ -1,5 +1,7 @@
 import { MessageSquare, NotebookText, Send, X } from "lucide-react";
 import { useEffect, useState } from "react";
+import { isNonEmptyString } from "../../../utils/validation";
+
 
 /**
  * Expects an `api` axios instance (each portal has its own with its own auth
@@ -14,6 +16,8 @@ export default function CourseForum({ api, courseId, onClose }) {
   const [newTopic, setNewTopic] = useState({ title: "", content: "" });
   const [reply, setReply] = useState("");
   const [newNote, setNewNote] = useState({ title: "", body_markdown: "" });
+  const [validationErrors, setValidationErrors] = useState({});
+
 
   function loadTopics() {
     api.get(`/lms/forum-topics/?course_id=${courseId}`).then(({ data }) => setTopics(data)).catch(() => setTopics([]));
@@ -25,7 +29,18 @@ export default function CourseForum({ api, courseId, onClose }) {
 
   async function postTopic(e) {
     e.preventDefault();
-    if (!newTopic.title.trim() || !newTopic.content.trim()) return;
+    const errs = {};
+    if (!isNonEmptyString(newTopic.title)) {
+      errs.topicTitle = "Topic title is required.";
+    }
+    if (!isNonEmptyString(newTopic.content)) {
+      errs.topicContent = "Topic content is required.";
+    }
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     await api.post("/lms/forum-topics/", { course_id: courseId, ...newTopic });
     setNewTopic({ title: "", content: "" });
     loadTopics();
@@ -38,7 +53,11 @@ export default function CourseForum({ api, courseId, onClose }) {
 
   async function postReply(e) {
     e.preventDefault();
-    if (!reply.trim()) return;
+    if (!isNonEmptyString(reply)) {
+      setValidationErrors({ reply: "Reply content cannot be empty." });
+      return;
+    }
+    setValidationErrors({});
     await api.post(`/lms/forum-topics/${activeTopic.id}/reply/`, { post_text: reply });
     setReply("");
     openTopic(activeTopic.id);
@@ -47,7 +66,18 @@ export default function CourseForum({ api, courseId, onClose }) {
 
   async function postNote(e) {
     e.preventDefault();
-    if (!newNote.title.trim() || !newNote.body_markdown.trim()) return;
+    const errs = {};
+    if (!isNonEmptyString(newNote.title)) {
+      errs.noteTitle = "Note title is required.";
+    }
+    if (!isNonEmptyString(newNote.body_markdown)) {
+      errs.noteBody = "Note body is required.";
+    }
+    if (Object.keys(errs).length > 0) {
+      setValidationErrors(errs);
+      return;
+    }
+    setValidationErrors({});
     await api.post("/lms/notes/", { course_id: courseId, ...newNote });
     setNewNote({ title: "", body_markdown: "" });
     loadNotes();
@@ -80,8 +110,24 @@ export default function CourseForum({ api, courseId, onClose }) {
         {tab === "forum" && !activeTopic && (
           <div className="space-y-4">
             <form onSubmit={postTopic} className="space-y-2 bg-surface-light rounded-xl p-3">
-              <input placeholder="Start a new topic…" value={newTopic.title} onChange={(e) => setNewTopic({ ...newTopic, title: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              <textarea placeholder="What's on your mind?" rows={2} value={newTopic.content} onChange={(e) => setNewTopic({ ...newTopic, content: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
+              <div>
+                <input placeholder="Start a new topic…" value={newTopic.title} onChange={(e) => setNewTopic({ ...newTopic, title: e.target.value })}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus-ring outline-none ${
+                    validationErrors.topicTitle ? "border-danger" : "border-slate-200"
+                  }`} />
+                {validationErrors.topicTitle && (
+                  <p className="text-xs text-danger mt-1">{validationErrors.topicTitle}</p>
+                )}
+              </div>
+              <div>
+                <textarea placeholder="What's on your mind?" rows={2} value={newTopic.content} onChange={(e) => setNewTopic({ ...newTopic, content: e.target.value })}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus-ring outline-none resize-none ${
+                    validationErrors.topicContent ? "border-danger" : "border-slate-200"
+                  }`} />
+                {validationErrors.topicContent && (
+                  <p className="text-xs text-danger mt-1">{validationErrors.topicContent}</p>
+                )}
+              </div>
               <button className="text-sm font-medium text-academic-blue hover:underline flex items-center gap-1"><Send size={13} /> Post topic</button>
             </form>
             {topics === null ? (
@@ -120,8 +166,16 @@ export default function CourseForum({ api, courseId, onClose }) {
               ))}
             </div>
             <form onSubmit={postReply} className="flex gap-2">
-              <input placeholder="Write a reply…" value={reply} onChange={(e) => setReply(e.target.value)} className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              <button className="px-3 rounded-lg bg-academic-blue text-white"><Send size={14} /></button>
+              <div className="flex-1">
+                <input placeholder="Write a reply…" value={reply} onChange={(e) => setReply(e.target.value)}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus-ring outline-none ${
+                    validationErrors.reply ? "border-danger" : "border-slate-200"
+                  }`} />
+                {validationErrors.reply && (
+                  <p className="text-xs text-danger mt-1">{validationErrors.reply}</p>
+                )}
+              </div>
+              <button className="px-3 rounded-lg bg-academic-blue text-white h-[38px]"><Send size={14} /></button>
             </form>
           </div>
         )}
@@ -129,8 +183,24 @@ export default function CourseForum({ api, courseId, onClose }) {
         {tab === "notes" && (
           <div className="space-y-4">
             <form onSubmit={postNote} className="space-y-2 bg-surface-light rounded-xl p-3">
-              <input placeholder="Note title" value={newNote.title} onChange={(e) => setNewNote({ ...newNote, title: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm" />
-              <textarea placeholder="Write your notes (markdown supported)…" rows={3} value={newNote.body_markdown} onChange={(e) => setNewNote({ ...newNote, body_markdown: e.target.value })} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono" />
+              <div>
+                <input placeholder="Note title" value={newNote.title} onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm focus-ring outline-none ${
+                    validationErrors.noteTitle ? "border-danger" : "border-slate-200"
+                  }`} />
+                {validationErrors.noteTitle && (
+                  <p className="text-xs text-danger mt-1">{validationErrors.noteTitle}</p>
+                )}
+              </div>
+              <div>
+                <textarea placeholder="Write your notes (markdown supported)…" rows={3} value={newNote.body_markdown} onChange={(e) => setNewNote({ ...newNote, body_markdown: e.target.value })}
+                  className={`w-full rounded-lg border px-3 py-2 text-sm font-mono focus-ring outline-none resize-none ${
+                    validationErrors.noteBody ? "border-danger" : "border-slate-200"
+                  }`} />
+                {validationErrors.noteBody && (
+                  <p className="text-xs text-danger mt-1">{validationErrors.noteBody}</p>
+                )}
+              </div>
               <button className="text-sm font-medium text-academic-blue hover:underline flex items-center gap-1"><Send size={13} /> Save note</button>
             </form>
             {notes === null ? (

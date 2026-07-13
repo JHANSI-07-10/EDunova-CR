@@ -6,6 +6,8 @@ import {
 import { useEffect, useState } from "react";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString, isPositiveNumber } from "../../../utils/validation";
+
 
 const RESOURCE_TYPES = [
   { value: "PDF", label: "📄 PDF Notes", desc: "Upload syllabus notes or slides" },
@@ -57,6 +59,12 @@ export default function Lms() {
   const [uploading, setUploading] = useState(false);
   const [scanningFile, setScanningFile] = useState(false);
 
+  // Validation States
+  const [chapterErrors, setChapterErrors] = useState({});
+  const [lessonErrors, setLessonErrors] = useState({});
+  const [resourceErrors, setResourceErrors] = useState({});
+
+
   useEffect(() => {
     loadCourses();
   }, []);
@@ -93,10 +101,18 @@ export default function Lms() {
   async function handleAddChapter(e) {
     e.preventDefault();
     const activeCourseId = chapterForm.course_id || selectedCourse?.id;
-    if (!chapterForm.title || !activeCourseId) {
-      setToast("Please select a class and enter a chapter title.");
+    const errs = {};
+    if (!isNonEmptyString(chapterForm.title)) {
+      errs.title = "Chapter title is required and cannot be empty.";
+    }
+    if (!activeCourseId) {
+      errs.course_id = "Please select a target class.";
+    }
+    if (Object.keys(errs).length > 0) {
+      setChapterErrors(errs);
       return;
     }
+    setChapterErrors({});
     
     setUploading(true);
     try {
@@ -151,7 +167,11 @@ export default function Lms() {
 
   async function handleAddLesson(e) {
     e.preventDefault();
-    if (!lessonForm.title) return;
+    if (!isNonEmptyString(lessonForm.title)) {
+      setLessonErrors({ title: "Lesson title is required and cannot be empty." });
+      return;
+    }
+    setLessonErrors({});
     try {
       if (editingLessonId) {
         await api.put("/teacher/lms/lessons/", {
@@ -265,7 +285,38 @@ export default function Lms() {
 
   async function handleAddResource(e) {
     e.preventDefault();
-    if (!resourceForm.title) return;
+    const errs = {};
+    if (!isNonEmptyString(resourceForm.title)) {
+      errs.title = "Resource title is required.";
+    }
+    if (resourceForm.content_type === "Assignment") {
+      if (!isPositiveNumber(resourceForm.max_marks)) {
+        errs.max_marks = "Max marks must be a positive number.";
+      }
+      if (!resourceForm.due_date) {
+        errs.due_date = "Due date is required.";
+      }
+    }
+    if (resourceForm.content_type === "Quiz") {
+      if (resourceForm.questions.length === 0) {
+        errs.quiz = "Please add at least one question.";
+      } else {
+        const missing = resourceForm.questions.some(q => !q.question_text || !q.correct_answer || q.options.some(o => !o));
+        if (missing) {
+          errs.quiz = "All questions, options, and correct answers must be filled out.";
+        }
+      }
+    } else {
+      if (resourceForm.resource_url && !resourceForm.file && !resourceForm.resource_url.startsWith("http://") && !resourceForm.resource_url.startsWith("https://") && !resourceForm.resource_url.startsWith("/")) {
+        errs.resource_url = "Please enter a valid URL or path (e.g. starts with http://, https://, or /).";
+      }
+    }
+
+    if (Object.keys(errs).length > 0) {
+      setResourceErrors(errs);
+      return;
+    }
+    setResourceErrors({});
     
     setUploading(true);
     try {
@@ -522,13 +573,18 @@ export default function Lms() {
                   required
                   value={chapterForm.course_id ? String(chapterForm.course_id) : ""}
                   onChange={e => setChapterForm(f => ({ ...f, course_id: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                    chapterErrors.course_id ? "border-danger" : "border-slate-200"
+                  }`}
                 >
                   <option value="">-- Choose Class --</option>
                   {courses?.map(c => (
                     <option key={c.id} value={String(c.id)}>{c.class_name} — {c.subject_name}</option>
                   ))}
                 </select>
+                {chapterErrors.course_id && (
+                  <p className="text-xs text-danger mt-1">{chapterErrors.course_id}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-ink-secondary block mb-1">Chapter Title</label>
@@ -537,8 +593,13 @@ export default function Lms() {
                   placeholder="e.g. Chapter 1: Introduction to Mechanics"
                   value={chapterForm.title}
                   onChange={e => setChapterForm(f => ({ ...f, title: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                    chapterErrors.title ? "border-danger" : "border-slate-200"
+                  }`}
                 />
+                {chapterErrors.title && (
+                  <p className="text-xs text-danger mt-1">{chapterErrors.title}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-ink-secondary block mb-1">Brief Description (Optional)</label>
@@ -597,8 +658,13 @@ export default function Lms() {
                   placeholder="e.g. Lesson 1.1: Newton's Laws of Motion"
                   value={lessonForm.title}
                   onChange={e => setLessonForm(f => ({ ...f, title: e.target.value }))}
-                  className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                    lessonErrors.title ? "border-danger" : "border-slate-200"
+                  }`}
                 />
+                {lessonErrors.title && (
+                  <p className="text-xs text-danger mt-1">{lessonErrors.title}</p>
+                )}
               </div>
               <div>
                 <label className="text-xs font-semibold text-ink-secondary block mb-1">Description (Optional)</label>
@@ -644,8 +710,13 @@ export default function Lms() {
                     placeholder="e.g. Intro to Trigonometry PDF"
                     value={resourceForm.title}
                     onChange={e => setResourceForm(f => ({ ...f, title: e.target.value }))}
-                    className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                    className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                      resourceErrors.title ? "border-danger" : "border-slate-200"
+                    }`}
                   />
+                  {resourceErrors.title && (
+                    <p className="text-xs text-danger mt-1">{resourceErrors.title}</p>
+                  )}
                 </div>
                 <div>
                   <label className="text-xs font-semibold text-ink-secondary block mb-1">Resource Type</label>
@@ -765,8 +836,13 @@ export default function Lms() {
                       required
                       value={resourceForm.due_date}
                       onChange={e => setResourceForm(f => ({ ...f, due_date: e.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                      className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                        resourceErrors.due_date ? "border-danger" : "border-slate-200"
+                      }`}
                     />
+                    {resourceErrors.due_date && (
+                      <p className="text-xs text-danger mt-1">{resourceErrors.due_date}</p>
+                    )}
                   </div>
                   <div>
                     <label className="text-xs font-semibold text-ink-secondary block mb-1">Max Marks</label>
@@ -776,8 +852,13 @@ export default function Lms() {
                       min={1}
                       value={resourceForm.max_marks}
                       onChange={e => setResourceForm(f => ({ ...f, max_marks: Number(e.target.value) }))}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                      className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                        resourceErrors.max_marks ? "border-danger" : "border-slate-200"
+                      }`}
                     />
+                    {resourceErrors.max_marks && (
+                      <p className="text-xs text-danger mt-1">{resourceErrors.max_marks}</p>
+                    )}
                   </div>
                 </div>
               ) : null}
@@ -812,9 +893,17 @@ export default function Lms() {
                       placeholder="e.g. https://youtube.com/... or https://drive.google.com/..."
                       value={resourceForm.resource_url}
                       onChange={e => setResourceForm(f => ({ ...f, resource_url: e.target.value }))}
-                      className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
+                      className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                        resourceErrors.resource_url ? "border-danger" : "border-slate-200"
+                      }`}
                     />
+                    {resourceErrors.resource_url && (
+                      <p className="text-xs text-danger mt-1">{resourceErrors.resource_url}</p>
+                    )}
                   </div>
+                  {resourceErrors.quiz && (
+                    <div className="text-sm text-danger bg-red-50 rounded-xl px-3 py-2 border border-danger/35">{resourceErrors.quiz}</div>
+                  )}
                 </div>
               )}
 

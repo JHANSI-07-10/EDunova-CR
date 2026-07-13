@@ -1,11 +1,15 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
+import { isNonEmptyString } from "../../../utils/validation";
+
 import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 
 export default function Feedback() {
   const [items, setItems] = useState(null);
   const [form, setForm] = useState({ category: "General", feedback_text: "" });
   const [toast, setToast] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
+
 
   function load() {
     api.get("/parent/feedback/").then(({ data }) => setItems(data)).catch(() => setItems([]));
@@ -15,6 +19,11 @@ export default function Feedback() {
 
   async function submit(e) {
     e.preventDefault();
+    if (!isNonEmptyString(form.feedback_text)) {
+      setValidationErrors({ feedback_text: "Feedback text is required and cannot be empty." });
+      return;
+    }
+    setValidationErrors({});
     try {
       await api.post("/parent/feedback/", form);
       setToast("Feedback submitted. Thank you!");
@@ -33,7 +42,15 @@ export default function Feedback() {
           <select value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
             {["General", "Academics", "Transport", "Facilities", "Staff", "Fees"].map((c) => <option key={c}>{c}</option>)}
           </select>
-          <textarea required value={form.feedback_text} onChange={(e) => setForm({ ...form, feedback_text: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" rows={4} placeholder="What would you like the school to know?" />
+          <div>
+            <textarea required value={form.feedback_text} onChange={(e) => setForm({ ...form, feedback_text: e.target.value })}
+              className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none resize-none ${
+                validationErrors.feedback_text ? "border-danger" : "border-slate-200"
+              }`} rows={4} placeholder="What would you like the school to know?" />
+            {validationErrors.feedback_text && (
+              <p className="text-xs text-danger mt-1">{validationErrors.feedback_text}</p>
+            )}
+          </div>
           <button className="bg-academic-green text-white rounded-xl py-2.5 px-6 font-medium">Submit feedback</button>
         </form>
       </Card>

@@ -204,7 +204,8 @@ CREATE TABLE IF NOT EXISTS public.portal_exam_schedule (
   exam_date date NOT NULL,
   start_time time NOT NULL DEFAULT '09:00',
   duration_minutes integer NOT NULL DEFAULT 60,
-  max_marks integer NOT NULL DEFAULT 100
+  max_marks integer NOT NULL DEFAULT 100,
+  status varchar(50) NOT NULL DEFAULT 'Draft' CHECK (status IN ('Draft','Submitted','Published','Returned'))
 );
 
 CREATE TABLE IF NOT EXISTS public.portal_hall_ticket (

@@ -21,7 +21,39 @@ export default function ExamResults() {
   const [reportExamName, setReportExamName] = useState("");
   const [reportCard, setReportCard] = useState(null);
 
+  // Oversee & Publish exams list
+  const [examsList, setExamsList] = useState([]);
+  const [loadingExams, setLoadingExams] = useState(false);
+
   const [toast, setToast] = useState("");
+
+  async function loadExams() {
+    setLoadingExams(true);
+    try {
+      const { data } = await api.get("/admin-portal/exams/");
+      setExamsList(data);
+    } catch {
+      setToast("Could not load exams list.");
+    } finally {
+      setLoadingExams(false);
+    }
+  }
+
+  useEffect(() => {
+    if (tab === "publish") {
+      loadExams();
+    }
+  }, [tab]);
+
+  async function handleExamAction(examId, action) {
+    try {
+      await api.post(`/admin-portal/exams/${examId}/action/`, { action });
+      setToast(`Exam results successfully ${action === 'Publish' ? 'published' : 'returned to teacher'}.`);
+      loadExams();
+    } catch {
+      setToast("Could not update exam status.");
+    }
+  }
 
   async function generateSubjectRank(e) {
     e.preventDefault();
@@ -51,8 +83,9 @@ export default function ExamResults() {
 
   return (
     <div className="space-y-6">
-      <div className="flex gap-2">
+      <div className="flex flex-wrap gap-2">
         {[
+          ["publish", "Oversee & Publish"],
           ["rank", "Subject Rank List"],
           ["overall", "Overall Class Rank"],
           ["report", "Report Card"],
@@ -66,6 +99,69 @@ export default function ExamResults() {
           </button>
         ))}
       </div>
+
+      {tab === "publish" && (
+        <Card>
+          <SectionTitle>Oversee Examinations &amp; Publish Results</SectionTitle>
+          {loadingExams ? <Loader rows={4} /> : examsList.length === 0 ? <EmptyState label="No scheduled exams found." /> : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-ink-secondary text-xs uppercase tracking-wide">
+                    <th className="py-2">Exam</th>
+                    <th className="py-2">Class &amp; Subject</th>
+                    <th className="py-2">Teacher</th>
+                    <th className="py-2">Date</th>
+                    <th className="py-2">Status</th>
+                    <th className="py-2 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {examsList.map((e) => (
+                    <tr key={e.id}>
+                      <td className="py-3 font-medium">
+                        {e.exam_name.replace(/_/g, " ")}
+                        <span className="block text-xs text-ink-secondary">Max Marks: {e.max_marks}</span>
+                      </td>
+                      <td className="py-3 font-medium">
+                        {e.class_name}
+                        <span className="block text-xs text-ink-secondary">{e.subject_name}</span>
+                      </td>
+                      <td className="py-3 text-ink-secondary">{e.teacher_name || "—"}</td>
+                      <td className="py-3 font-numeric">{e.exam_date}</td>
+                      <td className="py-3">
+                        <Badge tone={e.status === "Published" ? "green" : e.status === "Submitted" ? "blue" : e.status === "Returned" ? "red" : "gold"}>
+                          {e.status}
+                        </Badge>
+                      </td>
+                      <td className="py-3 text-right">
+                        {e.status === "Submitted" ? (
+                          <div className="flex justify-end gap-2">
+                            <button
+                              onClick={() => handleExamAction(e.id, "Publish")}
+                              className="bg-academic-green hover:bg-academic-green/90 text-white text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors"
+                            >
+                              Publish Results
+                            </button>
+                            <button
+                              onClick={() => handleExamAction(e.id, "Return")}
+                              className="bg-danger hover:bg-danger/90 text-white text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors"
+                            >
+                              Return to Teacher
+                            </button>
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-400 font-medium">No actions pending</span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Card>
+      )}
 
       {tab === "rank" && (
         <Card>
