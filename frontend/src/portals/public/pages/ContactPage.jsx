@@ -503,6 +503,65 @@ export default function ContactPage() {
                 {/* River Yamuna simulation */}
                 <path d="M 380,50 Q 420,200 400,300 T 480,450 T 600,550" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" opacity="0.5" />
                 <path d="M 380,50 Q 420,200 400,300 T 480,450 T 600,550" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
+
+                {/* Animated Route Line from Head Office (Dwarka) to Selected Branch */}
+                {selectedCampus && selectedCampus.id !== 1 && (() => {
+                  let targetLeft = 400;
+                  let targetTop = 300;
+                  if (selectedCampus.name.includes("Noida")) { targetLeft = 430; targetTop = 295; }
+                  else if (selectedCampus.name.includes("Gurugram")) { targetLeft = 370; targetTop = 320; }
+                  else if (selectedCampus.name.includes("Faridabad")) { targetLeft = 415; targetTop = 330; }
+                  else if (selectedCampus.name.includes("Jaipur")) { targetLeft = 240; targetTop = 410; }
+                  else if (selectedCampus.name.includes("Lucknow")) { targetLeft = 550; targetTop = 360; }
+
+                  if (targetLeft === 400 && targetTop === 300) return null;
+
+                  return (
+                    <>
+                      <defs>
+                        <linearGradient id="routeGrad" x1="400" y1="300" x2={targetLeft} y2={targetTop} gradientUnits="userSpaceOnUse">
+                          <stop offset="0%" stopColor="#FBBF24" />
+                          <stop offset="100%" stopColor="#F97316" />
+                        </linearGradient>
+                      </defs>
+                      {/* Outer shadow glow path */}
+                      <line 
+                        x1="400" 
+                        y1="300" 
+                        x2={targetLeft} 
+                        y2={targetTop} 
+                        stroke="url(#routeGrad)" 
+                        strokeWidth="4" 
+                        strokeLinecap="round" 
+                        opacity="0.4"
+                        className="blur-sm"
+                      />
+                      {/* Inner dashed moving path */}
+                      <line 
+                        x1="400" 
+                        y1="300" 
+                        x2={targetLeft} 
+                        y2={targetTop} 
+                        stroke="url(#routeGrad)" 
+                        strokeWidth="2.5" 
+                        strokeLinecap="round" 
+                        strokeDasharray="6,6"
+                        className="animate-dash"
+                      />
+                      <style>{`
+                        @keyframes dash {
+                          to {
+                            stroke-dashoffset: -20;
+                          }
+                        }
+                        .animate-dash {
+                          animation: dash 1s linear infinite;
+                          pointer-events: none;
+                        }
+                      `}</style>
+                    </>
+                  )
+                })()}
               </svg>
 
               {/* Delhi Area boundaries indicator */}
