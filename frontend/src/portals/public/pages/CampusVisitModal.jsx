@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Calendar, Clock, X, CheckCircle, Mail, Phone, User, FileText } from 'lucide-react'
+import { isValidEmail, isValidPhone, isNonEmptyString } from '../../../utils/validation'
 
 export default function CampusVisitModal({ isOpen, onClose, campuses, initialCampusId }) {
   const [form, setForm] = useState({
@@ -13,6 +14,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
   })
   const [status, setStatus] = useState('idle') // idle | sending | sent | error
   const [errorMessage, setErrorMessage] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
 
   useEffect(() => {
     if (isOpen) {
@@ -27,10 +29,37 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    
+    // Validations
+    const errors = {}
     if (!form.campus_id) {
-      setErrorMessage('Please select a campus.')
+      errors.campus_id = 'Please select a campus.'
+    }
+    if (!isNonEmptyString(form.visitor_name)) {
+      errors.visitor_name = 'Visitor name is required.'
+    }
+    if (!isValidEmail(form.visitor_email)) {
+      errors.visitor_email = 'Please enter a valid email address.'
+    }
+    if (!isValidPhone(form.visitor_phone)) {
+      errors.visitor_phone = 'Please enter a valid phone number (7-15 digits, digits and + only).'
+    }
+    if (!isNonEmptyString(form.visit_date)) {
+      errors.visit_date = 'Please select a visit date.'
+    }
+    if (!isNonEmptyString(form.visit_time)) {
+      errors.visit_time = 'Please select a preferred time slot.'
+    }
+    if (!isNonEmptyString(form.purpose)) {
+      errors.purpose = 'Please state the purpose of your visit.'
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
       return
     }
+
+    setValidationErrors({})
     setStatus('sending')
     try {
       const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')
@@ -107,13 +136,18 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                 required
                 value={form.campus_id}
                 onChange={(e) => setForm({ ...form, campus_id: e.target.value })}
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all"
+                className={`w-full bg-gray-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
+                  validationErrors.campus_id ? "border-red-500" : "border-gray-100"
+                }`}
               >
                 <option value="">Select a Campus...</option>
                 {campuses.map((c) => (
                   <option key={c.id} value={c.id}>{c.name} ({c.city})</option>
                 ))}
               </select>
+              {validationErrors.campus_id && (
+                <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.campus_id}</p>
+              )}
             </div>
 
             {/* Visitor Details */}
@@ -130,9 +164,14 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                     placeholder="John Doe"
                     value={form.visitor_name}
                     onChange={(e) => setForm({ ...form, visitor_name: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all"
+                    className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
+                      validationErrors.visitor_name ? "border-red-500" : "border-gray-100"
+                    }`}
                   />
                 </div>
+                {validationErrors.visitor_name && (
+                  <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.visitor_name}</p>
+                )}
               </div>
 
               <div>
@@ -147,9 +186,14 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                     placeholder="+91 98765 43210"
                     value={form.visitor_phone}
                     onChange={(e) => setForm({ ...form, visitor_phone: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all"
+                    className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
+                      validationErrors.visitor_phone ? "border-red-500" : "border-gray-100"
+                    }`}
                   />
                 </div>
+                {validationErrors.visitor_phone && (
+                  <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.visitor_phone}</p>
+                )}
               </div>
             </div>
 
@@ -165,9 +209,14 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                   placeholder="name@example.com"
                   value={form.visitor_email}
                   onChange={(e) => setForm({ ...form, visitor_email: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all"
+                  className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
+                    validationErrors.visitor_email ? "border-red-500" : "border-gray-100"
+                  }`}
                 />
               </div>
+              {validationErrors.visitor_email && (
+                <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.visitor_email}</p>
+              )}
             </div>
 
             {/* Visit Schedule */}
@@ -184,9 +233,14 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                     min={new Date().toISOString().split('T')[0]}
                     value={form.visit_date}
                     onChange={(e) => setForm({ ...form, visit_date: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all"
+                    className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
+                      validationErrors.visit_date ? "border-red-500" : "border-gray-100"
+                    }`}
                   />
                 </div>
+                {validationErrors.visit_date && (
+                  <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.visit_date}</p>
+                )}
               </div>
 
               <div>
@@ -199,7 +253,9 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                     required
                     value={form.visit_time}
                     onChange={(e) => setForm({ ...form, visit_time: e.target.value })}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all"
+                    className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
+                      validationErrors.visit_time ? "border-red-500" : "border-gray-100"
+                    }`}
                   >
                     <option value="">Select time...</option>
                     <option value="09:00 AM">09:00 AM</option>
@@ -209,6 +265,9 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                     <option value="03:30 PM">03:30 PM</option>
                   </select>
                 </div>
+                {validationErrors.visit_time && (
+                  <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.visit_time}</p>
+                )}
               </div>
             </div>
 
@@ -223,9 +282,14 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                   rows={2}
                   value={form.purpose}
                   onChange={(e) => setForm({ ...form, purpose: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all"
+                  className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
+                    validationErrors.purpose ? "border-red-500" : "border-gray-100"
+                  }`}
                 />
               </div>
+              {validationErrors.purpose && (
+                <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.purpose}</p>
+              )}
             </div>
 
             <button

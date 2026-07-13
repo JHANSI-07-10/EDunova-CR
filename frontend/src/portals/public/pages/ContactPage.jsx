@@ -4,6 +4,7 @@ import {
   Map, Search, Compass, ChevronDown, ChevronUp, Check, Layers, ZoomIn, ZoomOut, Maximize2, Sparkles, Building
 } from 'lucide-react'
 import CampusVisitModal from './CampusVisitModal'
+import { isValidEmail, isValidPhone, isNonEmptyString } from '../../../utils/validation'
 
 export default function ContactPage() {
   const [campuses, setCampuses] = useState([])
@@ -34,6 +35,7 @@ export default function ContactPage() {
   // Contact Form state
   const [contactForm, setContactForm] = useState({ name: '', email: '', phone: '', message: '' })
   const [formStatus, setFormStatus] = useState('idle') // idle | sending | sent | error
+  const [validationErrors, setValidationErrors] = useState({})
 
   // Default Head Office details
   const headOffice = {
@@ -111,6 +113,28 @@ export default function ContactPage() {
 
   const handleContactSubmit = async (e) => {
     e.preventDefault()
+    
+    // Validations
+    const errors = {}
+    if (!isNonEmptyString(contactForm.name)) {
+      errors.name = "Full name is required."
+    }
+    if (!isValidEmail(contactForm.email)) {
+      errors.email = "Please enter a valid email address."
+    }
+    if (contactForm.phone && !isValidPhone(contactForm.phone)) {
+      errors.phone = "Please enter a valid phone number (7-15 digits, digits and + only)."
+    }
+    if (!isNonEmptyString(contactForm.message)) {
+      errors.message = "Message details cannot be empty."
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors)
+      return
+    }
+
+    setValidationErrors({})
     setFormStatus('sending')
     try {
       const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')
@@ -256,24 +280,43 @@ export default function ContactPage() {
                   placeholder="Full Name" 
                   value={contactForm.name} 
                   onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15" 
+                  className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${
+                    validationErrors.name ? "border-red-500" : "border-slate-100"
+                  }`} 
                 />
+                {validationErrors.name && (
+                  <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.name}</p>
+                )}
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <input 
-                  required 
-                  type="email" 
-                  placeholder="Email" 
-                  value={contactForm.email} 
-                  onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15" 
-                />
-                <input 
-                  placeholder="Phone" 
-                  value={contactForm.phone} 
-                  onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15" 
-                />
+                <div>
+                  <input 
+                    required 
+                    type="email" 
+                    placeholder="Email" 
+                    value={contactForm.email} 
+                    onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                    className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${
+                      validationErrors.email ? "border-red-500" : "border-slate-100"
+                    }`} 
+                  />
+                  {validationErrors.email && (
+                    <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <input 
+                    placeholder="Phone" 
+                    value={contactForm.phone} 
+                    onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                    className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${
+                      validationErrors.phone ? "border-red-500" : "border-slate-100"
+                    }`} 
+                  />
+                  {validationErrors.phone && (
+                    <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.phone}</p>
+                  )}
+                </div>
               </div>
               <div>
                 <textarea 
@@ -282,8 +325,13 @@ export default function ContactPage() {
                   rows={4} 
                   value={contactForm.message} 
                   onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15" 
+                  className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${
+                    validationErrors.message ? "border-red-500" : "border-slate-100"
+                  }`} 
                 />
+                {validationErrors.message && (
+                  <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.message}</p>
+                )}
               </div>
               <button 
                 type="submit" 

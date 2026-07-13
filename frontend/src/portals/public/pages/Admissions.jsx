@@ -15,6 +15,7 @@ import { admissionsApi } from '../../../api/admissionsApi'
 import AdmissionProcessSteps from '../home/AdmissionProcessSteps'
 import ScholarshipsBanner from '../home/ScholarshipsBanner'
 import FadeIn from '../../../components/FadeIn'
+import { isValidEmail, isValidPhone, isNonEmptyString } from '../../../utils/validation'
 
 const EMPTY_FORM = {
   applicant_name: '',
@@ -83,6 +84,7 @@ export default function Admissions() {
   const [status, setStatus] = useState('idle')
   const [result, setResult] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
+  const [validationErrors, setValidationErrors] = useState({})
 
   // Eligibility state
   const [eligibilityChecked, setEligibilityChecked] = useState(false)
@@ -336,25 +338,39 @@ export default function Admissions() {
                       <div>
                         <h3 className="font-subheading font-bold text-primary text-sm mb-3">Student Details</h3>
                         <div className="grid sm:grid-cols-2 gap-4">
-                          <input
-                            required
-                            placeholder="Applicant full name"
-                            value={form.applicant_name}
-                            onChange={update('applicant_name')}
-                            className="border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm"
-                          />
+                          <div>
+                            <input
+                              required
+                              placeholder="Applicant full name"
+                              value={form.applicant_name}
+                              onChange={update('applicant_name')}
+                              className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
+                                validationErrors.applicant_name ? "border-red-500" : "border-gray-200"
+                              }`}
+                            />
+                            {validationErrors.applicant_name && (
+                              <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.applicant_name}</p>
+                            )}
+                          </div>
 
-                          <select
-                            required
-                            value={form.gender}
-                            onChange={update('gender')}
-                            className="border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm"
-                          >
-                            <option value="">Select gender</option>
-                            <option value="Male">Male</option>
-                            <option value="Female">Female</option>
-                            <option value="Other">Other</option>
-                          </select>
+                          <div>
+                            <select
+                              required
+                              value={form.gender}
+                              onChange={update('gender')}
+                              className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
+                                validationErrors.gender ? "border-red-500" : "border-gray-200"
+                              }`}
+                            >
+                              <option value="">Select gender</option>
+                              <option value="Male">Male</option>
+                              <option value="Female">Female</option>
+                              <option value="Other">Other</option>
+                            </select>
+                            {validationErrors.gender && (
+                              <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.gender}</p>
+                            )}
+                          </div>
                         </div>
                       </div>
 
@@ -363,41 +379,69 @@ export default function Admissions() {
                       <div>
                         <h3 className="font-subheading font-bold text-primary text-sm mb-3">Parent Details</h3>
                         <div className="grid sm:grid-cols-2 gap-4">
-                          <input
-                            required
-                            placeholder="Parent / Guardian name"
-                            value={form.parent_name}
-                            onChange={update('parent_name')}
-                            className="border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm"
-                          />
+                          <div>
+                            <input
+                              required
+                              placeholder="Parent / Guardian name"
+                              value={form.parent_name}
+                              onChange={update('parent_name')}
+                              className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
+                                validationErrors.parent_name ? "border-red-500" : "border-gray-200"
+                              }`}
+                            />
+                            {validationErrors.parent_name && (
+                              <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.parent_name}</p>
+                            )}
+                          </div>
 
-                          <input
-                            required
-                            placeholder="Parent phone number"
-                            value={form.parent_phone}
-                            onChange={update('parent_phone')}
-                            className="border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm"
-                          />
+                          <div>
+                            <input
+                              required
+                              placeholder="Parent phone number"
+                              value={form.parent_phone}
+                              onChange={update('parent_phone')}
+                              className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
+                                validationErrors.parent_phone ? "border-red-500" : "border-gray-200"
+                              }`}
+                            />
+                            {validationErrors.parent_phone && (
+                              <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.parent_phone}</p>
+                            )}
+                          </div>
                         </div>
                       </div>
 
-                      <input
-                        required
-                        type="email"
-                        placeholder="Parent email address"
-                        value={form.parent_email}
-                        onChange={update('parent_email')}
-                        className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm"
-                      />
+                      <div>
+                        <input
+                          required
+                          type="email"
+                          placeholder="Parent email address"
+                          value={form.parent_email}
+                          onChange={update('parent_email')}
+                          className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
+                            validationErrors.parent_email ? "border-red-500" : "border-gray-200"
+                          }`}
+                        />
+                        {validationErrors.parent_email && (
+                          <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.parent_email}</p>
+                        )}
+                      </div>
 
-                      <textarea
-                        required
-                        placeholder="Full home address"
-                        rows={3}
-                        value={form.address}
-                        onChange={update('address')}
-                        className="w-full border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm resize-none"
-                      />
+                      <div>
+                        <textarea
+                          required
+                          placeholder="Full home address"
+                          rows={3}
+                          value={form.address}
+                          onChange={update('address')}
+                          className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm resize-none ${
+                            validationErrors.address ? "border-red-500" : "border-gray-200"
+                          }`}
+                        />
+                        {validationErrors.address && (
+                          <p className="text-red-500 text-[11px] font-semibold mt-1">{validationErrors.address}</p>
+                        )}
+                      </div>
 
                       <label className="flex items-center gap-3 text-sm text-text-primary bg-bg-light rounded-xl p-4 border border-gray-100 cursor-pointer">
                         <input
@@ -418,9 +462,35 @@ export default function Admissions() {
                         Back
                       </button>
                       <button
-                        disabled={!form.applicant_name || !form.parent_name || !form.parent_email || !form.address}
-                        onClick={() => setStep(3)}
-                        className="btn-primary flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        onClick={() => {
+                          const errs = {};
+                          if (!isNonEmptyString(form.applicant_name)) {
+                            errs.applicant_name = "Applicant name is required.";
+                          }
+                          if (!form.gender) {
+                            errs.gender = "Please select applicant gender.";
+                          }
+                          if (!isNonEmptyString(form.parent_name)) {
+                            errs.parent_name = "Parent/Guardian name is required.";
+                          }
+                          if (!isValidPhone(form.parent_phone)) {
+                            errs.parent_phone = "Please enter a valid parent phone number.";
+                          }
+                          if (!isValidEmail(form.parent_email)) {
+                            errs.parent_email = "Please enter a valid parent email address.";
+                          }
+                          if (!isNonEmptyString(form.address)) {
+                            errs.address = "Address is required.";
+                          }
+
+                          if (Object.keys(errs).length > 0) {
+                            setValidationErrors(errs);
+                            return;
+                          }
+                          setValidationErrors({});
+                          setStep(3);
+                        }}
+                        className="btn-primary flex items-center gap-2"
                       >
                         Upload Documents <ArrowRight size={16} />
                       </button>
