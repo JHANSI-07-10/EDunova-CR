@@ -498,8 +498,56 @@ class PerformanceAnalyticsView(TeacherMixin, APIView):
     def get(self, request):
         class_id = request.query_params.get("class_id")
         subject_id = request.query_params.get("subject_id")
+        student_id = request.query_params.get("student_id")
+        
         if not class_id:
             return Response({"class_average": 0, "students": []})
+            
+        if student_id:
+            results = rows(
+                """
+                SELECT r.marks_obtained, e.max_marks, e.exam_name, s.name AS subject_name, e.exam_date
+                FROM portal_result r
+                JOIN portal_exam_schedule e ON e.id = r.exam_schedule_id
+                JOIN portal_subject s ON s.id = e.subject_id
+                WHERE r.student_id = %s AND e.class_id = %s
+                """, [student_id, class_id]
+            )
+            hw_stats = row(
+                """
+                SELECT COUNT(*)::int AS total
+                FROM portal_homework
+                WHERE class_id = %s AND (%s IS NULL OR subject_id = %s)
+                """, [class_id, subject_id, subject_id]
+            )
+            assign_stats = rows(
+                """
+                SELECT a.title, sub.marks_obtained, a.max_marks, sub.submitted_at
+                FROM portal_assignment_submission sub
+                JOIN portal_assignment a ON a.id = sub.assignment_id
+                WHERE sub.student_id = %s AND a.class_id = %s AND (%s IS NULL OR a.subject_id = %s)
+                """, [student_id, class_id, subject_id, subject_id]
+            )
+            att_records = rows(
+                """
+                SELECT date, status, remarks
+                FROM portal_attendance
+                WHERE student_id = %s AND class_id = %s
+                ORDER BY date DESC LIMIT 20
+                """, [student_id, class_id]
+            )
+            # Try resolving parent user ID to send comments/recommendations to them
+            parent_info = row(
+                "SELECT parent_id FROM portal_student_profile WHERE user_id = %s", [student_id]
+            )
+            return Response(serialise({
+                "results": results,
+                "homework_total": hw_stats["total"] if hw_stats else 0,
+                "assignments": assign_stats,
+                "attendance": att_records,
+                "parent_id": parent_info["parent_id"] if parent_info else None
+            }))
+
         data = rows(
             """
             SELECT u.id AS student_id, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS name,
