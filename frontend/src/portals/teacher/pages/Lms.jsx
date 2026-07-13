@@ -1,12 +1,13 @@
 import { 
   Plus, Trash2, BookOpen, FileText, Video, Award, HelpCircle, 
   ChevronRight, ArrowLeft, Loader2, Link, FileCheck, HelpCircle as QuizIcon, 
-  Clock, CheckCircle, PlusCircle, AlertCircle, Pencil, RotateCw
+  Clock, CheckCircle, PlusCircle, AlertCircle, Pencil, RotateCw, MessageSquare
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import api from "../lib/api";
 import { isNonEmptyString, isPositiveNumber } from "../../../utils/validation";
+import CourseForum from "../../student/components/CourseForum";
 
 
 const RESOURCE_TYPES = [
@@ -24,6 +25,7 @@ const RESOURCE_TYPES = [
 export default function Lms() {
   const [courses, setCourses] = useState(null);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [forumCourseId, setForumCourseId] = useState(null);
   const [chapters, setChapters] = useState([]);
   const [lessons, setLessons] = useState({});
   const [loading, setLoading] = useState(false);
@@ -418,15 +420,23 @@ export default function Lms() {
         <div className="text-sm text-ink-secondary font-medium">
           {chapters.length} Chapters Published
         </div>
-        <button
-          onClick={() => {
-            setChapterForm(f => ({ ...f, course_id: selectedCourse?.id || "", title: "", description: "", file: null }));
-            setShowChapterModal(true);
-          }}
-          className="flex items-center gap-1.5 bg-academic-blue text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-academic-blue/90 transition-all shadow-raised"
-        >
-          <Plus size={16} /> New Chapter
-        </button>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setForumCourseId(selectedCourse.id)}
+            className="flex items-center gap-1.5 bg-white border border-slate-200 text-academic-blue rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
+          >
+            <MessageSquare size={16} /> Discussions & AI Monitor
+          </button>
+          <button
+            onClick={() => {
+              setChapterForm(f => ({ ...f, course_id: selectedCourse?.id || "", title: "", description: "", file: null }));
+              setShowChapterModal(true);
+            }}
+            className="flex items-center gap-1.5 bg-academic-blue text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-academic-blue/90 transition-all shadow-raised"
+          >
+            <Plus size={16} /> New Chapter
+          </button>
+        </div>
       </div>
 
       {/* Chapters Outline */}
@@ -933,6 +943,7 @@ export default function Lms() {
         </div>
       )}
 
+      {forumCourseId && <CourseForum api={api} courseId={forumCourseId} role="teacher" onClose={() => setForumCourseId(null)} />}
       <Toast message={toast} onClose={() => setToast("")} />
     </div>
   );

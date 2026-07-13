@@ -43,6 +43,7 @@ urlpatterns = [
     path("lms/notes/", lms_extras_views.DigitalNoteView.as_view()),
     path("lms/mark-complete/", lms_extras_views.MarkContentCompleteView.as_view()),
     path("lms/analytics/", lms_extras_views.CourseAnalyticsView.as_view()),
+    path("student/ai-tutor/", lms_extras_views.StudentAITutorView.as_view()),
 
     # Teacher portal — mirrors the "Teacher Portal — Detailed Flowchart"
     path("teacher/profile/", teacher_views.TeacherProfileView.as_view()),
@@ -72,6 +73,7 @@ urlpatterns = [
     path("teacher/lms/chapters/", teacher_views.TeacherLmsChaptersView.as_view()),
     path("teacher/lms/lessons/", teacher_views.TeacherLmsLessonsView.as_view()),
     path("teacher/lms/resources/", teacher_views.TeacherLmsResourcesView.as_view()),
+    path("teacher/lms/ai-usage/", lms_extras_views.TeacherAIUsageView.as_view()),
 
     # Parent portal
     path("parent/profile/", parent_views.ParentProfileView.as_view()),
@@ -120,6 +122,7 @@ urlpatterns = [
     path("admin-portal/audit-log/", admin_views.AuditLogListView.as_view()),
     path("admin-portal/backup/export/", admin_views.BackupExportView.as_view()),
     path("admin-portal/lms/analytics/", admin_views.AdminLmsAnalyticsView.as_view()),
+    path("admin-portal/lms/ai-usage/", lms_extras_views.AdminAIUsageView.as_view()),
 
     # Hostel module
     path("admin-portal/hostels/", facilities_views.HostelView.as_view()),

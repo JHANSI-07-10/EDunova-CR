@@ -258,3 +258,189 @@ class CourseAnalyticsView(AuthenticatedMixin, APIView):
             d["total_content"] = total
             d["completion_percent"] = round((d["completed_count"] / total) * 100, 1)
         return Response(serialise(data))
+
+
+# =============================================================================
+# AI TUTOR WORKFLOWS
+# =============================================================================
+class StudentAITutorView(AuthenticatedMixin, APIView):
+    """POST {course_id, message} — student queries AI Tutor for a subject."""
+
+    def get(self, request):
+        if not table_exists("portal_ai_usage"):
+            return Response([])
+        course_id = request.query_params.get("course_id")
+        if not course_id:
+            return Response({"detail": "course_id parameter is required."}, status=400)
+        if not _can_access_course(request.user, course_id):
+            return _FORBIDDEN
+        
+        logs = rows(
+            """
+            SELECT id, question, answer_explanation, answer_examples, answer_questions, answer_video, created_at
+            FROM portal_ai_usage
+            WHERE student_id = %s AND course_id = %s
+            ORDER BY created_at ASC
+            """,
+            [request.user.id, course_id]
+        )
+        return Response(serialise(logs))
+
+    def post(self, request):
+        d = request.data
+        course_id = d.get("course_id")
+        message = d.get("message", "").strip()
+        if not course_id or not message:
+            return Response({"detail": "course_id and message are required."}, status=400)
+        if not _can_access_course(request.user, course_id):
+            return _FORBIDDEN
+            
+        msg_lower = message.lower()
+        
+        if any(w in msg_lower for w in ["equation", "math", "algebra", "calculus", "trigonometry", "geometry"]):
+            explanation = (
+                "Quadratic and algebraic equations describe relationships between variables. "
+                "For quadratic equations (ax² + bx + c = 0), the solutions are given by the quadratic formula: "
+                "x = (-b ± √(b² - 4ac)) / 2a."
+            )
+            examples = (
+                "Solve: x² - 5x + 6 = 0\n"
+                "1. Identify coefficients: a = 1, b = -5, c = 6.\n"
+                "2. Apply formula or factorize: (x - 2)(x - 3) = 0.\n"
+                "3. Roots are x = 2 and x = 3."
+            )
+            practice_questions = (
+                "1. Find the roots of the equation: x² - 7x + 12 = 0.\n"
+                "2. Find the discriminant of 3x² + 2x + 1 = 0."
+            )
+            video = "https://www.youtube.com/watch?v=XUt8LnbJvXQ"
+        elif any(w in msg_lower for w in ["force", "physics", "gravity", "motion", "velocity", "acceleration"]):
+            explanation = (
+                "Newton's laws of motion form the basis of classical mechanics. "
+                "The second law states that the force acting on an object is equal to its mass times acceleration (F = ma)."
+            )
+            examples = (
+                "Calculate force required to accelerate a 5 kg object at 3 m/s².\n"
+                "F = m * a\n"
+                "F = 5 kg * 3 m/s² = 15 Newtons."
+            )
+            practice_questions = (
+                "1. What is the force on a 10 kg object under gravity (a = 9.8 m/s²)?\n"
+                "2. State Newton's first law of motion in your own words."
+            )
+            video = "https://www.youtube.com/watch?v=keyMstO13F4"
+        elif any(w in msg_lower for w in ["code", "program", "html", "javascript", "python", "css", "web"]):
+            explanation = (
+                "HTML (HyperText Markup Language) structures web content, while CSS handles the styling. "
+                "JavaScript adds interactivity. Python is a highly popular, clean general-purpose language."
+            )
+            examples = (
+                "HTML structure example:\n"
+                "```html\n"
+                "<div>\n"
+                "  <h1>EduNova AI Tutor</h1>\n"
+                "  <p>Learn programming step by step.</p>\n"
+                "</div>\n"
+                "```"
+            )
+            practice_questions = (
+                "1. What is the difference between `==` and `===` in JavaScript?\n"
+                "2. Write a Python function that takes a number and returns its square."
+            )
+            video = "https://www.youtube.com/watch?v=pQN-pnXPaVg"
+        else:
+            explanation = (
+                f"Here is an educational explanation for your query on '{message}'. "
+                "We recommend reviewing the chapter lecture notes and syllabus resources for further study."
+            )
+            examples = (
+                "Consider the primary textbook examples and check the practice exercises under this lesson's PDFs."
+            )
+            practice_questions = (
+                "1. Discuss the key points of this topic with your course instructor.\n"
+                "2. Write a brief summary of how this concept applies in practical scenarios."
+            )
+            video = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS public.portal_ai_usage (
+                  id integer GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY,
+                  student_id integer NOT NULL REFERENCES public.auth_user(id) ON DELETE CASCADE,
+                  course_id integer REFERENCES public.portal_course(id) ON DELETE CASCADE,
+                  question text NOT NULL,
+                  answer_explanation text NOT NULL,
+                  answer_examples text NOT NULL,
+                  answer_questions text NOT NULL,
+                  answer_video text NOT NULL,
+                  created_at timestamptz NOT NULL DEFAULT now()
+                )
+                """
+            )
+            cursor.execute(
+                """
+                INSERT INTO portal_ai_usage (student_id, course_id, question, answer_explanation, answer_examples, answer_questions, answer_video)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                """,
+                [request.user.id, course_id, message, explanation, examples, practice_questions, video]
+            )
+
+        return Response({
+            "explanation": explanation,
+            "examples": examples,
+            "practice_questions": practice_questions,
+            "video": video
+        })
+
+
+class TeacherAIUsageView(AuthenticatedMixin, APIView):
+    """GET ?course_id= — returns student AI Tutor queries list for a course."""
+
+    def get(self, request):
+        if not table_exists("portal_ai_usage"):
+            return Response([])
+        course_id = request.query_params.get("course_id")
+        if not course_id:
+            return Response({"detail": "course_id parameter is required."}, status=400)
+        if not _can_access_course(request.user, course_id):
+            return _FORBIDDEN
+        
+        logs = rows(
+            """
+            SELECT u.id, u.question, u.answer_explanation, u.answer_examples, u.answer_questions, u.answer_video, u.created_at,
+                   COALESCE(st.first_name || ' ' || st.last_name, st.username) AS student_name
+            FROM portal_ai_usage u
+            JOIN auth_user st ON st.id = u.student_id
+            WHERE u.course_id = %s
+            ORDER BY u.created_at DESC
+            """,
+            [course_id]
+        )
+        return Response(serialise(logs))
+
+
+class AdminAIUsageView(AuthenticatedMixin, APIView):
+    """GET — returns school-wide student AI Tutor queries logs."""
+
+    def get(self, request):
+        role = get_role(request.user)
+        if role != "Admin":
+            return _FORBIDDEN
+        if not table_exists("portal_ai_usage"):
+            return Response([])
+        
+        logs = rows(
+            """
+            SELECT u.id, u.question, u.answer_explanation, u.answer_examples, u.answer_questions, u.answer_video, u.created_at,
+                   c.title AS course_title, s.name AS subject_name,
+                   COALESCE(st.first_name || ' ' || st.last_name, st.username) AS student_name
+            FROM portal_ai_usage u
+            JOIN portal_course c ON c.id = u.course_id
+            JOIN portal_subject s ON s.id = c.subject_id
+            JOIN auth_user st ON st.id = u.student_id
+            ORDER BY u.created_at DESC
+            """
+        )
+        return Response(serialise(logs))
+
