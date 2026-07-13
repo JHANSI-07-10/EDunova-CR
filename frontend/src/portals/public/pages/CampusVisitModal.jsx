@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Calendar, Clock, X, CheckCircle, Mail, Phone, User, FileText } from 'lucide-react'
 
 export default function CampusVisitModal({ isOpen, onClose, campuses, initialCampusId }) {
@@ -13,6 +13,15 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
   })
   const [status, setStatus] = useState('idle') // idle | sending | sent | error
   const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    if (isOpen) {
+      setForm(prev => ({
+        ...prev,
+        campus_id: initialCampusId || ''
+      }))
+    }
+  }, [isOpen, initialCampusId])
 
   if (!isOpen) return null
 

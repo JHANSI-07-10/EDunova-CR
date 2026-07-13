@@ -297,6 +297,70 @@ export default function ContactPage() {
             </form>
           </div>
 
+          {/* Key School Statistics (Requirements Document) */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
+            <h3 className="font-heading text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Sparkles className="text-academic-gold" size={20} /> EduNova Scale & Strength
+            </h3>
+            <p className="text-xs text-slate-500 font-sub">Stats directly from institutional registry</p>
+            <div className="grid grid-cols-2 gap-3 text-center">
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <p className="font-numbers text-2xl font-extrabold text-academic-blue">6,500+</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mt-1">Students</p>
+              </div>
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <p className="font-numbers text-2xl font-extrabold text-academic-gold">150+</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mt-1">School Buses</p>
+              </div>
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <p className="font-numbers text-2xl font-extrabold text-academic-green">350+</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mt-1">Teachers</p>
+              </div>
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <p className="font-numbers text-2xl font-extrabold text-red-500">100%</p>
+                <p className="text-[10px] text-slate-500 uppercase tracking-wider font-semibold mt-1">Digital Campus</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Departmental Directory */}
+          <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100 space-y-4">
+            <h3 className="font-heading text-lg font-bold text-slate-900 flex items-center gap-2">
+              <Mail className="text-academic-blue" size={20} /> Departmental Helplines
+            </h3>
+            <p className="text-xs text-slate-500 font-sub text-left">Connect directly with regional coordinators and support desks</p>
+            <div className="space-y-3 text-xs font-body text-slate-600">
+              <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                <span className="font-semibold text-slate-800">Admissions Helpline</span>
+                <a href="mailto:admissions@edunovaacademy.edu.in" className="text-academic-blue hover:underline font-medium">admissions@edunovaacademy.edu.in</a>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                <span className="font-semibold text-slate-800">Academic Affairs</span>
+                <a href="mailto:academics@edunovaacademy.edu.in" className="text-academic-blue hover:underline font-medium">academics@edunovaacademy.edu.in</a>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                <span className="font-semibold text-slate-800">Student & Parent Support</span>
+                <a href="mailto:support@edunovaacademy.edu.in" className="text-academic-blue hover:underline font-medium font-medium">support@edunovaacademy.edu.in</a>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                <span className="font-semibold text-slate-800">Transport Registry</span>
+                <a href="mailto:transport@edunovaacademy.edu.in" className="text-academic-blue hover:underline font-medium">transport@edunovaacademy.edu.in</a>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                <span className="font-semibold text-slate-800">Hostel Desk</span>
+                <a href="mailto:hostel@edunovaacademy.edu.in" className="text-academic-blue hover:underline font-medium">hostel@edunovaacademy.edu.in</a>
+              </div>
+              <div className="flex items-center justify-between border-b border-slate-50 pb-2">
+                <span className="font-semibold text-slate-800">IT Department Helpdesk</span>
+                <a href="mailto:it@edunovaacademy.edu.in" className="text-academic-blue hover:underline font-medium font-medium">it@edunovaacademy.edu.in</a>
+              </div>
+              <div className="flex items-center justify-between pb-1">
+                <span className="font-semibold text-slate-800">Finance & Accounts Cell</span>
+                <a href="mailto:accounts@edunovaacademy.edu.in" className="text-academic-blue hover:underline font-medium font-medium">accounts@edunovaacademy.edu.in</a>
+              </div>
+            </div>
+          </div>
+
         </div>
 
         {/* MIDDLE & RIGHT COLUMNS: Map & Location Finder & Branch Lists */}
@@ -342,7 +406,13 @@ export default function ContactPage() {
                   value={selectedCampus ? selectedCampus.id : ''} 
                   onChange={(e) => {
                     const match = campuses.find(c => String(c.id) === String(e.target.value))
-                    if (match) setSelectedCampus(match)
+                    if (match) {
+                      setSelectedCampus(match)
+                      setSelectedState(match.state)
+                      setSelectedCity(match.city)
+                    } else {
+                      setSelectedCampus(null)
+                    }
                   }}
                   className="w-full bg-white/10 border border-white/10 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-white/20 text-white"
                 >
@@ -440,17 +510,6 @@ export default function ContactPage() {
                 <span className="text-[10px] text-slate-500 uppercase tracking-widest">Delhi NCR</span>
               </div>
 
-              {/* Head Office Marker */}
-              <button 
-                onClick={() => setSelectedCampus({ id: 'HO', ...headOffice })}
-                className="absolute top-[300px] left-[400px] -translate-x-1/2 -translate-y-1/2 group z-20 flex flex-col items-center"
-              >
-                <div className="w-4 h-4 bg-academic-gold rounded-full border-2 border-white flex items-center justify-center shadow-lg group-hover:scale-125 transition-transform duration-200 animate-pulse" />
-                <span className="text-[10px] bg-slate-900 border border-slate-800 text-academic-gold px-2 py-0.5 rounded-full mt-1.5 shadow-md font-semibold tracking-wider whitespace-nowrap">
-                  ⭐ Head Office (Dwarka)
-                </span>
-              </button>
-
               {/* Branch Campus Markers */}
               {filteredCampuses.map(c => {
                 // Map lat/long coordinates onto our custom vector grid relative position
@@ -466,8 +525,10 @@ export default function ContactPage() {
                 else if (c.name.includes("Faridabad")) { left = 415; top = 330; }
                 else if (c.name.includes("Jaipur")) { left = 240; top = 410; }
                 else if (c.name.includes("Lucknow")) { left = 550; top = 360; }
+                else if (c.name.includes("Head Office") || c.name.includes("Dwarka")) { left = 400; top = 300; }
 
                 const isCurrentlySelected = selectedCampus && selectedCampus.id === c.id
+                const isHQ = c.name.includes("Head Office") || c.name.includes("Dwarka")
 
                 return (
                   <button 
@@ -476,12 +537,12 @@ export default function ContactPage() {
                     className="absolute -translate-x-1/2 -translate-y-1/2 group z-10 flex flex-col items-center"
                     style={{ top: `${top}px`, left: `${left}px` }}
                   >
-                    <div className={`w-3.5 h-3.5 rounded-full border-2 border-white shadow-lg transition-all duration-200 group-hover:scale-125
-                      ${isCurrentlySelected ? 'bg-red-500 w-4 h-4 ring-4 ring-red-500/20' : 'bg-academic-blue'}`} 
+                    <div className={`rounded-full border-2 border-white shadow-lg transition-all duration-200 group-hover:scale-125
+                      ${isCurrentlySelected ? 'bg-red-500 w-4 h-4 ring-4 ring-red-500/20' : isHQ ? 'bg-academic-gold w-4 h-4 animate-pulse' : 'bg-academic-blue w-3.5 h-3.5'}`} 
                     />
                     <span className={`text-[9px] px-2 py-0.5 rounded-md mt-1 shadow-md font-medium whitespace-nowrap transition-colors
-                      ${isCurrentlySelected ? 'bg-red-500 text-white' : 'bg-slate-800 border border-slate-700 text-slate-200 group-hover:bg-slate-700'}`}>
-                      {c.name}
+                      ${isCurrentlySelected ? 'bg-red-500 text-white' : isHQ ? 'bg-slate-900 border border-slate-800 text-academic-gold font-semibold' : 'bg-slate-800 border border-slate-700 text-slate-200 group-hover:bg-slate-700'}`}>
+                      {isHQ ? `⭐ ${c.name}` : c.name}
                     </span>
                   </button>
                 )
