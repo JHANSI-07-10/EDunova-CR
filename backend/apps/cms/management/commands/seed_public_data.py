@@ -166,11 +166,17 @@ class Command(BaseCommand):
             _attach_image(achievement, "cover_image", image)
 
         sample_leadership = [
-            ("Dr. Meera Sharma", "Principal", "Academic leader focused on digital education, student excellence, innovation, and holistic learning.", "EduNova.jpeg"),
-            ("Mr. Arvind Rao", "Academic Director", "Leads curriculum planning, academic quality, assessment strategy, and teacher development programs.", "student.jpeg"),
-            ("Ms. Nandita Iyer", "Cambridge Coordinator", "Supports international curriculum delivery, inquiry-based learning, and global academic standards.", "Campus.jpeg"),
-            ("Mr. Rohan Kapoor", "Head of STEM & Innovation", "Guides robotics, STEM education, innovation projects, student research, and future skills.", "building.jpeg"),
+            ("Dr. Rajesh Malhotra", "Founder & Chairman", "Dedicated founder guiding EduNova Academy’s vision and long-term educational strategy.", "images/Man_in_Academic_Office_2K_202607130959.jpeg"),
+            ("Anita Kapoor", "Managing Director", "Directs institutional operations, strategic partnerships, and administrative efficiency.", "fstudent.jpeg"),
+            ("Dr. Meera Sharma", "Principal", "Academic leader focused on digital education, student excellence, innovation, and holistic learning.", "images/Woman_Principal_in_Office_202607130959.jpeg"),
+            ("Arjun Verma", "Academic Director", "Leads curriculum planning, academic quality, assessment strategy, and teacher development programs.", "images/Man_in_modern_office_202607130959.jpeg"),
+            ("Ms. Nandita Iyer", "Cambridge Coordinator", "Supports international curriculum delivery, inquiry-based learning, and global academic standards.", "images/Nandita_Iyer_Cambridge_Coordinat…_2K_202607130959.jpeg"),
+            ("Nisha Bansal", "Vice Principal", "Supports school administration, discipline, student affairs, and co-curricular programs.", "fstudent.jpeg"),
+            ("Rohan Khanna", "IT Director", "Drives digital transformation, campus ERP systems, online LMS, and technology integrations.", "student.jpeg"),
+            ("Sanjay Mehta", "Finance Head", "Manages financial planning, fee management, accounting compliance, and resource allocation.", "student-1.jpeg"),
+            ("Priya Arora", "Admissions Director", "Coordinates admissions processes, outreach, student registration, and parent onboarding.", "Campus.jpeg"),
         ]
+        LeadershipMember.objects.all().delete()
         for i, (name, designation, bio, photo) in enumerate(sample_leadership):
             member, _ = LeadershipMember.objects.update_or_create(
                 name=name,
