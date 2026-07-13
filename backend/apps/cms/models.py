@@ -11,6 +11,9 @@ class SchoolSettings(models.Model):
     company_type = models.CharField(max_length=255, default="Private Limited Educational Institution")
     established_year = models.PositiveIntegerField(default=2015)
     headquarters_address = models.TextField(blank=True)
+    admissions_open = models.BooleanField(default=True)
+    admissions_close_date = models.DateField(blank=True, null=True)
+    admissions_academic_year = models.CharField(max_length=50, default="2026-2027")
 
     def save(self, *args, **kwargs):
         self.pk = 1  # enforce singleton

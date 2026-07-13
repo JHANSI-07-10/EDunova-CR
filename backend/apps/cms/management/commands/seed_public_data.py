@@ -34,6 +34,9 @@ class Command(BaseCommand):
                 website_domain="www.edunovaacademy.edu.in",
                 company_type="Private Limited Educational Institution",
                 established_year=2015,
+                admissions_open=True,
+                admissions_close_date="2026-08-31",
+                admissions_academic_year="2026-2027",
             ),
         )
 
