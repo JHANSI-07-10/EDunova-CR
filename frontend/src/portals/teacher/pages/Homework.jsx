@@ -92,9 +92,9 @@ function HomeworkForm({ classes, onClose, onSaved }) {
     }
   }, [classes]);
 
-  function pickClass(classId) {
-    const match = classes.find((c) => String(c.class_id) === classId);
-    setForm((f) => ({ ...f, class_id: classId, subject_id: match?.subject_id }));
+  function pickClassSubject(val) {
+    const [classId, subjectId] = val.split("-");
+    setForm((f) => ({ ...f, class_id: classId ? Number(classId) : "", subject_id: subjectId ? Number(subjectId) : "" }));
   }
 
   async function submit(e) {
@@ -121,12 +121,13 @@ function HomeworkForm({ classes, onClose, onSaved }) {
         {error && <div className="mb-3 text-sm text-danger bg-red-50 rounded-xl px-3 py-2">{error}</div>}
         <form onSubmit={submit} className="space-y-3">
           <select
-            value={form.class_id}
-            onChange={(e) => pickClass(e.target.value)}
+            value={form.class_id && form.subject_id ? `${form.class_id}-${form.subject_id}` : ""}
+            onChange={(e) => pickClassSubject(e.target.value)}
             className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none"
           >
+            <option value="">Select Class & Subject</option>
             {classes.map((c) => (
-              <option key={c.id} value={c.class_id}>{c.class_name} — {c.subject_name}</option>
+              <option key={c.id} value={`${c.class_id}-${c.subject_id}`}>{c.class_name} — {c.subject_name}</option>
             ))}
           </select>
           <input
