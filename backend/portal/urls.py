@@ -154,6 +154,7 @@ urlpatterns = [
     path("admin-portal/campuses/<int:campus_id>/", admin_views.AdminCampusDetailView.as_view()),
     path("admin-portal/campuses/visits/", admin_views.AdminCampusVisitsView.as_view()),
     path("admin-portal/campuses/visits/<int:visit_id>/status/", admin_views.AdminCampusVisitsView.as_view()),
+    path("cms/scholarships/", views.PublicScholarshipsView.as_view()),
 
     # Admin exams management & publication
     path("admin-portal/exams/", exam_extras_views.AdminExamActionView.as_view()),

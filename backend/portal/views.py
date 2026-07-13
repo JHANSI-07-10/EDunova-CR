@@ -1030,3 +1030,61 @@ class NearestCampusView(APIView):
             "email": nearest["email"]
         })
 
+
+class PublicScholarshipsView(APIView):
+    def get(self, request):
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS public.portal_scholarship (
+                    id SERIAL PRIMARY KEY,
+                    name varchar(200) NOT NULL,
+                    description text NOT NULL,
+                    eligibility text NOT NULL,
+                    coverage_percent integer NOT NULL
+                )
+                """
+            )
+        data = rows("SELECT * FROM portal_scholarship ORDER BY id")
+        if not data:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    """
+                    INSERT INTO portal_scholarship (name, description, eligibility, coverage_percent) VALUES
+                    ('Academic Excellence Merit Scholarship', 'Awarded to top 5% academic performers of each grade to incentivize higher learning standards.', 'GPA 9.2 or above / overall percentage above 90% in the last academic year.', 50),
+                    ('EduNova Financial Assistance Grant', 'Need-based scholarship program aimed at supporting students from economically weaker sections.', 'Family annual income below specified threshold, verified by financial documentation.', 100),
+                    ('Sports & Athletics Champion Scholarship', 'Encouraging young sportspersons representing the school or state in athletic events.', 'State or National level representation in sports in the past 2 years.', 40)
+                    """
+                )
+            data = rows("SELECT * FROM portal_scholarship ORDER BY id")
+        return Response(serialise(data))
+
+    def post(self, request):
+        if not request.user or not request.user.is_authenticated or not request.user.is_staff:
+            return Response({"detail": "Admin permission required."}, status=403)
+        name = request.data.get("name")
+        description = request.data.get("description")
+        eligibility = request.data.get("eligibility")
+        coverage_percent = request.data.get("coverage_percent")
+        
+        if not name or not description or not eligibility or not coverage_percent:
+            return Response({"detail": "All fields are required."}, status=400)
+            
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO portal_scholarship (name, description, eligibility, coverage_percent) VALUES (%s,%s,%s,%s) RETURNING id",
+                [name, description, eligibility, int(coverage_percent)]
+            )
+            nid = cursor.fetchone()[0]
+        return Response({"id": nid, "detail": "Scholarship created successfully."})
+
+    def delete(self, request):
+        if not request.user or not request.user.is_authenticated or not request.user.is_staff:
+            return Response({"detail": "Admin permission required."}, status=403)
+        sid = request.query_params.get("id")
+        if not sid:
+            return Response({"detail": "Scholarship ID is required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM portal_scholarship WHERE id=%s", [sid])
+        return Response({"detail": "Scholarship deleted."})
+

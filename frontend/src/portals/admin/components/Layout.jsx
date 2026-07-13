@@ -10,6 +10,7 @@ const TITLES = {
   "/roles-permissions": "Roles & Permissions",
   "/classes": "Classes & Subjects",
   "/fees": "Fees",
+  "/scholarships": "Scholarships",
   "/payroll": "Payroll",
   "/exam-results": "Rank Lists & Report Cards",
   "/transport": "Transport",

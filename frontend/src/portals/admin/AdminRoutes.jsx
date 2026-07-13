@@ -27,6 +27,7 @@ import Payroll from "./pages/Payroll";
 import RolesPermissions from "./pages/RolesPermissions";
 import LmsMonitor from "./pages/LmsMonitor";
 import Campuses from "./pages/Campuses";
+import Scholarships from "./pages/Scholarships";
 
 export default function AdminRoutes() {
   return (
@@ -43,15 +44,18 @@ export default function AdminRoutes() {
           <Route index element={<Dashboard />} />
           <Route path="admissions" element={<Admissions />} />
           <Route path="users" element={<Users />} />
+          <Route path="roles-permissions" element={<RolesPermissions />} />
           <Route path="classes" element={<Classes />} />
+          <Route path="lms" element={<LmsMonitor />} />
           <Route path="fees" element={<Fees />} />
-          <Route path="transport" element={<Transport />} />
-          <Route path="library" element={<Library />} />
+          <Route path="scholarships" element={<Scholarships />} />
           <Route path="notices" element={<Notices />} />
           <Route path="leaves" element={<Leaves />} />
           <Route path="reports" element={<Reports />} />
           <Route path="audit-log" element={<AuditLog />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="transport" element={<Transport />} />
+          <Route path="library" element={<Library />} />
           <Route path="hostel" element={<Hostel />} />
           <Route path="inventory" element={<Inventory />} />
           <Route path="visitors" element={<Visitors />} />
@@ -59,8 +63,6 @@ export default function AdminRoutes() {
           <Route path="medical-records" element={<MedicalRecords />} />
           <Route path="exam-results" element={<ExamResults />} />
           <Route path="payroll" element={<Payroll />} />
-          <Route path="roles-permissions" element={<RolesPermissions />} />
-          <Route path="lms" element={<LmsMonitor />} />
           <Route path="campuses" element={<Campuses />} />
           <Route path="*" element={<PortalNotFound homePath="/admin" />} />
         </Route>
