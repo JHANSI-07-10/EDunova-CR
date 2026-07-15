@@ -255,7 +255,7 @@ class ChildDocumentsView(ParentMixin, APIView):
 
 
 class ChildTransportView(ParentMixin, APIView):
-    """Bus route/pickup info + most recent known GPS ping for the child's bus."""
+    """Bus route/pickup info, pass, fee status, latest route alerts, and GPS coordinates."""
 
     def get(self, request):
         child_id = request.query_params.get("child_id")
@@ -266,23 +266,74 @@ class ChildTransportView(ParentMixin, APIView):
         alloc = row(
             """
             SELECT ta.pickup_point, v.id AS vehicle_id, v.vehicle_number, v.maintenance_status,
-                   r.route_name, r.start_point, r.end_point,
-                   COALESCE(du.first_name || ' ' || du.last_name, du.username) AS driver_name
+                   r.id AS route_id, r.route_name, r.start_point, r.end_point,
+                   COALESCE(du.first_name || ' ' || du.last_name, du.username) AS driver_name,
+                   dr.phone AS driver_phone,
+                   COALESCE(su.first_name || ' ' || su.last_name, su.username) AS student_name
             FROM portal_transport_allocation ta
             JOIN portal_vehicle v ON v.id = ta.vehicle_id
             JOIN portal_route r ON r.id = ta.route_id
             LEFT JOIN auth_user du ON du.id = v.driver_id
+            LEFT JOIN portal_transport_driver dr ON dr.user_id = v.driver_id
+            JOIN auth_user su ON su.id = ta.student_id
             WHERE ta.student_id = %s
             """,
             [child_id],
         )
+        if not alloc:
+            return Response({"allocation": None, "last_location": None})
+
+        # Transport pass
+        transport_pass = None
+        if table_exists("portal_transport_pass"):
+            transport_pass = row(
+                "SELECT pass_number, issued_at, valid_until, is_active FROM portal_transport_pass WHERE student_id=%s",
+                [child_id],
+            )
+
+        # Pickup stop scheduled times
+        pickup_detail = None
+        if table_exists("portal_pickup_point"):
+            pickup_detail = row(
+                "SELECT name, sequence_order, pickup_time, drop_time FROM portal_pickup_point "
+                "WHERE route_id=%s AND name=%s",
+                [alloc["route_id"], alloc["pickup_point"]],
+            )
+
+        # Fee status
+        transport_fee = None
+        if table_exists("portal_transport_fee"):
+            transport_fee = row(
+                "SELECT amount, amount_paid, status, due_date FROM portal_transport_fee WHERE student_id=%s",
+                [child_id],
+            )
+
+        # Latest route alert
+        latest_alert = None
+        if table_exists("portal_transport_notification"):
+            latest_alert = row(
+                "SELECT type, message, created_at FROM portal_transport_notification "
+                "WHERE route_id=%s OR vehicle_id=%s ORDER BY created_at DESC LIMIT 1",
+                [alloc["route_id"], alloc["vehicle_id"]],
+            )
+
+        # GPS location
         last_location = None
-        if alloc and table_exists("portal_live_bus_log"):
+        if table_exists("portal_live_bus_log"):
             last_location = row(
-                "SELECT latitude, longitude, updated_at FROM portal_live_bus_log WHERE vehicle_id=%s ORDER BY updated_at DESC LIMIT 1",
+                "SELECT latitude, longitude, updated_at FROM portal_live_bus_log "
+                "WHERE vehicle_id=%s ORDER BY updated_at DESC LIMIT 1",
                 [alloc["vehicle_id"]],
             )
-        return Response(serialise({"allocation": alloc, "last_location": last_location}))
+
+        return Response(serialise({
+            "allocation": alloc,
+            "transport_pass": transport_pass,
+            "pickup_detail": pickup_detail,
+            "transport_fee": transport_fee,
+            "latest_alert": latest_alert,
+            "last_location": last_location,
+        }))
 
 
 class TeacherContactsView(ParentMixin, APIView):

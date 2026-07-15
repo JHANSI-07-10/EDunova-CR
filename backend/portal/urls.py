@@ -107,9 +107,32 @@ urlpatterns = [
     path("admin-portal/enrollments/", admin_views.ClassEnrollmentView.as_view()),
     path("admin-portal/class-teachers/", admin_views.ClassTeacherAssignView.as_view()),
     path("admin-portal/subjects/", admin_views.SubjectView.as_view()),
+    # Transport — Vehicles
     path("admin-portal/vehicles/", admin_views.VehicleView.as_view()),
+    # Transport — Routes
     path("admin-portal/routes/", admin_views.RouteView.as_view()),
+    # Transport — Student Allocations
     path("admin-portal/transport-allocations/", admin_views.TransportAllocationView.as_view()),
+    # Transport — Drivers
+    path("admin-portal/transport/drivers/", admin_views.DriverView.as_view()),
+    # Transport — Attendants
+    path("admin-portal/transport/attendants/", admin_views.AttendantView.as_view()),
+    # Transport — Pickup / Drop Points
+    path("admin-portal/transport/pickup-points/", admin_views.PickupPointView.as_view()),
+    # Transport — Passes
+    path("admin-portal/transport/passes/", admin_views.TransportPassView.as_view()),
+    # Transport — Trip Logs
+    path("admin-portal/transport/trips/", admin_views.TripLogView.as_view()),
+    # Transport — Notifications / Alerts
+    path("admin-portal/transport/notifications/", admin_views.TransportNotificationView.as_view()),
+    # Transport — Settings
+    path("admin-portal/transport/settings/", admin_views.TransportSettingsView.as_view()),
+    # Transport — Reports
+    path("admin-portal/transport/reports/", admin_views.TransportReportsView.as_view()),
+    # Transport — Live Fleet Map (latest GPS ping per vehicle)
+    path("admin-portal/transport/live-map/", admin_views.LiveBusMapView.as_view()),
+    # Transport — Transport Fees
+    path("admin-portal/transport/fees/", admin_views.TransportFeeView.as_view()),
     path("admin-portal/fee-structures/", admin_views.FeeStructureView.as_view()),
     path("admin-portal/payments/", admin_views.PaymentListView.as_view()),
     path("admin-portal/library/books/", admin_views.LibraryBookView.as_view()),
@@ -129,6 +152,11 @@ urlpatterns = [
     path("admin-portal/rooms/", facilities_views.RoomView.as_view()),
     path("admin-portal/hostel-allocations/", facilities_views.HostelAllocationView.as_view()),
     path("admin-portal/hostel-allocations/<int:allocation_id>/vacate/", facilities_views.HostelVacateView.as_view()),
+    path("hostels/applications/", facilities_views.HostelApplicationView.as_view()),
+    path("hostels/leaves/", facilities_views.HostelLeaveView.as_view()),
+    path("hostels/complaints/", facilities_views.HostelComplaintView.as_view()),
+    path("hostels/fees/", facilities_views.HostelFeeView.as_view()),
+    path("hostels/reports/", facilities_views.HostelReportsView.as_view()),
 
     # Inventory module
     path("admin-portal/inventory/", facilities_views.InventoryView.as_view()),

@@ -569,22 +569,725 @@ class SubjectView(SimpleTableView):
     order_by = "name"
 
 
-class VehicleView(SimpleTableView):
-    table = "portal_vehicle"
-    columns = ("vehicle_number", "capacity", "driver_id", "gps_device_id", "maintenance_status")
-    order_by = "vehicle_number"
+class VehicleView(AdminMixin, APIView):
+    """
+    GET  — list all vehicles with driver name joined
+    POST — add a new vehicle
+    PATCH — update vehicle (body must include id)
+    DELETE ?id= — remove vehicle
+    """
+
+    def get(self, request):
+        if not table_exists("portal_vehicle"):
+            return Response([])
+        return Response(serialise(rows(
+            """
+            SELECT v.id, v.vehicle_number, v.capacity, v.gps_device_id, v.maintenance_status,
+                   v.driver_id,
+                   COALESCE(u.first_name || ' ' || u.last_name, u.username) AS driver_name,
+                   d.phone AS driver_phone, d.license_number,
+                   v.driver_id IS NOT NULL AS has_driver
+            FROM portal_vehicle v
+            LEFT JOIN portal_transport_driver d ON d.vehicle_id = v.id
+            LEFT JOIN auth_user u ON u.id = v.driver_id
+            ORDER BY v.vehicle_number
+            """
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_vehicle"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        vnum = (d.get("vehicle_number") or "").strip()
+        if not vnum:
+            return Response({"detail": "vehicle_number is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_vehicle (vehicle_number, capacity, driver_id, gps_device_id, maintenance_status) "
+                "VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                [vnum, d.get("capacity") or None, d.get("driver_id") or None,
+                 d.get("gps_device_id") or None, d.get("maintenance_status", "Active")],
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "transport.vehicle.create", "portal_vehicle", new_id, {"vehicle_number": vnum})
+        return Response({"id": new_id, "detail": "Vehicle added."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_vehicle"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        vid = d.get("id")
+        if not vid:
+            return Response({"detail": "id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_vehicle SET vehicle_number=%s, capacity=%s, driver_id=%s, "
+                "gps_device_id=%s, maintenance_status=%s WHERE id=%s",
+                [d.get("vehicle_number"), d.get("capacity") or None,
+                 d.get("driver_id") or None, d.get("gps_device_id") or None,
+                 d.get("maintenance_status", "Active"), vid],
+            )
+        log_action(request.user, "transport.vehicle.update", "portal_vehicle", vid, dict(d))
+        return Response({"detail": "Vehicle updated."})
+
+    def delete(self, request):
+        vid = request.query_params.get("id")
+        if not vid:
+            return Response({"detail": "id required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute("DELETE FROM portal_vehicle WHERE id=%s", [vid])
+        log_action(request.user, "transport.vehicle.delete", "portal_vehicle", vid, {})
+        return Response({"detail": "Vehicle deleted."})
 
 
-class RouteView(SimpleTableView):
-    table = "portal_route"
-    columns = ("route_name", "start_point", "end_point")
-    order_by = "route_name"
+class RouteView(AdminMixin, APIView):
+    """
+    GET  — list routes with vehicle & attendant names + stop counts
+    POST — create route
+    PATCH — update route (body must include id)
+    DELETE ?id= — remove route
+    """
+
+    def get(self, request):
+        if not table_exists("portal_route"):
+            return Response([])
+        return Response(serialise(rows(
+            """
+            SELECT r.id, r.route_name, r.start_point, r.end_point,
+                   r.vehicle_id, v.vehicle_number,
+                   r.attendant_id,
+                   COALESCE(au.first_name || ' ' || au.last_name, au.username) AS attendant_name,
+                   (SELECT COUNT(*)::int FROM portal_pickup_point pp WHERE pp.route_id = r.id) AS stop_count
+            FROM portal_route r
+            LEFT JOIN portal_vehicle v ON v.id = r.vehicle_id
+            LEFT JOIN portal_transport_attendant a ON a.id = r.attendant_id
+            LEFT JOIN auth_user au ON au.id = a.user_id
+            ORDER BY r.route_name
+            """
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_route"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        name = (d.get("route_name") or "").strip()
+        if not name:
+            return Response({"detail": "route_name is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_route (route_name, start_point, end_point, vehicle_id, attendant_id) "
+                "VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                [name, d.get("start_point", ""), d.get("end_point", ""),
+                 d.get("vehicle_id") or None, d.get("attendant_id") or None],
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "transport.route.create", "portal_route", new_id, {"route_name": name})
+        return Response({"id": new_id, "detail": "Route created."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_route"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        rid = d.get("id")
+        if not rid:
+            return Response({"detail": "id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_route SET route_name=%s, start_point=%s, end_point=%s, "
+                "vehicle_id=%s, attendant_id=%s WHERE id=%s",
+                [d.get("route_name"), d.get("start_point", ""), d.get("end_point", ""),
+                 d.get("vehicle_id") or None, d.get("attendant_id") or None, rid],
+            )
+        log_action(request.user, "transport.route.update", "portal_route", rid, dict(d))
+        return Response({"detail": "Route updated."})
+
+    def delete(self, request):
+        rid = request.query_params.get("id")
+        if not rid:
+            return Response({"detail": "id required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute("DELETE FROM portal_route WHERE id=%s", [rid])
+        log_action(request.user, "transport.route.delete", "portal_route", rid, {})
+        return Response({"detail": "Route deleted."})
 
 
-class TransportAllocationView(SimpleTableView):
-    table = "portal_transport_allocation"
-    columns = ("student_id", "vehicle_id", "route_id", "pickup_point")
-    order_by = "id"
+class TransportAllocationView(AdminMixin, APIView):
+    """
+    GET  — list all allocations with student name, route name, vehicle number
+    POST — allocate (upsert — one route per student)
+    DELETE ?student_id= — remove allocation
+    """
+
+    def get(self, request):
+        if not table_exists("portal_transport_allocation"):
+            return Response([])
+        return Response(serialise(rows(
+            """
+            SELECT ta.id, ta.student_id, ta.vehicle_id, ta.route_id, ta.pickup_point,
+                   COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name,
+                   u.username AS student_username,
+                   r.route_name, v.vehicle_number,
+                   tp.pass_number, tp.is_active AS pass_active
+            FROM portal_transport_allocation ta
+            JOIN auth_user u ON u.id = ta.student_id
+            JOIN portal_route r ON r.id = ta.route_id
+            JOIN portal_vehicle v ON v.id = ta.vehicle_id
+            LEFT JOIN portal_transport_pass tp ON tp.student_id = ta.student_id
+            ORDER BY u.first_name, u.last_name
+            """
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_transport_allocation"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        sid = d.get("student_id")
+        vid = d.get("vehicle_id")
+        rid = d.get("route_id")
+        if not sid or not vid or not rid:
+            return Response({"detail": "student_id, vehicle_id, and route_id are required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_transport_allocation (student_id, vehicle_id, route_id, pickup_point) "
+                "VALUES (%s,%s,%s,%s) ON CONFLICT (student_id) DO UPDATE SET "
+                "vehicle_id=EXCLUDED.vehicle_id, route_id=EXCLUDED.route_id, pickup_point=EXCLUDED.pickup_point "
+                "RETURNING id",
+                [sid, vid, rid, d.get("pickup_point", "")],
+            )
+            alloc_id = cur.fetchone()[0]
+        log_action(request.user, "transport.allocate", "portal_transport_allocation", alloc_id,
+                   {"student_id": sid, "vehicle_id": vid, "route_id": rid})
+        return Response({"id": alloc_id, "detail": "Student allocated to bus route."}, status=201)
+
+    def delete(self, request):
+        sid = request.query_params.get("student_id")
+        if not sid:
+            return Response({"detail": "student_id required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute("DELETE FROM portal_transport_allocation WHERE student_id=%s", [sid])
+        log_action(request.user, "transport.deallocate", "portal_transport_allocation", sid, {})
+        return Response({"detail": "Allocation removed."})
+
+
+# ---------------------------------------------------------------------------
+# Transport Drivers
+# ---------------------------------------------------------------------------
+class DriverView(AdminMixin, APIView):
+    """CRUD for portal_transport_driver."""
+
+    def get(self, request):
+        if not table_exists("portal_transport_driver"):
+            return Response([])
+        return Response(serialise(rows(
+            """
+            SELECT d.id, d.user_id, d.license_number, d.phone, d.vehicle_id, d.is_active,
+                   COALESCE(u.first_name || ' ' || u.last_name, u.username) AS name,
+                   v.vehicle_number
+            FROM portal_transport_driver d
+            JOIN auth_user u ON u.id = d.user_id
+            LEFT JOIN portal_vehicle v ON v.id = d.vehicle_id
+            ORDER BY name
+            """
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_transport_driver"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        uid = d.get("user_id")
+        if not uid:
+            return Response({"detail": "user_id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_transport_driver (user_id, license_number, phone, vehicle_id) "
+                "VALUES (%s,%s,%s,%s) ON CONFLICT (user_id) DO UPDATE SET "
+                "license_number=EXCLUDED.license_number, phone=EXCLUDED.phone, vehicle_id=EXCLUDED.vehicle_id "
+                "RETURNING id",
+                [uid, d.get("license_number", ""), d.get("phone", ""), d.get("vehicle_id") or None],
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "transport.driver.upsert", "portal_transport_driver", new_id, dict(d))
+        return Response({"id": new_id, "detail": "Driver saved."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_transport_driver"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        did = d.get("id")
+        if not did:
+            return Response({"detail": "id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_transport_driver SET license_number=%s, phone=%s, vehicle_id=%s, is_active=%s WHERE id=%s",
+                [d.get("license_number", ""), d.get("phone", ""), d.get("vehicle_id") or None,
+                 d.get("is_active", True), did],
+            )
+        log_action(request.user, "transport.driver.update", "portal_transport_driver", did, dict(d))
+        return Response({"detail": "Driver updated."})
+
+
+# ---------------------------------------------------------------------------
+# Transport Attendants
+# ---------------------------------------------------------------------------
+class AttendantView(AdminMixin, APIView):
+    """CRUD for portal_transport_attendant."""
+
+    def get(self, request):
+        if not table_exists("portal_transport_attendant"):
+            return Response([])
+        return Response(serialise(rows(
+            """
+            SELECT a.id, a.user_id, a.phone, a.assigned_route_id, a.is_active,
+                   COALESCE(u.first_name || ' ' || u.last_name, u.username) AS name,
+                   r.route_name
+            FROM portal_transport_attendant a
+            JOIN auth_user u ON u.id = a.user_id
+            LEFT JOIN portal_route r ON r.id = a.assigned_route_id
+            ORDER BY name
+            """
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_transport_attendant"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        uid = d.get("user_id")
+        if not uid:
+            return Response({"detail": "user_id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_transport_attendant (user_id, phone, assigned_route_id) "
+                "VALUES (%s,%s,%s) ON CONFLICT (user_id) DO UPDATE SET "
+                "phone=EXCLUDED.phone, assigned_route_id=EXCLUDED.assigned_route_id RETURNING id",
+                [uid, d.get("phone", ""), d.get("assigned_route_id") or None],
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "transport.attendant.upsert", "portal_transport_attendant", new_id, dict(d))
+        return Response({"id": new_id, "detail": "Attendant saved."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_transport_attendant"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        aid = d.get("id")
+        if not aid:
+            return Response({"detail": "id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_transport_attendant SET phone=%s, assigned_route_id=%s, is_active=%s WHERE id=%s",
+                [d.get("phone", ""), d.get("assigned_route_id") or None, d.get("is_active", True), aid],
+            )
+        log_action(request.user, "transport.attendant.update", "portal_transport_attendant", aid, dict(d))
+        return Response({"detail": "Attendant updated."})
+
+
+# ---------------------------------------------------------------------------
+# Pickup / Drop Points
+# ---------------------------------------------------------------------------
+class PickupPointView(AdminMixin, APIView):
+    """GET ?route_id=  POST  PATCH  DELETE ?id="""
+
+    def get(self, request):
+        if not table_exists("portal_pickup_point"):
+            return Response([])
+        route_id = request.query_params.get("route_id")
+        sql = "SELECT * FROM portal_pickup_point"
+        params = []
+        if route_id:
+            sql += " WHERE route_id=%s"
+            params.append(route_id)
+        sql += " ORDER BY route_id, sequence_order"
+        return Response(serialise(rows(sql, params)))
+
+    def post(self, request):
+        if not table_exists("portal_pickup_point"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        rid = d.get("route_id")
+        name = (d.get("name") or "").strip()
+        if not rid or not name:
+            return Response({"detail": "route_id and name are required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_pickup_point (route_id, name, sequence_order, pickup_time, drop_time) "
+                "VALUES (%s,%s,%s,%s,%s) ON CONFLICT (route_id, name) DO UPDATE SET "
+                "sequence_order=EXCLUDED.sequence_order, pickup_time=EXCLUDED.pickup_time, drop_time=EXCLUDED.drop_time "
+                "RETURNING id",
+                [rid, name, d.get("sequence_order", 1), d.get("pickup_time") or None, d.get("drop_time") or None],
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "transport.stop.create", "portal_pickup_point", new_id, dict(d))
+        return Response({"id": new_id, "detail": "Stop saved."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_pickup_point"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        pid = d.get("id")
+        if not pid:
+            return Response({"detail": "id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_pickup_point SET name=%s, sequence_order=%s, pickup_time=%s, drop_time=%s WHERE id=%s",
+                [d.get("name"), d.get("sequence_order", 1), d.get("pickup_time") or None, d.get("drop_time") or None, pid],
+            )
+        log_action(request.user, "transport.stop.update", "portal_pickup_point", pid, dict(d))
+        return Response({"detail": "Stop updated."})
+
+    def delete(self, request):
+        pid = request.query_params.get("id")
+        if not pid:
+            return Response({"detail": "id required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute("DELETE FROM portal_pickup_point WHERE id=%s", [pid])
+        log_action(request.user, "transport.stop.delete", "portal_pickup_point", pid, {})
+        return Response({"detail": "Stop deleted."})
+
+
+# ---------------------------------------------------------------------------
+# Transport Pass
+# ---------------------------------------------------------------------------
+import uuid as _uuid
+
+class TransportPassView(AdminMixin, APIView):
+    """
+    GET ?student_id=  — get the pass for a student
+    POST {student_id} — generate or regenerate pass
+    DELETE ?student_id= — deactivate pass
+    """
+
+    def get(self, request):
+        if not table_exists("portal_transport_pass"):
+            return Response([])
+        sid = request.query_params.get("student_id")
+        if sid:
+            data = row("SELECT * FROM portal_transport_pass WHERE student_id=%s", [sid])
+            return Response(serialise(data))
+        return Response(serialise(rows(
+            """
+            SELECT tp.*, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name
+            FROM portal_transport_pass tp JOIN auth_user u ON u.id = tp.student_id
+            ORDER BY tp.issued_at DESC
+            """
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_transport_pass"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        sid = d.get("student_id")
+        if not sid:
+            return Response({"detail": "student_id is required."}, status=400)
+        pass_number = f"TRP-{_uuid.uuid4().hex[:8].upper()}"
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_transport_pass (student_id, pass_number, valid_until, is_active) "
+                "VALUES (%s,%s,%s,true) ON CONFLICT (student_id) DO UPDATE SET "
+                "pass_number=%s, issued_at=CURRENT_DATE, valid_until=EXCLUDED.valid_until, is_active=true "
+                "RETURNING id, pass_number",
+                [sid, pass_number, d.get("valid_until") or None, pass_number],
+            )
+            pid, pnum = cur.fetchone()
+        log_action(request.user, "transport.pass.generate", "portal_transport_pass", pid,
+                   {"student_id": sid, "pass_number": pnum})
+        return Response({"id": pid, "pass_number": pnum, "detail": "Transport pass generated."}, status=201)
+
+    def delete(self, request):
+        sid = request.query_params.get("student_id")
+        if not sid:
+            return Response({"detail": "student_id required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute("UPDATE portal_transport_pass SET is_active=false WHERE student_id=%s", [sid])
+        log_action(request.user, "transport.pass.deactivate", "portal_transport_pass", sid, {})
+        return Response({"detail": "Pass deactivated."})
+
+
+# ---------------------------------------------------------------------------
+# Trip Log
+# ---------------------------------------------------------------------------
+class TripLogView(AdminMixin, APIView):
+    """
+    GET ?date=YYYY-MM-DD  — list trips for a date (today if omitted)
+    POST {vehicle_id, route_id} — start a trip
+    PATCH {id, status, notes?} — update trip (mark In Progress / Completed / Cancelled)
+    """
+
+    def get(self, request):
+        if not table_exists("portal_trip_log"):
+            return Response([])
+        trip_date = request.query_params.get("date") or date.today().isoformat()
+        return Response(serialise(rows(
+            """
+            SELECT tl.id, tl.trip_date, tl.started_at, tl.ended_at, tl.status, tl.notes,
+                   v.vehicle_number, r.route_name,
+                   COALESCE(u.first_name || ' ' || u.last_name, u.username) AS started_by_name
+            FROM portal_trip_log tl
+            JOIN portal_vehicle v ON v.id = tl.vehicle_id
+            LEFT JOIN portal_route r ON r.id = tl.route_id
+            LEFT JOIN auth_user u ON u.id = tl.started_by
+            WHERE tl.trip_date = %s
+            ORDER BY tl.started_at DESC NULLS LAST
+            """,
+            [trip_date],
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_trip_log"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        vid = d.get("vehicle_id")
+        if not vid:
+            return Response({"detail": "vehicle_id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_trip_log (vehicle_id, route_id, started_at, status, started_by) "
+                "VALUES (%s,%s,now(),'In Progress',%s) RETURNING id",
+                [vid, d.get("route_id") or None, request.user.id],
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "transport.trip.start", "portal_trip_log", new_id, {"vehicle_id": vid})
+        return Response({"id": new_id, "detail": "Trip started."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_trip_log"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        tid = d.get("id")
+        status_val = d.get("status", "Completed")
+        if not tid:
+            return Response({"detail": "id is required."}, status=400)
+        if status_val == "Completed":
+            with connection.cursor() as cur:
+                cur.execute(
+                    "UPDATE portal_trip_log SET status=%s, ended_at=now(), notes=%s WHERE id=%s",
+                    [status_val, d.get("notes", ""), tid],
+                )
+        else:
+            with connection.cursor() as cur:
+                cur.execute(
+                    "UPDATE portal_trip_log SET status=%s, notes=%s WHERE id=%s",
+                    [status_val, d.get("notes", ""), tid],
+                )
+        log_action(request.user, "transport.trip.update", "portal_trip_log", tid, {"status": status_val})
+        return Response({"detail": "Trip updated."})
+
+
+# ---------------------------------------------------------------------------
+# Transport Notifications / Alerts
+# ---------------------------------------------------------------------------
+class TransportNotificationView(AdminMixin, APIView):
+    """
+    GET ?route_id=  — list recent notifications (last 50)
+    POST {type, message, vehicle_id?, route_id?} — broadcast alert
+    """
+
+    def get(self, request):
+        if not table_exists("portal_transport_notification"):
+            return Response([])
+        rid = request.query_params.get("route_id")
+        sql = (
+            "SELECT n.*, v.vehicle_number, r.route_name, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS created_by_name "
+            "FROM portal_transport_notification n "
+            "LEFT JOIN portal_vehicle v ON v.id = n.vehicle_id "
+            "LEFT JOIN portal_route r ON r.id = n.route_id "
+            "LEFT JOIN auth_user u ON u.id = n.created_by"
+        )
+        params = []
+        if rid:
+            sql += " WHERE n.route_id=%s"
+            params.append(rid)
+        sql += " ORDER BY n.created_at DESC LIMIT 50"
+        return Response(serialise(rows(sql, params)))
+
+    def post(self, request):
+        if not table_exists("portal_transport_notification"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        msg = (d.get("message") or "").strip()
+        ntype = d.get("type", "Info")
+        if not msg:
+            return Response({"detail": "message is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_transport_notification (vehicle_id, route_id, type, message, created_by) "
+                "VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                [d.get("vehicle_id") or None, d.get("route_id") or None, ntype, msg, request.user.id],
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "transport.notify", "portal_transport_notification", new_id, {"type": ntype})
+        return Response({"id": new_id, "detail": "Alert broadcasted."}, status=201)
+
+
+# ---------------------------------------------------------------------------
+# Transport Settings
+# ---------------------------------------------------------------------------
+class TransportSettingsView(AdminMixin, APIView):
+    """GET — returns all settings as key/value dict.  POST/PATCH {key, value} to upsert."""
+
+    def get(self, request):
+        if not table_exists("portal_transport_settings"):
+            return Response({})
+        data = rows("SELECT key, value FROM portal_transport_settings ORDER BY key")
+        return Response({r["key"]: r["value"] for r in data})
+
+    def post(self, request):
+        if not table_exists("portal_transport_settings"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        updates = request.data  # dict of {key: value}
+        if not isinstance(updates, dict):
+            return Response({"detail": "Expected a JSON object {key: value}."}, status=400)
+        with connection.cursor() as cur:
+            for k, v in updates.items():
+                cur.execute(
+                    "INSERT INTO portal_transport_settings (key, value) VALUES (%s,%s) "
+                    "ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()",
+                    [k, str(v)],
+                )
+        log_action(request.user, "transport.settings.update", "portal_transport_settings", None, updates)
+        return Response({"detail": "Settings saved."})
+
+
+# ---------------------------------------------------------------------------
+# Transport Reports / Analytics
+# ---------------------------------------------------------------------------
+class TransportReportsView(AdminMixin, APIView):
+    """GET — summary stats + per-route utilisation."""
+
+    def get(self, request):
+        def safe_count(sql, params=None):
+            r = row(sql, params or [])
+            return r[list(r.keys())[0]] if r else 0
+
+        total_vehicles = safe_count("SELECT COUNT(*)::int AS c FROM portal_vehicle") if table_exists("portal_vehicle") else 0
+        total_routes = safe_count("SELECT COUNT(*)::int AS c FROM portal_route") if table_exists("portal_route") else 0
+        allocated_students = safe_count("SELECT COUNT(*)::int AS c FROM portal_transport_allocation") if table_exists("portal_transport_allocation") else 0
+        active_trips = safe_count("SELECT COUNT(*)::int AS c FROM portal_trip_log WHERE status='In Progress'") if table_exists("portal_trip_log") else 0
+        active_passes = safe_count("SELECT COUNT(*)::int AS c FROM portal_transport_pass WHERE is_active=true") if table_exists("portal_transport_pass") else 0
+
+        route_utilisation = []
+        if table_exists("portal_route") and table_exists("portal_transport_allocation"):
+            route_utilisation = serialise(rows(
+                """
+                SELECT r.route_name, r.start_point, r.end_point,
+                       COUNT(ta.id)::int AS student_count,
+                       v.vehicle_number, v.capacity
+                FROM portal_route r
+                LEFT JOIN portal_transport_allocation ta ON ta.route_id = r.id
+                LEFT JOIN portal_vehicle v ON v.id = r.vehicle_id
+                GROUP BY r.id, r.route_name, r.start_point, r.end_point, v.vehicle_number, v.capacity
+                ORDER BY student_count DESC
+                """
+            ))
+
+        recent_trips = []
+        if table_exists("portal_trip_log"):
+            recent_trips = serialise(rows(
+                """
+                SELECT tl.trip_date, tl.status, tl.started_at, tl.ended_at,
+                       v.vehicle_number, r.route_name
+                FROM portal_trip_log tl
+                JOIN portal_vehicle v ON v.id = tl.vehicle_id
+                LEFT JOIN portal_route r ON r.id = tl.route_id
+                ORDER BY tl.trip_date DESC, tl.started_at DESC
+                LIMIT 20
+                """
+            ))
+
+        return Response(serialise({
+            "total_vehicles": total_vehicles,
+            "total_routes": total_routes,
+            "allocated_students": allocated_students,
+            "active_trips": active_trips,
+            "active_passes": active_passes,
+            "route_utilisation": route_utilisation,
+            "recent_trips": recent_trips,
+        }))
+
+
+# ---------------------------------------------------------------------------
+# Live Bus Map — latest GPS ping per vehicle
+# ---------------------------------------------------------------------------
+class LiveBusMapView(AdminMixin, APIView):
+    """Returns the most recent GPS ping for every vehicle, for the admin fleet map."""
+
+    def get(self, request):
+        if not table_exists("portal_live_bus_log") or not table_exists("portal_vehicle"):
+            return Response([])
+        return Response(serialise(rows(
+            """
+            SELECT DISTINCT ON (v.id)
+                   v.id AS vehicle_id, v.vehicle_number, v.maintenance_status,
+                   l.latitude, l.longitude, l.updated_at
+            FROM portal_vehicle v
+            LEFT JOIN portal_live_bus_log l ON l.vehicle_id = v.id
+            ORDER BY v.id, l.updated_at DESC
+            """
+        )))
+
+
+# ---------------------------------------------------------------------------
+# Transport Fee
+# ---------------------------------------------------------------------------
+class TransportFeeView(AdminMixin, APIView):
+    """
+    GET ?student_id=  — get fee record(s)
+    POST {student_id, amount, academic_year?, due_date?} — create/update fee
+    PATCH {student_id, amount_paid, status} — record payment
+    """
+
+    def get(self, request):
+        if not table_exists("portal_transport_fee"):
+            return Response([])
+        sid = request.query_params.get("student_id")
+        if sid:
+            return Response(serialise(row("SELECT * FROM portal_transport_fee WHERE student_id=%s", [sid])))
+        return Response(serialise(rows(
+            """
+            SELECT tf.*, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name
+            FROM portal_transport_fee tf JOIN auth_user u ON u.id = tf.student_id
+            ORDER BY tf.status, student_name
+            """
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_transport_fee"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        sid = d.get("student_id")
+        if not sid:
+            return Response({"detail": "student_id is required."}, status=400)
+        yr = d.get("academic_year") or str(date.today().year)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_transport_fee (student_id, academic_year, amount, due_date) "
+                "VALUES (%s,%s,%s,%s) ON CONFLICT (student_id, academic_year) DO UPDATE SET "
+                "amount=EXCLUDED.amount, due_date=EXCLUDED.due_date RETURNING id",
+                [sid, yr, d.get("amount", 0), d.get("due_date") or None],
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "transport.fee.set", "portal_transport_fee", new_id, dict(d))
+        return Response({"id": new_id, "detail": "Transport fee set."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_transport_fee"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        sid = d.get("student_id")
+        if not sid:
+            return Response({"detail": "student_id is required."}, status=400)
+        yr = d.get("academic_year") or str(date.today().year)
+        amount_paid = d.get("amount_paid", 0)
+        status_val = d.get("status", "Pending")
+        paid_at_sql = "now()" if status_val == "Paid" else "NULL"
+        with connection.cursor() as cur:
+            cur.execute(
+                f"UPDATE portal_transport_fee SET amount_paid=%s, status=%s, paid_at={paid_at_sql} "
+                "WHERE student_id=%s AND academic_year=%s",
+                [amount_paid, status_val, sid, yr],
+            )
+        log_action(request.user, "transport.fee.payment", "portal_transport_fee", sid, dict(d))
+        return Response({"detail": "Fee payment recorded."})
 
 
 class FeeStructureView(SimpleTableView):
