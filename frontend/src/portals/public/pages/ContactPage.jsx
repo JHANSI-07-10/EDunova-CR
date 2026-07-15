@@ -284,7 +284,7 @@ export default function ContactPage() {
     if (!isValidEmail(contactForm.email)) {
       errors.email = "Please enter a valid email address."
     }
-    if (contactForm.phone && !isValidPhone(contactForm.phone)) {
+    if (!contactForm.phone || !isValidPhone(contactForm.phone)) {
       errors.phone = "Please enter a valid phone number (7-15 digits, digits and + only)."
     }
     if (!isNonEmptyString(contactForm.message)) {
@@ -468,6 +468,7 @@ export default function ContactPage() {
                 </div>
                 <div>
                   <input 
+                    required
                     placeholder="Phone" 
                     value={contactForm.phone} 
                     onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
