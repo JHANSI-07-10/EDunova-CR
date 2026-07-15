@@ -519,6 +519,49 @@ class ClassView(SimpleTableView):
     columns = ("name", "section", "curriculum", "room_number")
     order_by = "name, section"
 
+    def get(self, request):
+        if not table_exists(self.table):
+            return Response([])
+        # Optional: return enriched list with student/teacher counts
+        data = rows(
+            """
+            SELECT c.id, c.name, c.section, c.curriculum, c.room_number,
+                   (SELECT COUNT(*)::int FROM portal_student_enrollment se WHERE se.class_id=c.id) AS enrolled_students,
+                   (SELECT COUNT(DISTINCT ct.teacher_id)::int FROM portal_class_teacher ct WHERE ct.class_id=c.id) AS assigned_teachers
+            FROM portal_class c ORDER BY c.name, c.section
+            """
+        ) if table_exists("portal_student_enrollment") and table_exists("portal_class_teacher") else \
+        rows(f"SELECT * FROM {self.table} ORDER BY {self.order_by}")
+        return Response(serialise(data))
+
+    def post(self, request):
+        if not table_exists(self.table):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        name = request.data.get("name", "").strip()
+        section = request.data.get("section", "").strip()
+        curriculum = request.data.get("curriculum", "CBSE")
+        room_number = request.data.get("room_number", "")
+        if not name or not section:
+            return Response({"detail": "Class name and section are required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO portal_class (name, section, curriculum, room_number) VALUES (%s,%s,%s,%s) RETURNING id",
+                [name, section, curriculum, room_number]
+            )
+            new_id = cursor.fetchone()[0]
+        log_action(request.user, "portal_class.create", self.table, new_id,
+                   {"name": name, "section": section, "curriculum": curriculum, "room_number": room_number})
+        return Response({
+            "id": new_id,
+            "name": name,
+            "section": section,
+            "curriculum": curriculum,
+            "room_number": room_number,
+            "enrolled_students": 0,
+            "assigned_teachers": 0,
+            "detail": "Class created."
+        }, status=201)
+
 
 class SubjectView(SimpleTableView):
     table = "portal_subject"
