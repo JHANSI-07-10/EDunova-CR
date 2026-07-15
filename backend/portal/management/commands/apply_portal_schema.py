@@ -16,6 +16,7 @@ SQL_FILES = [
     "portal_extension_transport.sql",
     "portal_extension_hostel.sql",
     "portal_extension_examination.sql",
+    "portal_extension_scholarship.sql",
 ]
 
 TRACKING_TABLE_SQL = """

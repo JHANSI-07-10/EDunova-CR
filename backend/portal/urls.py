@@ -205,3 +205,15 @@ urlpatterns = [
     path("admin-portal/exams/supplementary/", exam_extras_views.SupplementaryRegistrationView.as_view()),
     path("admin-portal/exams/certificates/", exam_extras_views.AcademicCertificateView.as_view()),
 ]
+
+
+# Scholarships
+from django.urls import path
+from . import scholarship_views
+urlpatterns += [
+    path('student/scholarships/', scholarship_views.ScholarshipStudentApplicationView.as_view()),
+    path('student/scholarships/renew/', scholarship_views.ScholarshipRenewalView.as_view()),
+    path('admin-portal/scholarships/', scholarship_views.ScholarshipAdminActionView.as_view()),
+    path('admin-portal/scholarships/renew/', scholarship_views.ScholarshipRenewalView.as_view()),
+    path('parent/scholarships/', scholarship_views.ScholarshipParentView.as_view()),
+]
