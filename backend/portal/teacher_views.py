@@ -439,7 +439,7 @@ class MarksEntryView(TeacherMixin, APIView):
         exam_id = request.query_params.get("exam_schedule_id")
         if not exam_id or not table_exists("portal_exam_schedule"):
             return Response({"exam": None, "rows": []})
-        exam = row("SELECT e.id, e.exam_name, e.max_marks, e.status, c.name || '-' || c.section AS class_name, s.name AS subject_name FROM portal_exam_schedule e JOIN portal_class c ON c.id=e.class_id JOIN portal_subject s ON s.id=e.subject_id WHERE e.id=%s", [exam_id])
+        exam = row("SELECT e.id, e.exam_name, e.max_marks, e.status, e.passing_marks, e.internal_weightage, e.practical_weightage, c.name || '-' || c.section AS class_name, s.name AS subject_name FROM portal_exam_schedule e JOIN portal_class c ON c.id=e.class_id JOIN portal_subject s ON s.id=e.subject_id WHERE e.id=%s", [exam_id])
         if not exam:
             return Response({"exam": None, "rows": []})
         data = rows(
@@ -565,6 +565,159 @@ class PerformanceAnalyticsView(TeacherMixin, APIView):
         ) if table_exists("portal_student_enrollment") else []
         class_avg = round(sum(float(s["average_marks"] or 0) for s in data) / len(data), 1) if data else 0
         return Response(serialise({"class_average": class_avg, "students": data}))
+
+
+# =============================================================================
+# QUESTION BANK & QUESTION PAPER WORKFLOW
+# =============================================================================
+class QuestionBankView(TeacherMixin, APIView):
+    def get(self, request):
+        if not table_exists("portal_question_bank"):
+            return Response([])
+        sub_id = request.query_params.get("subject_id")
+        sql = "SELECT q.*, s.name AS subject_name FROM portal_question_bank q JOIN portal_subject s ON s.id = q.subject_id"
+        params = []
+        if sub_id:
+            sql += " WHERE q.subject_id = %s"
+            params.append(sub_id)
+        sql += " ORDER BY q.chapter, q.difficulty"
+        return Response(serialise(rows(sql, params)))
+
+    def post(self, request):
+        if not table_exists("portal_question_bank"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        sub_id = d.get("subject_id")
+        txt = (d.get("question_text") or "").strip()
+        qtype = d.get("type", "MCQ")
+        ans = (d.get("correct_answer") or "").strip()
+        difficulty = d.get("difficulty", "Medium")
+        chapter = (d.get("chapter") or "").strip()
+        
+        if not sub_id or not txt or not ans or not chapter:
+            return Response({"detail": "subject_id, question_text, correct_answer, and chapter are required."}, status=400)
+            
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_question_bank (teacher_id, subject_id, question_text, type, options, correct_answer, difficulty, chapter) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id",
+                [request.user.id, sub_id, txt, qtype, json.dumps(d.get("options", [])), ans, difficulty, chapter]
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "exams.question.create", "portal_question_bank", new_id, {"subject_id": sub_id})
+        return Response({"id": new_id, "detail": "Question added to bank."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_question_bank"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        qid = d.get("id")
+        if not qid:
+            return Response({"detail": "id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_question_bank SET question_text=%s, type=%s, options=%s, correct_answer=%s, "
+                "difficulty=%s, chapter=%s WHERE id=%s AND teacher_id=%s",
+                [d.get("question_text"), d.get("type"), json.dumps(d.get("options", [])), d.get("correct_answer"),
+                 d.get("difficulty"), d.get("chapter"), qid, request.user.id]
+            )
+        log_action(request.user, "exams.question.update", "portal_question_bank", qid, dict(d))
+        return Response({"detail": "Question updated."})
+
+    def delete(self, request):
+        qid = request.query_params.get("id")
+        if not qid:
+            return Response({"detail": "id required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute("DELETE FROM portal_question_bank WHERE id=%s AND teacher_id=%s", [qid, request.user.id])
+        log_action(request.user, "exams.question.delete", "portal_question_bank", qid, {})
+        return Response({"detail": "Question deleted."})
+
+
+import json
+
+class QuestionPaperView(TeacherMixin, APIView):
+    def get(self, request):
+        if not table_exists("portal_question_paper"):
+            return Response([])
+        sched_id = request.query_params.get("exam_schedule_id")
+        sql = "SELECT p.*, es.exam_name, s.name AS subject_name FROM portal_question_paper p JOIN portal_exam_schedule es ON es.id = p.exam_schedule_id JOIN portal_subject s ON s.id = es.subject_id"
+        params = []
+        if sched_id:
+            sql += " WHERE p.exam_schedule_id = %s"
+            params.append(sched_id)
+        return Response(serialise(rows(sql, params)))
+
+    def post(self, request):
+        if not table_exists("portal_question_paper"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        sched_id = d.get("exam_schedule_id")
+        title = (d.get("title") or "").strip()
+        ptype = d.get("paper_type", "Manual")
+        questions = d.get("questions") or []
+        
+        if not sched_id or not title:
+            return Response({"detail": "exam_schedule_id and title are required."}, status=400)
+            
+        # Automated question generator
+        if ptype == "Auto" and not questions:
+            # Get subject corresponding to this exam schedule
+            sched = row("SELECT subject_id FROM portal_exam_schedule WHERE id = %s", [sched_id])
+            if sched:
+                # Select 5 random questions matching the subject
+                q_candidates = rows(
+                    "SELECT id FROM portal_question_bank WHERE subject_id = %s ORDER BY RANDOM() LIMIT 5",
+                    [sched["subject_id"]]
+                )
+                questions = [q["id"] for q in q_candidates]
+                
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_question_paper (exam_schedule_id, title, paper_type, questions, status) "
+                "VALUES (%s,%s,%s,%s,'Draft') ON CONFLICT (exam_schedule_id) DO UPDATE SET "
+                "title=EXCLUDED.title, paper_type=EXCLUDED.paper_type, questions=EXCLUDED.questions RETURNING id",
+                [sched_id, title, ptype, json.dumps(questions)]
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "exams.paper.create", "portal_question_paper", new_id, {"exam_schedule_id": sched_id})
+        return Response({"id": new_id, "questions": questions, "detail": "Question paper generated/saved successfully."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_question_paper"):
+            return Response({"detail": "Portal schema not applied."}, status=400)
+        d = request.data
+        pid = d.get("id")
+        if not pid:
+            return Response({"detail": "id is required."}, status=400)
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_question_paper SET title=%s, questions=%s, status=%s WHERE id=%s",
+                [d.get("title"), json.dumps(d.get("questions", [])), d.get("status", "Draft"), pid]
+            )
+        log_action(request.user, "exams.paper.update", "portal_question_paper", pid, dict(d))
+        return Response({"detail": "Question paper updated."})
+
+
+# =============================================================================
+# INVIGILATOR WORKFLOW
+# =============================================================================
+class InvigilationDutyView(TeacherMixin, APIView):
+    def get(self, request):
+        if not table_exists("portal_exam_schedule"):
+            return Response([])
+        sql = """
+            SELECT es.id, es.exam_name, es.exam_type, es.exam_date, es.start_time, es.duration_minutes,
+                   es.room_name, es.max_marks,
+                   c.name || '-' || c.section AS class_name, s.name AS subject_name,
+                   (SELECT COUNT(*)::int FROM portal_student_enrollment se WHERE se.class_id = es.class_id) AS student_count
+            FROM portal_exam_schedule es
+            JOIN portal_class c ON c.id = es.class_id
+            JOIN portal_subject s ON s.id = es.subject_id
+            WHERE es.invigilator_id = %s
+            ORDER BY es.exam_date DESC, es.start_time DESC
+        """
+        return Response(serialise(rows(sql, [request.user.id])))
 
 
 class MessageThreadView(TeacherMixin, APIView):
