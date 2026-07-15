@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import { useAuth } from "../context/AuthContext";
+import { isNonEmptyString } from "../../../utils/validation";
 
 export default function Transport() {
   const { activeChildId } = useAuth();
@@ -14,6 +15,7 @@ export default function Transport() {
   const [requestType, setRequestType] = useState("Route Change");
   const [requestDetails, setRequestDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [requestError, setRequestError] = useState("");
 
   function load() {
     if (!activeChildId) return;
@@ -38,7 +40,9 @@ export default function Transport() {
 
   async function handleRequest(e) {
     e.preventDefault();
-    if (!requestDetails.trim() || !activeChildId) return;
+    if (!isNonEmptyString(requestDetails)) { setRequestError("Please provide details for your request."); return; }
+    if (!activeChildId) return;
+    setRequestError("");
     setSubmitting(true);
     try {
       await api.post("/parent/messages/", {
@@ -102,10 +106,11 @@ export default function Transport() {
               required
               rows={3}
               value={requestDetails}
-              onChange={(e) => setRequestDetails(e.target.value)}
+              onChange={(e) => { setRequestDetails(e.target.value); if (requestError) setRequestError(""); }}
               placeholder="Provide pickup address, landmarks, and timings..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring resize-none"
+              className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus-ring resize-none ${requestError ? "border-danger" : "border-slate-200"}`}
             />
+            {requestError && <p className="text-xs text-danger">{requestError}</p>}
             <button
               disabled={submitting}
               className="bg-academic-blue text-white rounded-xl px-5 py-2 font-medium text-sm hover:bg-academic-blue/90"

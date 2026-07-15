@@ -3,6 +3,7 @@ import api from "../lib/api";
 import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import { useAuth } from "../context/AuthContext";
 import { Lock, Clock, Calendar, Check, AlertTriangle, CalendarDays } from "lucide-react";
+import { isNonEmptyString } from "../../../utils/validation";
 
 const TONE = { Scheduled: "blue", Completed: "green", Cancelled: "red", Waitlisted: "gold" };
 
@@ -12,6 +13,7 @@ export default function PtmBooking() {
   const [bookings, setBookings] = useState(null);
   const [form, setForm] = useState({ teacher_id: "", meeting_date: "", time_slot: "", parent_notes: "" });
   const [toast, setToast] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   const [hasPendingFees, setHasPendingFees] = useState(false);
   const [feesLoading, setFeesLoading] = useState(true);
@@ -40,6 +42,12 @@ export default function PtmBooking() {
 
   function startVerification(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(form.teacher_id)) errs.teacher_id = "Please select a teacher.";
+    if (!form.meeting_date) errs.meeting_date = "Meeting date is required.";
+    if (!form.time_slot) errs.time_slot = "Time slot is required.";
+    if (Object.keys(errs).length > 0) { setValidationErrors(errs); return; }
+    setValidationErrors({});
     if (!form.teacher_id || !form.meeting_date || !form.time_slot) return;
     setVerifyingSlot(true);
     setVerificationResult(null);
@@ -108,18 +116,21 @@ export default function PtmBooking() {
         <form onSubmit={startVerification} className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-ink-secondary">Select Teacher</label>
-            <select required value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none">
+            <select required value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })} className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${validationErrors.teacher_id ? "border-danger" : "border-slate-200"}`}>
               <option value="">Select teacher</option>
               {teachers.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.subject_name}</option>)}
             </select>
+            {validationErrors.teacher_id && <p className="text-xs text-danger">{validationErrors.teacher_id}</p>}
           </div>
           <div className="space-y-1">
             <label className="text-xs font-semibold text-ink-secondary">Time Slot (Even minutes = Available, Odd = Booked)</label>
-            <input required type="time" value={form.time_slot} onChange={(e) => setForm({ ...form, time_slot: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+            <input required type="time" value={form.time_slot} onChange={(e) => setForm({ ...form, time_slot: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${validationErrors.time_slot ? "border-danger" : "border-slate-200"}`} />
+            {validationErrors.time_slot && <p className="text-xs text-danger">{validationErrors.time_slot}</p>}
           </div>
           <div className="space-y-1 sm:col-span-2">
             <label className="text-xs font-semibold text-ink-secondary">Meeting Date</label>
-            <input required type="date" value={form.meeting_date} onChange={(e) => setForm({ ...form, meeting_date: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+            <input required type="date" value={form.meeting_date} onChange={(e) => setForm({ ...form, meeting_date: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${validationErrors.meeting_date ? "border-danger" : "border-slate-200"}`} />
+            {validationErrors.meeting_date && <p className="text-xs text-danger">{validationErrors.meeting_date}</p>}
           </div>
           <div className="space-y-1 sm:col-span-2">
             <label className="text-xs font-semibold text-ink-secondary">Notes (Optional)</label>

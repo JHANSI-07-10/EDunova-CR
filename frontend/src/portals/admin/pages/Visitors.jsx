@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../components/Common";
+import { isNonEmptyString } from "../../../utils/validation";
 
 export default function Visitors() {
   const [visitors, setVisitors] = useState(null);
   const [form, setForm] = useState({ visitor_name: "", purpose: "", host_user_id: "", id_proof_type: "Aadhaar" });
   const [showOpenOnly, setShowOpenOnly] = useState(false);
   const [toast, setToast] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   function load() {
     api.get(`/admin-portal/visitors/${showOpenOnly ? "?open=true" : ""}`).then(({ data }) => setVisitors(data)).catch(() => setVisitors([]));
@@ -15,6 +17,11 @@ export default function Visitors() {
 
   async function checkIn(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(form.visitor_name)) errs.visitor_name = "Visitor name is required.";
+    if (!isNonEmptyString(form.purpose)) errs.purpose = "Purpose of visit is required.";
+    if (Object.keys(errs).length > 0) { setValidationErrors(errs); return; }
+    setValidationErrors({});
     try {
       await api.post("/admin-portal/visitors/", form);
       setForm({ visitor_name: "", purpose: "", host_user_id: "", id_proof_type: "Aadhaar" });
@@ -36,8 +43,14 @@ export default function Visitors() {
       <Card>
         <SectionTitle>Check in a visitor</SectionTitle>
         <form onSubmit={checkIn} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <input required placeholder="Visitor name" value={form.visitor_name} onChange={(e) => setForm({ ...form, visitor_name: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input required placeholder="Purpose of visit" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+          <div className="flex flex-col gap-1">
+            <input required placeholder="Visitor name" value={form.visitor_name} onChange={(e) => setForm({ ...form, visitor_name: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.visitor_name ? "border-danger" : "border-slate-200"}`} />
+            {validationErrors.visitor_name && <p className="text-xs text-danger">{validationErrors.visitor_name}</p>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <input required placeholder="Purpose of visit" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.purpose ? "border-danger" : "border-slate-200"}`} />
+            {validationErrors.purpose && <p className="text-xs text-danger">{validationErrors.purpose}</p>}
+          </div>
           <input placeholder="Host (staff user ID, optional)" value={form.host_user_id} onChange={(e) => setForm({ ...form, host_user_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           <select value={form.id_proof_type} onChange={(e) => setForm({ ...form, id_proof_type: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm">
             <option>Aadhaar</option><option>Driving License</option><option>Passport</option><option>Voter ID</option><option>Other</option>

@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { isNonEmptyString } from "../../../utils/validation";
 
 export default function MedicalRecords() {
   const [logs, setLogs] = useState(null);
   const [studentId, setStudentId] = useState("");
   const [form, setForm] = useState({ student_id: "", symptoms: "", treatment_given: "", doctor_notes: "" });
   const [toast, setToast] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   function load() {
     api.get(`/admin-portal/medical-logs/${studentId ? `?student_id=${studentId}` : ""}`).then(({ data }) => setLogs(data)).catch(() => setLogs([]));
@@ -15,6 +17,12 @@ export default function MedicalRecords() {
 
   async function save(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(form.student_id)) errs.student_id = "Student ID is required.";
+    if (!isNonEmptyString(form.symptoms)) errs.symptoms = "Symptoms are required.";
+    if (!isNonEmptyString(form.treatment_given)) errs.treatment_given = "Treatment given is required.";
+    if (Object.keys(errs).length > 0) { setValidationErrors(errs); return; }
+    setValidationErrors({});
     try {
       await api.post("/admin-portal/medical-logs/", form);
       setForm({ student_id: "", symptoms: "", treatment_given: "", doctor_notes: "" });
@@ -28,9 +36,18 @@ export default function MedicalRecords() {
       <Card>
         <SectionTitle>Log a medical visit</SectionTitle>
         <form onSubmit={save} className="grid sm:grid-cols-2 gap-3">
-          <input required placeholder="Student user ID" value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input required placeholder="Symptoms" value={form.symptoms} onChange={(e) => setForm({ ...form, symptoms: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input required placeholder="Treatment given" value={form.treatment_given} onChange={(e) => setForm({ ...form, treatment_given: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm sm:col-span-2" />
+          <div className="flex flex-col gap-1">
+            <input required placeholder="Student user ID" value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.student_id ? "border-danger" : "border-slate-200"}`} />
+            {validationErrors.student_id && <p className="text-xs text-danger">{validationErrors.student_id}</p>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <input required placeholder="Symptoms" value={form.symptoms} onChange={(e) => setForm({ ...form, symptoms: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.symptoms ? "border-danger" : "border-slate-200"}`} />
+            {validationErrors.symptoms && <p className="text-xs text-danger">{validationErrors.symptoms}</p>}
+          </div>
+          <div className="flex flex-col gap-1 sm:col-span-2">
+            <input required placeholder="Treatment given" value={form.treatment_given} onChange={(e) => setForm({ ...form, treatment_given: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm sm:col-span-2 ${validationErrors.treatment_given ? "border-danger" : "border-slate-200"}`} />
+            {validationErrors.treatment_given && <p className="text-xs text-danger">{validationErrors.treatment_given}</p>}
+          </div>
           <textarea placeholder="Doctor notes (optional)" value={form.doctor_notes} onChange={(e) => setForm({ ...form, doctor_notes: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm sm:col-span-2" rows={2} />
           <button className="sm:col-span-2 bg-academic-blue text-white rounded-xl py-2 font-medium">Save record</button>
         </form>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { isNonEmptyString } from "../../../utils/validation";
 
 export default function Library() {
   const [books, setBooks] = useState(null);
@@ -8,6 +9,9 @@ export default function Library() {
   const [issueForm, setIssueForm] = useState({ book_id: "", borrower_id: "", loan_days: 14 });
   const [returnId, setReturnId] = useState("");
   const [toast, setToast] = useState("");
+  const [issueErrors, setIssueErrors] = useState({});
+  const [returnErrors, setReturnErrors] = useState({});
+  const [bookErrors, setBookErrors] = useState({});
 
   function load() {
     api.get("/admin-portal/library/books/").then(({ data }) => setBooks(data)).catch(() => setBooks([]));
@@ -16,6 +20,11 @@ export default function Library() {
 
   async function addBook(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(bookForm.title)) errs.title = "Title is required.";
+    if (!isNonEmptyString(bookForm.author)) errs.author = "Author is required.";
+    if (Object.keys(errs).length > 0) { setBookErrors(errs); return; }
+    setBookErrors({});
     try {
       await api.post("/admin-portal/library/books/", bookForm);
       setBookForm({ title: "", author: "", isbn: "", barcode_id: "", quantity: 1, available_quantity: 1, book_type: "Physical", digital_file_url: "" });
@@ -25,6 +34,11 @@ export default function Library() {
 
   async function issue(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(issueForm.book_id)) errs.book_id = "Book ID is required.";
+    if (!isNonEmptyString(issueForm.borrower_id)) errs.borrower_id = "Borrower ID is required.";
+    if (Object.keys(errs).length > 0) { setIssueErrors(errs); return; }
+    setIssueErrors({});
     try {
       const { data } = await api.post("/admin-portal/library/issue/", issueForm);
       setToast(`Issued. Due back ${data.due_date}.`);
@@ -35,6 +49,10 @@ export default function Library() {
 
   async function returnBook(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(returnId)) errs.returnId = "Transaction ID is required.";
+    if (Object.keys(errs).length > 0) { setReturnErrors(errs); return; }
+    setReturnErrors({});
     try {
       const { data } = await api.post(`/admin-portal/library/return/${returnId}/`, {});
       setToast(`Returned. ${data.late_days} day(s) late — fine ₹${data.fine_amount}.`);
@@ -49,8 +67,14 @@ export default function Library() {
         <Card>
           <SectionTitle>Issue a book (barcode/ID)</SectionTitle>
           <form onSubmit={issue} className="grid grid-cols-2 gap-3">
-            <input required placeholder="Book ID" value={issueForm.book_id} onChange={(e) => setIssueForm({ ...issueForm, book_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <input required placeholder="Borrower user ID" value={issueForm.borrower_id} onChange={(e) => setIssueForm({ ...issueForm, borrower_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <div className="flex flex-col gap-1">
+              <input required placeholder="Book ID" value={issueForm.book_id} onChange={(e) => setIssueForm({ ...issueForm, book_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${issueErrors.book_id ? "border-danger" : "border-slate-200"}`} />
+              {issueErrors.book_id && <p className="text-xs text-danger">{issueErrors.book_id}</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <input required placeholder="Borrower user ID" value={issueForm.borrower_id} onChange={(e) => setIssueForm({ ...issueForm, borrower_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${issueErrors.borrower_id ? "border-danger" : "border-slate-200"}`} />
+              {issueErrors.borrower_id && <p className="text-xs text-danger">{issueErrors.borrower_id}</p>}
+            </div>
             <input type="number" placeholder="Loan days" value={issueForm.loan_days} onChange={(e) => setIssueForm({ ...issueForm, loan_days: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
             <button className="bg-academic-blue text-white rounded-xl py-2 font-medium">Issue</button>
           </form>
@@ -58,7 +82,10 @@ export default function Library() {
         <Card>
           <SectionTitle>Return a book</SectionTitle>
           <form onSubmit={returnBook} className="grid grid-cols-2 gap-3">
-            <input required placeholder="Transaction ID" value={returnId} onChange={(e) => setReturnId(e.target.value)} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <div className="flex flex-col gap-1">
+              <input required placeholder="Transaction ID" value={returnId} onChange={(e) => setReturnId(e.target.value)} className={`rounded-xl border px-3 py-2 text-sm ${returnErrors.returnId ? "border-danger" : "border-slate-200"}`} />
+              {returnErrors.returnId && <p className="text-xs text-danger">{returnErrors.returnId}</p>}
+            </div>
             <button className="bg-academic-green text-white rounded-xl py-2 font-medium">Return (auto fine calc)</button>
           </form>
           <p className="text-xs text-ink-secondary mt-2">Fine is calculated automatically: ₹5/day beyond the due date.</p>
@@ -68,8 +95,14 @@ export default function Library() {
       <Card>
         <SectionTitle>Add book to catalogue</SectionTitle>
         <form onSubmit={addBook} className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
-          <input required placeholder="Title" value={bookForm.title} onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input required placeholder="Author" value={bookForm.author} onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+          <div className="flex flex-col gap-1">
+            <input required placeholder="Title" value={bookForm.title} onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${bookErrors.title ? "border-danger" : "border-slate-200"}`} />
+            {bookErrors.title && <p className="text-xs text-danger">{bookErrors.title}</p>}
+          </div>
+          <div className="flex flex-col gap-1">
+            <input required placeholder="Author" value={bookForm.author} onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${bookErrors.author ? "border-danger" : "border-slate-200"}`} />
+            {bookErrors.author && <p className="text-xs text-danger">{bookErrors.author}</p>}
+          </div>
           <input placeholder="ISBN" value={bookForm.isbn} onChange={(e) => setBookForm({ ...bookForm, isbn: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           <input placeholder="Barcode ID" value={bookForm.barcode_id} onChange={(e) => setBookForm({ ...bookForm, barcode_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           <input type="number" placeholder="Quantity" value={bookForm.quantity} onChange={(e) => setBookForm({ ...bookForm, quantity: e.target.value, available_quantity: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />

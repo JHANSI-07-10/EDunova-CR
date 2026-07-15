@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../components/Common";
+import { isNonEmptyString } from "../../../utils/validation";
 
 export default function Inventory() {
   const [items, setItems] = useState(null);
   const [form, setForm] = useState({ item_name: "", category: "General", quantity: 0, department: "Administration" });
   const [toast, setToast] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
 
   function load() {
     api.get("/admin-portal/inventory/").then(({ data }) => setItems(data)).catch(() => setItems([]));
@@ -14,6 +16,10 @@ export default function Inventory() {
 
   async function addItem(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(form.item_name)) errs.item_name = "Item name is required.";
+    if (Object.keys(errs).length > 0) { setValidationErrors(errs); return; }
+    setValidationErrors({});
     try {
       await api.post("/admin-portal/inventory/", form);
       setForm({ item_name: "", category: "General", quantity: 0, department: "Administration" });
@@ -34,7 +40,10 @@ export default function Inventory() {
       <Card>
         <SectionTitle>Add inventory item</SectionTitle>
         <form onSubmit={addItem} className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
-          <input required placeholder="Item name" value={form.item_name} onChange={(e) => setForm({ ...form, item_name: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+          <div className="flex flex-col gap-1">
+            <input required placeholder="Item name" value={form.item_name} onChange={(e) => setForm({ ...form, item_name: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.item_name ? "border-danger" : "border-slate-200"}`} />
+            {validationErrors.item_name && <p className="text-xs text-danger">{validationErrors.item_name}</p>}
+          </div>
           <input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           <input type="number" placeholder="Quantity" value={form.quantity} onChange={(e) => setForm({ ...form, quantity: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           <input placeholder="Department" value={form.department} onChange={(e) => setForm({ ...form, department: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />

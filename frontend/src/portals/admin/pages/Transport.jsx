@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { isNonEmptyString } from "../../../utils/validation";
 
 export default function Transport() {
   const [vehicles, setVehicles] = useState(null);
@@ -9,6 +10,9 @@ export default function Transport() {
   const [rForm, setRForm] = useState({ route_name: "", start_point: "", end_point: "" });
   const [aForm, setAForm] = useState({ student_id: "", vehicle_id: "", route_id: "", pickup_point: "" });
   const [toast, setToast] = useState("");
+  const [vErrors, setVErrors] = useState({});
+  const [rErrors, setRErrors] = useState({});
+  const [aErrors, setAErrors] = useState({});
 
   function load() {
     api.get("/admin-portal/vehicles/").then(({ data }) => setVehicles(data)).catch(() => setVehicles([]));
@@ -18,16 +22,30 @@ export default function Transport() {
 
   async function addVehicle(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(vForm.vehicle_number)) errs.vehicle_number = "Vehicle number is required.";
+    if (Object.keys(errs).length > 0) { setVErrors(errs); return; }
+    setVErrors({});
     try { await api.post("/admin-portal/vehicles/", vForm); setVForm({ vehicle_number: "", capacity: "", driver_id: "", gps_device_id: "", maintenance_status: "Active" }); load(); }
     catch { setToast("Could not add vehicle."); }
   }
   async function addRoute(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(rForm.route_name)) errs.route_name = "Route name is required.";
+    if (Object.keys(errs).length > 0) { setRErrors(errs); return; }
+    setRErrors({});
     try { await api.post("/admin-portal/routes/", rForm); setRForm({ route_name: "", start_point: "", end_point: "" }); load(); }
     catch { setToast("Could not add route."); }
   }
   async function allocate(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(aForm.student_id)) errs.student_id = "Student ID is required.";
+    if (!isNonEmptyString(aForm.vehicle_id)) errs.vehicle_id = "Vehicle ID is required.";
+    if (!isNonEmptyString(aForm.route_id)) errs.route_id = "Route ID is required.";
+    if (Object.keys(errs).length > 0) { setAErrors(errs); return; }
+    setAErrors({});
     try { await api.post("/admin-portal/transport-allocations/", aForm); setToast("Student allocated to bus route."); setAForm({ student_id: "", vehicle_id: "", route_id: "", pickup_point: "" }); }
     catch { setToast("Could not allocate transport."); }
   }
@@ -38,7 +56,10 @@ export default function Transport() {
         <Card>
           <SectionTitle>Add vehicle</SectionTitle>
           <form onSubmit={addVehicle} className="grid grid-cols-2 gap-3">
-            <input required placeholder="Vehicle number" value={vForm.vehicle_number} onChange={(e) => setVForm({ ...vForm, vehicle_number: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <div className="flex flex-col gap-1">
+              <input required placeholder="Vehicle number" value={vForm.vehicle_number} onChange={(e) => setVForm({ ...vForm, vehicle_number: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${vErrors.vehicle_number ? "border-danger" : "border-slate-200"}`} />
+              {vErrors.vehicle_number && <p className="text-xs text-danger">{vErrors.vehicle_number}</p>}
+            </div>
             <input placeholder="Capacity" type="number" value={vForm.capacity} onChange={(e) => setVForm({ ...vForm, capacity: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
             <input placeholder="Driver user ID" value={vForm.driver_id} onChange={(e) => setVForm({ ...vForm, driver_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
             <input placeholder="GPS device ID" value={vForm.gps_device_id} onChange={(e) => setVForm({ ...vForm, gps_device_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
@@ -48,7 +69,10 @@ export default function Transport() {
         <Card>
           <SectionTitle>Add route</SectionTitle>
           <form onSubmit={addRoute} className="grid grid-cols-2 gap-3">
-            <input required placeholder="Route name" value={rForm.route_name} onChange={(e) => setRForm({ ...rForm, route_name: e.target.value })} className="col-span-2 rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <div className="flex flex-col gap-1 col-span-2">
+              <input required placeholder="Route name" value={rForm.route_name} onChange={(e) => setRForm({ ...rForm, route_name: e.target.value })} className={`col-span-2 rounded-xl border px-3 py-2 text-sm ${rErrors.route_name ? "border-danger" : "border-slate-200"}`} />
+              {rErrors.route_name && <p className="text-xs text-danger">{rErrors.route_name}</p>}
+            </div>
             <input placeholder="Start point" value={rForm.start_point} onChange={(e) => setRForm({ ...rForm, start_point: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
             <input placeholder="End point" value={rForm.end_point} onChange={(e) => setRForm({ ...rForm, end_point: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
             <button className="col-span-2 bg-academic-blue text-white rounded-xl py-2 font-medium">Add route</button>
@@ -58,13 +82,22 @@ export default function Transport() {
 
       <Card>
         <SectionTitle>Allocate a student to a bus route</SectionTitle>
-        <form onSubmit={allocate} className="grid sm:grid-cols-4 gap-3">
-          <input required placeholder="Student user ID" value={aForm.student_id} onChange={(e) => setAForm({ ...aForm, student_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input required placeholder="Vehicle ID" value={aForm.vehicle_id} onChange={(e) => setAForm({ ...aForm, vehicle_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input required placeholder="Route ID" value={aForm.route_id} onChange={(e) => setAForm({ ...aForm, route_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <input placeholder="Pickup point" value={aForm.pickup_point} onChange={(e) => setAForm({ ...aForm, pickup_point: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-          <button className="sm:col-span-4 bg-academic-green text-white rounded-xl py-2 font-medium">Allocate</button>
-        </form>
+          <form onSubmit={allocate} className="grid sm:grid-cols-4 gap-3">
+            <div className="flex flex-col gap-1">
+              <input required placeholder="Student user ID" value={aForm.student_id} onChange={(e) => setAForm({ ...aForm, student_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${aErrors.student_id ? "border-danger" : "border-slate-200"}`} />
+              {aErrors.student_id && <p className="text-xs text-danger">{aErrors.student_id}</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <input required placeholder="Vehicle ID" value={aForm.vehicle_id} onChange={(e) => setAForm({ ...aForm, vehicle_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${aErrors.vehicle_id ? "border-danger" : "border-slate-200"}`} />
+              {aErrors.vehicle_id && <p className="text-xs text-danger">{aErrors.vehicle_id}</p>}
+            </div>
+            <div className="flex flex-col gap-1">
+              <input required placeholder="Route ID" value={aForm.route_id} onChange={(e) => setAForm({ ...aForm, route_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${aErrors.route_id ? "border-danger" : "border-slate-200"}`} />
+              {aErrors.route_id && <p className="text-xs text-danger">{aErrors.route_id}</p>}
+            </div>
+            <input placeholder="Pickup point" value={aForm.pickup_point} onChange={(e) => setAForm({ ...aForm, pickup_point: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <button className="sm:col-span-4 bg-academic-green text-white rounded-xl py-2 font-medium">Allocate</button>
+          </form>
       </Card>
 
       <div className="grid lg:grid-cols-2 gap-6">

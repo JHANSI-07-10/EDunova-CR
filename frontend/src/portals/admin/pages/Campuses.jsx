@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../components/Common";
 import { MapPin, Phone, Mail, Globe, Clock, Plus, Edit2, Trash2, Calendar, Check, X, ShieldAlert } from "lucide-react";
+import { isNonEmptyString, isValidEmail, isValidPhone } from "../../../utils/validation";
 
 export default function Campuses() {
   const [campuses, setCampuses] = useState(null);
@@ -12,6 +13,7 @@ export default function Campuses() {
   const [editingCampus, setEditingCampus] = useState(null); // null for new, campus object for edit
   const [showForm, setShowForm] = useState(false);
   const [toast, setToast] = useState("");
+  const [validationErrors, setValidationErrors] = useState({});
   
   const [form, setForm] = useState({
     name: "",
@@ -56,6 +58,18 @@ export default function Campuses() {
   // Save (Create/Update) Location
   async function handleSubmit(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(form.name)) errs.name = "Campus name is required.";
+    if (!isNonEmptyString(form.city)) errs.city = "City is required.";
+    if (!isNonEmptyString(form.state)) errs.state = "State is required.";
+    if (!isNonEmptyString(form.postal_code)) errs.postal_code = "Postal code is required.";
+    if (!isValidEmail(form.email)) errs.email = "Please enter a valid email address.";
+    if (!isNonEmptyString(form.phone)) errs.phone = "Phone number is required.";
+    if (!isNonEmptyString(form.office_hours)) errs.office_hours = "Office hours are required.";
+    if (form.latitude === "" || isNaN(parseFloat(form.latitude))) errs.latitude = "Valid latitude is required.";
+    if (form.longitude === "" || isNaN(parseFloat(form.longitude))) errs.longitude = "Valid longitude is required.";
+    if (Object.keys(errs).length > 0) { setValidationErrors(errs); return; }
+    setValidationErrors({});
     const payload = {
       ...form,
       latitude: parseFloat(form.latitude),
@@ -207,22 +221,26 @@ export default function Campuses() {
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Campus Name *</label>
-                    <input required placeholder="e.g. Noida Campus" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <input required placeholder="e.g. Noida Campus" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.name ? "border-danger" : "border-slate-200"}`} />
+                    {validationErrors.name && <p className="text-xs text-danger">{validationErrors.name}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Email Address *</label>
-                    <input required type="email" placeholder="e.g. noida@edunovaacademy.edu.in" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <input required type="email" placeholder="e.g. noida@edunovaacademy.edu.in" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.email ? "border-danger" : "border-slate-200"}`} />
+                    {validationErrors.email && <p className="text-xs text-danger">{validationErrors.email}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Phone Number *</label>
-                    <input required placeholder="e.g. +91-120-6543210" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <input required placeholder="e.g. +91-120-6543210" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.phone ? "border-danger" : "border-slate-200"}`} />
+                    {validationErrors.phone && <p className="text-xs text-danger">{validationErrors.phone}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1">
                     <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">City *</label>
-                    <input required placeholder="e.g. Noida" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <input required placeholder="e.g. Noida" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.city ? "border-danger" : "border-slate-200"}`} />
+                    {validationErrors.city && <p className="text-xs text-danger">{validationErrors.city}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1">

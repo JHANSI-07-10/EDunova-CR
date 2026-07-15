@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../components/Common";
+import { isNonEmptyString } from "../../../utils/validation";
 
 export default function Hostel() {
   const [hostels, setHostels] = useState(null);
@@ -10,6 +11,9 @@ export default function Hostel() {
   const [roomForm, setRoomForm] = useState({ hostel_id: "", room_number: "", capacity: 2 });
   const [allocForm, setAllocForm] = useState({ student_id: "", room_id: "" });
   const [toast, setToast] = useState("");
+  const [hostelErrors, setHostelErrors] = useState({});
+  const [roomErrors, setRoomErrors] = useState({});
+  const [allocErrors, setAllocErrors] = useState({});
 
   function load() {
     api.get("/admin-portal/hostels/").then(({ data }) => setHostels(data)).catch(() => setHostels([]));
@@ -20,6 +24,10 @@ export default function Hostel() {
 
   async function addHostel(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(hostelForm.name)) errs.name = "Hostel name is required.";
+    if (Object.keys(errs).length > 0) { setHostelErrors(errs); return; }
+    setHostelErrors({});
     try {
       await api.post("/admin-portal/hostels/", hostelForm);
       setHostelForm({ name: "", type: "Boys", warden_id: "" });
@@ -30,6 +38,11 @@ export default function Hostel() {
 
   async function addRoom(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(String(roomForm.hostel_id))) errs.hostel_id = "Please select a hostel.";
+    if (!isNonEmptyString(roomForm.room_number)) errs.room_number = "Room number is required.";
+    if (Object.keys(errs).length > 0) { setRoomErrors(errs); return; }
+    setRoomErrors({});
     try {
       await api.post("/admin-portal/rooms/", roomForm);
       setRoomForm({ hostel_id: "", room_number: "", capacity: 2 });
@@ -40,6 +53,11 @@ export default function Hostel() {
 
   async function allocate(e) {
     e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(allocForm.student_id)) errs.student_id = "Student ID is required.";
+    if (!isNonEmptyString(String(allocForm.room_id))) errs.room_id = "Please select a room.";
+    if (Object.keys(errs).length > 0) { setAllocErrors(errs); return; }
+    setAllocErrors({});
     try {
       await api.post("/admin-portal/hostel-allocations/", allocForm);
       setAllocForm({ student_id: "", room_id: "" });
@@ -62,7 +80,10 @@ export default function Hostel() {
         <Card>
           <SectionTitle>Add hostel</SectionTitle>
           <form onSubmit={addHostel} className="space-y-3">
-            <input required placeholder="Hostel name" value={hostelForm.name} onChange={(e) => setHostelForm({ ...hostelForm, name: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <div>
+              <input required placeholder="Hostel name" value={hostelForm.name} onChange={(e) => setHostelForm({ ...hostelForm, name: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${hostelErrors.name ? "border-danger" : "border-slate-200"}`} />
+              {hostelErrors.name && <p className="text-xs text-danger mt-1">{hostelErrors.name}</p>}
+            </div>
             <select value={hostelForm.type} onChange={(e) => setHostelForm({ ...hostelForm, type: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
               <option>Boys</option><option>Girls</option><option>Staff</option>
             </select>
@@ -74,11 +95,17 @@ export default function Hostel() {
         <Card>
           <SectionTitle>Add room</SectionTitle>
           <form onSubmit={addRoom} className="space-y-3">
-            <select required value={roomForm.hostel_id} onChange={(e) => setRoomForm({ ...roomForm, hostel_id: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
-              <option value="">Select hostel</option>
-              {(hostels || []).map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
-            </select>
-            <input required placeholder="Room number" value={roomForm.room_number} onChange={(e) => setRoomForm({ ...roomForm, room_number: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+            <div>
+              <select required value={roomForm.hostel_id} onChange={(e) => setRoomForm({ ...roomForm, hostel_id: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${roomErrors.hostel_id ? "border-danger" : "border-slate-200"}`}>
+                <option value="">Select hostel</option>
+                {(hostels || []).map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+              </select>
+              {roomErrors.hostel_id && <p className="text-xs text-danger mt-1">{roomErrors.hostel_id}</p>}
+            </div>
+            <div>
+              <input required placeholder="Room number" value={roomForm.room_number} onChange={(e) => setRoomForm({ ...roomForm, room_number: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${roomErrors.room_number ? "border-danger" : "border-slate-200"}`} />
+              {roomErrors.room_number && <p className="text-xs text-danger mt-1">{roomErrors.room_number}</p>}
+            </div>
             <input type="number" min="1" placeholder="Capacity" value={roomForm.capacity} onChange={(e) => setRoomForm({ ...roomForm, capacity: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
             <button className="w-full bg-academic-blue text-white rounded-xl py-2 font-medium">Add room</button>
           </form>
@@ -87,13 +114,19 @@ export default function Hostel() {
         <Card>
           <SectionTitle>Allocate student to room</SectionTitle>
           <form onSubmit={allocate} className="space-y-3">
-            <input required placeholder="Student user ID" value={allocForm.student_id} onChange={(e) => setAllocForm({ ...allocForm, student_id: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm" />
-            <select required value={allocForm.room_id} onChange={(e) => setAllocForm({ ...allocForm, room_id: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm">
-              <option value="">Select room</option>
-              {(rooms || []).map((r) => (
-                <option key={r.id} value={r.id}>{r.hostel_name} — {r.room_number} ({r.occupied_beds}/{r.capacity})</option>
-              ))}
-            </select>
+            <div>
+              <input required placeholder="Student user ID" value={allocForm.student_id} onChange={(e) => setAllocForm({ ...allocForm, student_id: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${allocErrors.student_id ? "border-danger" : "border-slate-200"}`} />
+              {allocErrors.student_id && <p className="text-xs text-danger mt-1">{allocErrors.student_id}</p>}
+            </div>
+            <div>
+              <select required value={allocForm.room_id} onChange={(e) => setAllocForm({ ...allocForm, room_id: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${allocErrors.room_id ? "border-danger" : "border-slate-200"}`}>
+                <option value="">Select room</option>
+                {(rooms || []).map((r) => (
+                  <option key={r.id} value={r.id}>{r.hostel_name} — {r.room_number} ({r.occupied_beds}/{r.capacity})</option>
+                ))}
+              </select>
+              {allocErrors.room_id && <p className="text-xs text-danger mt-1">{allocErrors.room_id}</p>}
+            </div>
             <button className="w-full bg-academic-green text-white rounded-xl py-2 font-medium">Allocate</button>
           </form>
         </Card>
