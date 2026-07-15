@@ -435,7 +435,7 @@ export default function ContactPage() {
           {/* Quick Connect Form */}
           <div className="bg-white rounded-3xl p-6 shadow-sm border border-slate-100">
             <h3 className="font-heading text-lg font-bold text-slate-900 mb-4">Send a Message</h3>
-            <form onSubmit={handleContactSubmit} className="space-y-4">
+            <form onSubmit={handleContactSubmit} className="space-y-4" noValidate>
               <div>
                 <input 
                   required 

@@ -94,6 +94,10 @@ export default function Admissions() {
   const update = (field) => (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value
     setForm({ ...form, [field]: value })
+    if (field === 'date_of_birth' || field === 'target_class') {
+      setEligibilityChecked(false)
+      setIsEligible(false)
+    }
   }
 
   const handleFileChange = (e) => {
@@ -282,6 +286,7 @@ export default function Admissions() {
                           <label className="text-xs font-medium text-ink-secondary">Applicant date of birth</label>
                           <input
                             type="date"
+                            max={new Date().toISOString().split('T')[0]}
                             value={form.date_of_birth}
                             onChange={update('date_of_birth')}
                             className="w-full border border-gray-200 bg-white rounded-xl px-4 py-2 text-sm outline-none"
