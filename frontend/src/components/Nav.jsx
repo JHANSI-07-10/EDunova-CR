@@ -74,8 +74,11 @@ export default function Nav() {
           scrolled ? 'h-14' : 'h-16'
         }`}
       >
-        <Link to="/" className="font-heading font-bold text-xl text-primary">
-          EduNova <span className="text-accent">Global Academy</span>
+        <Link to="/" className="flex items-center gap-3">
+          <img src="/logo.png" alt="EduNova Logo" className="h-12 w-auto object-contain" />
+          <span className="font-heading font-bold text-xl text-primary hidden sm:block">
+            EduNova <span className="text-accent">Global Academy</span>
+          </span>
         </Link>
 
         <nav className="hidden lg:flex items-center gap-6">
