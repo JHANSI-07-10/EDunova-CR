@@ -29,6 +29,8 @@ import LmsMonitor from "./pages/LmsMonitor";
 import Campuses from "./pages/Campuses";
 import Scholarships from "./pages/Scholarships";
 
+import Timetable from "./pages/Timetable";
+
 export default function AdminRoutes() {
   return (
     <AuthProvider>
@@ -46,6 +48,7 @@ export default function AdminRoutes() {
           <Route path="users" element={<Users />} />
           <Route path="roles-permissions" element={<RolesPermissions />} />
           <Route path="classes" element={<Classes />} />
+          <Route path="timetable" element={<Timetable />} />
           <Route path="lms" element={<LmsMonitor />} />
           <Route path="fees" element={<Fees />} />
           <Route path="scholarships" element={<Scholarships />} />
@@ -70,3 +73,4 @@ export default function AdminRoutes() {
     </AuthProvider>
   );
 }
+

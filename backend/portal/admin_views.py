@@ -1862,3 +1862,118 @@ class AdminCampusVisitsView(APIView):
         return Response({"detail": "Campus visit status updated successfully."})
 
 
+# ---------------------------------------------------------------------------
+# Timetable Management
+# ---------------------------------------------------------------------------
+class AdminTimetableView(AdminMixin, APIView):
+    def get(self, request):
+        class_id = request.query_params.get("class_id")
+        if not class_id:
+            from rest_framework import status
+            return Response({"detail": "class_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if not table_exists("portal_timetable"):
+            return Response([])
+            
+        data = rows(
+            """
+            SELECT t.id, t.class_id, t.subject_id, s.name as subject_name,
+                   t.teacher_id, CONCAT(u.first_name, ' ', u.last_name) as teacher_name,
+                   t.day_of_week, t.start_time, t.end_time, t.room_number,
+                   t.is_published
+            FROM portal_timetable t
+            LEFT JOIN portal_subject s ON t.subject_id = s.id
+            LEFT JOIN auth_user u ON t.teacher_id = u.id
+            WHERE t.class_id = %s
+            ORDER BY 
+                CASE t.day_of_week
+                    WHEN 'Monday' THEN 1
+                    WHEN 'Tuesday' THEN 2
+                    WHEN 'Wednesday' THEN 3
+                    WHEN 'Thursday' THEN 4
+                    WHEN 'Friday' THEN 5
+                    WHEN 'Saturday' THEN 6
+                    WHEN 'Sunday' THEN 7
+                END, t.start_time
+            """,
+            [class_id]
+        )
+        return Response(serialise(data))
+
+    def post(self, request):
+        from rest_framework import status
+        class_id = request.data.get("class_id")
+        subject_id = request.data.get("subject_id")
+        teacher_id = request.data.get("teacher_id")
+        day_of_week = request.data.get("day_of_week")
+        start_time = request.data.get("start_time")
+        end_time = request.data.get("end_time")
+        room_number = request.data.get("room_number")
+
+        if not all([class_id, subject_id, teacher_id, day_of_week, start_time, end_time]):
+            return Response({"detail": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 1. Conflict Validation: Teacher overlap
+        teacher_conflict = row(
+            """
+            SELECT id FROM portal_timetable 
+            WHERE teacher_id = %s AND day_of_week = %s 
+              AND ((start_time < %s AND end_time > %s) 
+                   OR (start_time < %s AND end_time > %s)
+                   OR (start_time >= %s AND end_time <= %s))
+            """,
+            [teacher_id, day_of_week, end_time, start_time, end_time, start_time, start_time, end_time]
+        )
+        if teacher_conflict:
+            return Response({"detail": "Teacher is already occupied at this time."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 2. Conflict Validation: Room overlap (if room is provided)
+        if room_number:
+            room_conflict = row(
+                """
+                SELECT id FROM portal_timetable 
+                WHERE room_number = %s AND day_of_week = %s 
+                  AND ((start_time < %s AND end_time > %s) 
+                       OR (start_time < %s AND end_time > %s)
+                       OR (start_time >= %s AND end_time <= %s))
+                """,
+                [room_number, day_of_week, end_time, start_time, end_time, start_time, start_time, end_time]
+            )
+            if room_conflict:
+                return Response({"detail": "Room is already occupied at this time."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO portal_timetable (class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room_number)
+                VALUES (%s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                [class_id, subject_id, teacher_id, day_of_week, start_time, end_time, room_number]
+            )
+            slot_id = cursor.fetchone()[0]
+
+        return Response({"id": slot_id, "detail": "Timetable slot added successfully."}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        from rest_framework import status
+        slot_id = request.query_params.get("id")
+        if not slot_id:
+            return Response({"detail": "id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM portal_timetable WHERE id=%s", [slot_id])
+            
+        return Response({"detail": "Timetable slot deleted successfully."})
+
+class AdminTimetablePublishView(AdminMixin, APIView):
+    def post(self, request):
+        from rest_framework import status
+        class_id = request.data.get("class_id")
+        if not class_id:
+            return Response({"detail": "class_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE portal_timetable SET is_published=true WHERE class_id=%s", [class_id])
+            
+        return Response({"detail": "Timetable published successfully."})

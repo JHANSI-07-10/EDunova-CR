@@ -281,7 +281,7 @@ class TimetableView(StudentOnlyMixin, APIView):
             JOIN portal_subject s ON s.id=t.subject_id
             JOIN auth_user u ON u.id=t.teacher_id
             JOIN portal_class cl ON cl.id=t.class_id
-            WHERE t.class_id=%s
+            WHERE t.class_id=%s AND t.is_published=true
             ORDER BY t.day_of_week, t.start_time
             """, [cls["class_id"]]
         )

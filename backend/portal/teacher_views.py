@@ -796,7 +796,7 @@ class TeacherTimetableView(TeacherMixin, APIView):
             """
             SELECT t.id, t.day_of_week, t.start_time, t.end_time, c.name || '-' || c.section AS class_name, s.name AS subject_name
             FROM portal_timetable t JOIN portal_class c ON c.id=t.class_id JOIN portal_subject s ON s.id=t.subject_id
-            WHERE t.teacher_id=%s ORDER BY t.day_of_week, t.start_time
+            WHERE t.teacher_id=%s AND t.is_published=true ORDER BY t.day_of_week, t.start_time
             """, [request.user.id]
         )
         return Response(serialise(data))
