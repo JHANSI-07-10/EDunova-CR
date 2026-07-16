@@ -474,7 +474,9 @@ class UserDetailView(AdminMixin, APIView):
         if target.groups.exists():
             role = target.groups.first().name
 
-        temp_password = get_random_string(10)
+        temp_password = request.data.get("password")
+        if not temp_password:
+            temp_password = get_random_string(10)
         target.set_password(temp_password)
         target.save(update_fields=["password"])
         
@@ -505,9 +507,23 @@ class UserDetailView(AdminMixin, APIView):
             })
 
         return Response({
-            "detail": "Password reset. Email sent successfully.",
+            "detail": "Password reset/changed. Email sent successfully.",
             "temp_password": temp_password
         })
+
+    def delete(self, request, user_id):
+        try:
+            target = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response({"detail": "User not found."}, status=404)
+            
+        role = "User"
+        if target.groups.exists():
+            role = target.groups.first().name
+            
+        target.delete()
+        log_action(request.user, f"Audit {role} Deleted", "user", user_id, {})
+        return Response({"detail": "User deleted."})
 
 
 class RolesView(AdminMixin, APIView):

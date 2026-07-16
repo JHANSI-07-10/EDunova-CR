@@ -73,8 +73,31 @@ export default function Users() {
   }
 
   async function resetPassword(u) {
+    if (!window.confirm(`Reset password for ${u.username}?`)) return;
     const { data } = await api.post(`/admin-portal/users/${u.id}/reset-password/`, {});
     setToast(`New temp password for ${u.username}: ${data.temp_password}`);
+  }
+
+  async function changePassword(u) {
+    const newPass = window.prompt(`Enter new password for ${u.username}:`);
+    if (!newPass) return;
+    try {
+      await api.post(`/admin-portal/users/${u.id}/reset-password/`, { password: newPass });
+      setToast(`Password changed for ${u.username}.`);
+    } catch (err) {
+      setToast(err?.response?.data?.detail || "Could not change password.");
+    }
+  }
+
+  async function deleteUser(u) {
+    if (!window.confirm(`Are you sure you want to permanently delete user ${u.username}? This action cannot be undone.`)) return;
+    try {
+      await api.delete(`/admin-portal/users/${u.id}/`);
+      setToast(`User ${u.username} deleted.`);
+      load();
+    } catch (err) {
+      setToast(err?.response?.data?.detail || "Could not delete user.");
+    }
   }
 
   return (
@@ -215,7 +238,9 @@ export default function Users() {
                   >
                     {u.is_active ? "Active" : "Deactivated"}
                   </button>
+                  <button onClick={() => changePassword(u)} className="text-xs text-academic-blue hover:underline">Change PW</button>
                   <button onClick={() => resetPassword(u)} className="text-xs text-academic-blue hover:underline">Reset PW</button>
+                  <button onClick={() => deleteUser(u)} className="text-xs text-danger hover:underline">Delete</button>
                 </div>
               </div>
             ))}
