@@ -3,8 +3,21 @@ import {
   FileText, Info, MapPin, Phone, Plus, RefreshCw, Shield, User, Users, X
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import api from "../lib/api";
+
+function Btn({ variant = "primary", size = "md", className = "", children, ...props }) {
+  const base = "inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all disabled:opacity-50";
+  const sz = size === "sm" ? "px-3 py-1.5 text-xs" : "px-4 py-2 text-sm";
+  const variants = {
+    primary: "bg-academic-blue text-white hover:bg-academic-blue/90 shadow-sm",
+    green: "bg-academic-green text-white hover:bg-academic-green/90 shadow-sm",
+    danger: "bg-rose-600 text-white hover:bg-rose-700 shadow-sm",
+    ghost: "bg-slate-100 text-ink-primary hover:bg-slate-200",
+    outline: "border border-slate-200 text-ink-primary hover:bg-slate-50",
+  };
+  return <button className={`${base} ${sz} ${variants[variant]} ${className}`} {...props}>{children}</button>;
+}
 
 const STATUS_COLORS = {
   Pending: "orange",
