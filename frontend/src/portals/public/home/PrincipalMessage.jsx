@@ -11,7 +11,7 @@ export default function PrincipalMessage() {
   const name = principal?.name || 'Dr. Meera Sharma'
   const designation = principal?.designation || 'Principal, EduNova Global Academy'
   const bio = principal?.bio || 'Our mission is to nurture curious, confident learners equipped for a rapidly changing world — through academic rigor, technology, and genuine care for every student.'
-  const photo = principal?.photo ? getMediaUrl(principal.photo) : '/EduNova.jpeg'
+  const photo = principal?.photo ? getMediaUrl(principal.photo) : '/images/meera.jpeg'
 
   return (
     <section className="bg-bg-light">
