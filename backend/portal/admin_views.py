@@ -162,6 +162,17 @@ def _generate_credentials(enquiry):
                     "ON CONFLICT (user_id) DO NOTHING",
                     [student.id],
                 )
+                
+                # Store plain-text passwords for Admin
+                if parent:
+                    cursor.execute(
+                        "INSERT INTO portal_user_credentials (user_id, plain_password) VALUES (%s, %s) ON CONFLICT (user_id) DO UPDATE SET plain_password=EXCLUDED.plain_password",
+                        [parent.id, parent_temp_password]
+                    )
+                cursor.execute(
+                    "INSERT INTO portal_user_credentials (user_id, plain_password) VALUES (%s, %s) ON CONFLICT (user_id) DO UPDATE SET plain_password=EXCLUDED.plain_password",
+                    [student.id, temp_password]
+                )
             if table_exists("portal_parent_profile"):
                 parent_code = f"PRN-{parent.id:04d}-{get_random_string(4).upper()}"
                 cursor.execute(
@@ -279,11 +290,17 @@ class UserListView(AdminMixin, APIView):
         users = User.objects.all().prefetch_related("groups").order_by("-date_joined")
         
         user_types = {}
+        user_passwords = {}
         if table_exists("portal_user_profile"):
             with connection.cursor() as cursor:
                 cursor.execute("SELECT user_id, user_type FROM portal_user_profile")
                 for uid, utype in cursor.fetchall():
                     user_types[uid] = utype
+                    
+                if table_exists("portal_user_credentials"):
+                    cursor.execute("SELECT user_id, plain_password FROM portal_user_credentials")
+                    for uid, pw in cursor.fetchall():
+                        user_passwords[uid] = pw
                     
         data = []
         for u in users:
@@ -295,7 +312,8 @@ class UserListView(AdminMixin, APIView):
                 "name": u.get_full_name() or u.username,
                 "is_active": u.is_active,
                 "date_joined": u.date_joined,
-                "role": role
+                "role": role,
+                "temp_password": user_passwords.get(u.id, "")
             })
 
         if role_filter:
@@ -398,6 +416,12 @@ class UserListView(AdminMixin, APIView):
                     "ON CONFLICT (user_id) DO NOTHING",
                     [user.id, parent_code]
                 )
+        if table_exists("portal_user_credentials"):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_user_credentials (user_id, plain_password) VALUES (%s, %s) ON CONFLICT (user_id) DO UPDATE SET plain_password=EXCLUDED.plain_password",
+                    [user.id, temp_password]
+                )
         log_action(request.user, f"Audit {role} Created", "user", user.id, {"role": role})
         return Response({"id": user.id, "username": user.username, "temp_password": temp_password, "role": role})
 
@@ -453,6 +477,14 @@ class UserDetailView(AdminMixin, APIView):
         temp_password = get_random_string(10)
         target.set_password(temp_password)
         target.save(update_fields=["password"])
+        
+        if table_exists("portal_user_credentials"):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_user_credentials (user_id, plain_password) VALUES (%s, %s) ON CONFLICT (user_id) DO UPDATE SET plain_password=EXCLUDED.plain_password",
+                    [user_id, temp_password]
+                )
+                
         log_action(request.user, f"Audit {role} Password Reset", "user", user_id, {})
 
         email_sent = True

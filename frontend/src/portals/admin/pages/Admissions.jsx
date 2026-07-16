@@ -18,8 +18,7 @@ export default function Admissions() {
   const [items, setItems] = useState(null);
   const [busy, setBusy] = useState(null);
   const [toast, setToast] = useState("");
-  const [credentials, setCredentials] = useState(null);
-  const [showForm, setShowForm] = useState(false);
+    const [showForm, setShowForm] = useState(false);
 
   function load() {
     api.get("/admin-portal/admissions/").then(({ data }) => setItems(data)).catch(() => setItems([]));
@@ -73,18 +72,7 @@ export default function Admissions() {
         </button>
       </div>
 
-      {credentials && (
-        <Card className="border-2 border-academic-green">
-          <p className="font-semibold text-academic-green mb-2">Accounts created — share these securely with the family:</p>
-          <p className="text-sm">Student: <b>{credentials.student_username}</b> / temp password <b>{credentials.student_temp_password}</b></p>
-          {credentials.parent_temp_password ? (
-            <p className="text-sm">Parent: <b>{credentials.parent_username}</b> / temp password <b>{credentials.parent_temp_password}</b></p>
-          ) : (
-            <p className="text-sm">Parent account <b>{credentials.parent_username}</b> already existed and was reused.</p>
-          )}
-          <button onClick={() => setCredentials(null)} className="mt-2 text-xs text-ink-secondary hover:underline">Dismiss</button>
-        </Card>
-      )}
+      
 
       {items.length === 0 ? (
         <EmptyState label="No admission applications yet." />

@@ -2,6 +2,12 @@
 -- Run this AFTER your current Django/CMS/admissions schema.
 -- It uses Django's existing auth_user table, because your latest schema already contains auth_user.
 
+
+CREATE TABLE IF NOT EXISTS public.portal_user_credentials (
+  user_id integer PRIMARY KEY REFERENCES public.auth_user(id) ON DELETE CASCADE,
+  plain_password varchar(255) NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS public.portal_user_profile (
   user_id integer PRIMARY KEY REFERENCES public.auth_user(id) ON DELETE CASCADE,
   user_type varchar(20) NOT NULL CHECK (user_type IN ('Student','Parent','Teacher','Admin','Employee')),
