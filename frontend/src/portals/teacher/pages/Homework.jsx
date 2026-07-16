@@ -163,7 +163,7 @@ function HomeworkForm({ classes, onClose, onSaved }) {
           <div>
             <input
               required
-              placeholder="Title"
+              placeholder="Title (*)"
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
@@ -179,7 +179,7 @@ function HomeworkForm({ classes, onClose, onSaved }) {
             <textarea
               required
               rows={3}
-              placeholder="Description"
+              placeholder="Description (*)"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${

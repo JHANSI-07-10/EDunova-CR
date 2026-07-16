@@ -15,7 +15,6 @@ import TestimonialsCarousel from './home/TestimonialsCarousel'
 import AdmissionProcessSteps from './home/AdmissionProcessSteps'
 import ScholarshipsBanner from './home/ScholarshipsBanner'
 import FAQAccordion from './home/FAQAccordion'
-import ContactSection from './home/ContactSection'
 
 // Order matches "Homepage Sections" list in the client requirements doc.
 // NOTE: Hero Banner now renders first (right after sticky nav), Admission
@@ -40,7 +39,6 @@ export default function Home() {
       <AdmissionProcessSteps />
       <ScholarshipsBanner />
       <FAQAccordion />
-      <ContactSection />
     </>
   )
 }

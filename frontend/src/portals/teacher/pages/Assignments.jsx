@@ -343,10 +343,10 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-ink-secondary uppercase">Title</label>
+            <label className="text-xs font-semibold text-ink-secondary uppercase">Title (*)</label>
             <input
               required
-              placeholder="e.g. Chapter 3 Integration Test"
+              placeholder="e.g. Chapter 3 Integration Test (*)"
               value={form.title}
               onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
@@ -359,11 +359,11 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-ink-secondary uppercase">Description</label>
+            <label className="text-xs font-semibold text-ink-secondary uppercase">Description (*)</label>
             <textarea
               required
               rows={2}
-              placeholder="Instructions or guidelines..."
+              placeholder="Instructions or guidelines... (*)"
               value={form.description}
               onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${
@@ -488,7 +488,7 @@ function AssignmentForm({ classes, assignment, onClose, onSaved }) {
 
                       <input
                         required
-                        placeholder="Question Text"
+                        placeholder="Question Text (*)"
                         value={q.question_text}
                         onChange={(e) => updateQuestion(qIdx, "question_text", e.target.value)}
                         className="w-full rounded-lg border border-slate-200 px-2 py-1.5 text-xs outline-none focus-ring"

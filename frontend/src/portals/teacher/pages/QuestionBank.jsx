@@ -155,7 +155,7 @@ function QuestionForm({ subjects, onClose, onSaved }) {
             <textarea
               required
               rows={3}
-              placeholder="Question text"
+              placeholder="Question text (*)"
               value={text}
               onChange={(e) => setText(e.target.value)}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${
@@ -169,7 +169,7 @@ function QuestionForm({ subjects, onClose, onSaved }) {
           <div>
             <input
               required
-              placeholder="Expected answer"
+              placeholder="Expected answer (*)"
               value={answer}
               onChange={(e) => setAnswer(e.target.value)}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${

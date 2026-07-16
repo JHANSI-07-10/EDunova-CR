@@ -41,7 +41,7 @@ export default function Inventory() {
         <SectionTitle>Add inventory item</SectionTitle>
         <form onSubmit={addItem} className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
           <div className="flex flex-col gap-1">
-            <input required placeholder="Item name" value={form.item_name} onChange={(e) => setForm({ ...form, item_name: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.item_name ? "border-danger" : "border-slate-200"}`} />
+            <input required placeholder="Item name (*)" value={form.item_name} onChange={(e) => setForm({ ...form, item_name: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.item_name ? "border-danger" : "border-slate-200"}`} />
             {validationErrors.item_name && <p className="text-xs text-danger">{validationErrors.item_name}</p>}
           </div>
           <input placeholder="Category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />

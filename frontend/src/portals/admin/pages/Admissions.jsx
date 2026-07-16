@@ -216,7 +216,7 @@ function ManualAdmissionForm({ onClose, onSaved }) {
         <form onSubmit={submit} className="space-y-4 text-sm">
           <div className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1 col-span-2">
-              <label className="text-xs font-semibold text-slate-500 uppercase">Applicant Name</label>
+              <label className="text-xs font-semibold text-slate-500 uppercase">Applicant Name (*)</label>
               <input
                 required
                 type="text"
@@ -233,7 +233,7 @@ function ManualAdmissionForm({ onClose, onSaved }) {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-semibold text-slate-500 uppercase">Date of Birth</label>
+              <label className="text-xs font-semibold text-slate-500 uppercase">Date of Birth (*)</label>
               <input
                 required
                 type="date"
@@ -279,7 +279,7 @@ function ManualAdmissionForm({ onClose, onSaved }) {
             <h3 className="font-semibold text-sm text-ink-primary">Parent / Guardian Details</h3>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1 col-span-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Parent Name</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Parent Name (*)</label>
                 <input
                   required
                   type="text"
@@ -296,7 +296,7 @@ function ManualAdmissionForm({ onClose, onSaved }) {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Parent Phone</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Parent Phone (*)</label>
                 <input
                   required
                   type="tel"
@@ -313,7 +313,7 @@ function ManualAdmissionForm({ onClose, onSaved }) {
               </div>
 
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Parent Email</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Parent Email (*)</label>
                 <input
                   required
                   type="email"
@@ -330,7 +330,7 @@ function ManualAdmissionForm({ onClose, onSaved }) {
               </div>
 
               <div className="flex flex-col gap-1 col-span-2">
-                <label className="text-xs font-semibold text-slate-500 uppercase">Residential Address</label>
+                <label className="text-xs font-semibold text-slate-500 uppercase">Residential Address (*)</label>
                 <textarea
                   required
                   rows={2}

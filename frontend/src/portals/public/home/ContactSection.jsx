@@ -35,7 +35,7 @@ export default function ContactSection() {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <input
-              required placeholder="Your name" value={form.name}
+              required placeholder="Your name (*)" value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
               className={`w-full border rounded-lg px-4 py-3 font-body ${validationErrors.name ? 'border-red-400' : 'border-gray-200'}`}
             />
@@ -43,7 +43,7 @@ export default function ContactSection() {
           </div>
           <div>
             <input
-              required type="email" placeholder="Email address" value={form.email}
+              required type="email" placeholder="Email address (*)" value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
               className={`w-full border rounded-lg px-4 py-3 font-body ${validationErrors.email ? 'border-red-400' : 'border-gray-200'}`}
             />
@@ -59,7 +59,7 @@ export default function ContactSection() {
           </div>
           <div>
             <textarea
-              required placeholder="Your message" rows={4} value={form.message}
+              required placeholder="Your message (*)" rows={4} value={form.message}
               onChange={(e) => setForm({ ...form, message: e.target.value })}
               className={`w-full border rounded-lg px-4 py-3 font-body ${validationErrors.message ? 'border-red-400' : 'border-gray-200'}`}
             />

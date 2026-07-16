@@ -134,7 +134,7 @@ function LeaveForm({ onClose, onSaved }) {
             </div>
           </div>
           <div>
-            <textarea required rows={3} placeholder="Reason" value={form.reason}
+            <textarea required rows={3} placeholder="Reason (*)" value={form.reason}
               onChange={(e) => setForm((f) => ({ ...f, reason: e.target.value }))}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none resize-none ${
                 validationErrors.reason ? "border-danger" : "border-slate-200"

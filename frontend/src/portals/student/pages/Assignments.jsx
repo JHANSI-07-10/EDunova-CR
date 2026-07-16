@@ -256,11 +256,11 @@ function SubmitModal({ assignment, onClose, onSubmitted }) {
 
               {submissionMode === "type" ? (
                 <div className="space-y-2">
-                  <label className="text-xs font-semibold text-ink-secondary block">Type your answers/response below:</label>
+                  <label className="text-xs font-semibold text-ink-secondary block">Type your answers/response below: (*)</label>
                   <textarea
                     required
                     rows={6}
-                    placeholder="Start typing your response here..."
+                    placeholder="Start typing your response here... (*)"
                     value={typedText}
                     onChange={e => setTypedText(e.target.value)}
                     className={`w-full rounded-xl border p-3 text-sm focus-ring outline-none h-40 ${

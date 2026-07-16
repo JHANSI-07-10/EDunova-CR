@@ -152,7 +152,7 @@ export default function Hostel() {
               </div>
               <form onSubmit={submitApplication} className="space-y-4">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-ink-secondary uppercase">Preferred Hostel Building *</label>
+                  <label className="text-xs font-medium text-ink-secondary uppercase">Preferred Hostel Building * (*)</label>
                   <select
                     required
                     value={appForm.hostel_id}
@@ -381,16 +381,16 @@ export default function Hostel() {
             <form onSubmit={submitLeave} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-ink-secondary">Start Date *</label>
+                  <label className="text-xs font-medium text-ink-secondary">Start Date * (*)</label>
                   <input required type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white" />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-medium text-ink-secondary">End Date *</label>
+                  <label className="text-xs font-medium text-ink-secondary">End Date * (*)</label>
                   <input required type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white" />
                 </div>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-ink-secondary uppercase">Reason for Leave *</label>
+                <label className="text-xs font-medium text-ink-secondary uppercase">Reason for Leave * (*)</label>
                 <textarea required rows={3} value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="e.g. Traveling home for weekend..." className="rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none" />
               </div>
               <div className="flex gap-3 pt-2">
@@ -420,11 +420,11 @@ export default function Hostel() {
                 </select>
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-ink-secondary">Issue Title *</label>
+                <label className="text-xs font-medium text-ink-secondary">Issue Title * (*)</label>
                 <input required type="text" value={complaintForm.title} onChange={e => setComplaintForm({ ...complaintForm, title: e.target.value })} placeholder="e.g. Geyser not working" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs font-medium text-ink-secondary uppercase">Detailed Description *</label>
+                <label className="text-xs font-medium text-ink-secondary uppercase">Detailed Description * (*)</label>
                 <textarea required rows={3} value={complaintForm.description} onChange={e => setComplaintForm({ ...complaintForm, description: e.target.value })} placeholder="Describe the issue in detail..." className="rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none" />
               </div>
               <div className="flex gap-3 pt-2">

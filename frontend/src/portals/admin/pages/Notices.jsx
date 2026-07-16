@@ -40,9 +40,9 @@ export default function Notices() {
             </select>
             <input placeholder="Target class ID (optional)" value={form.target_class_id} onChange={(e) => setForm({ ...form, target_class_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
           </div>
-          <input required placeholder="Title" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${validationErrors.title ? "border-danger" : "border-slate-200"}`} />
+          <input required placeholder="Title (*)" value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${validationErrors.title ? "border-danger" : "border-slate-200"}`} />
           {validationErrors.title && <p className="text-xs text-danger">{validationErrors.title}</p>}
-          <textarea required placeholder="Message" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${validationErrors.message ? "border-danger" : "border-slate-200"}`} rows={3} />
+          <textarea required placeholder="Message (*)" value={form.message} onChange={(e) => setForm({ ...form, message: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm ${validationErrors.message ? "border-danger" : "border-slate-200"}`} rows={3} />
           {validationErrors.message && <p className="text-xs text-danger">{validationErrors.message}</p>}
           <button className="bg-academic-blue text-white rounded-xl py-2 px-6 font-medium">Broadcast</button>
         </form>

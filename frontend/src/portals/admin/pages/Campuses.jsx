@@ -220,52 +220,52 @@ export default function Campuses() {
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Campus Name *</label>
-                    <input required placeholder="e.g. Noida Campus" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.name ? "border-danger" : "border-slate-200"}`} />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Campus Name * (*)</label>
+                    <input required placeholder="e.g. Noida Campus (*)" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.name ? "border-danger" : "border-slate-200"}`} />
                     {validationErrors.name && <p className="text-xs text-danger">{validationErrors.name}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Email Address *</label>
-                    <input required type="email" placeholder="e.g. noida@edunovaacademy.edu.in" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.email ? "border-danger" : "border-slate-200"}`} />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Email Address * (*)</label>
+                    <input required type="email" placeholder="e.g. noida@edunovaacademy.edu.in (*)" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.email ? "border-danger" : "border-slate-200"}`} />
                     {validationErrors.email && <p className="text-xs text-danger">{validationErrors.email}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Phone Number *</label>
-                    <input required placeholder="e.g. +91-120-6543210" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.phone ? "border-danger" : "border-slate-200"}`} />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Phone Number * (*)</label>
+                    <input required placeholder="e.g. +91-120-6543210 (*)" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.phone ? "border-danger" : "border-slate-200"}`} />
                     {validationErrors.phone && <p className="text-xs text-danger">{validationErrors.phone}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">City *</label>
-                    <input required placeholder="e.g. Noida" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.city ? "border-danger" : "border-slate-200"}`} />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">City * (*)</label>
+                    <input required placeholder="e.g. Noida (*)" value={form.city} onChange={(e) => setForm({ ...form, city: e.target.value })} className={`rounded-xl border px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue ${validationErrors.city ? "border-danger" : "border-slate-200"}`} />
                     {validationErrors.city && <p className="text-xs text-danger">{validationErrors.city}</p>}
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">State *</label>
-                    <input required placeholder="e.g. Uttar Pradesh" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">State * (*)</label>
+                    <input required placeholder="e.g. Uttar Pradesh (*)" value={form.state} onChange={(e) => setForm({ ...form, state: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Postal Code *</label>
-                    <input required placeholder="e.g. 201301" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Postal Code * (*)</label>
+                    <input required placeholder="e.g. 201301 (*)" value={form.postal_code} onChange={(e) => setForm({ ...form, postal_code: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Latitude *</label>
-                    <input required type="number" step="any" placeholder="e.g. 28.5355" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Latitude * (*)</label>
+                    <input required type="number" step="any" placeholder="e.g. 28.5355 (*)" value={form.latitude} onChange={(e) => setForm({ ...form, latitude: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Longitude *</label>
-                    <input required type="number" step="any" placeholder="e.g. 77.3910" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Longitude * (*)</label>
+                    <input required type="number" step="any" placeholder="e.g. 77.3910 (*)" value={form.longitude} onChange={(e) => setForm({ ...form, longitude: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Office Hours *</label>
-                    <input required placeholder="e.g. 8:00 AM - 4:00 PM" value={form.office_hours} onChange={(e) => setForm({ ...form, office_hours: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
+                    <label className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Office Hours * (*)</label>
+                    <input required placeholder="e.g. 8:00 AM - 4:00 PM (*)" value={form.office_hours} onChange={(e) => setForm({ ...form, office_hours: e.target.value })} className="rounded-xl border border-slate-200 px-3.5 py-2 text-sm focus:outline-none focus:border-academic-blue" />
                   </div>
 
                   <div className="flex flex-col gap-1">

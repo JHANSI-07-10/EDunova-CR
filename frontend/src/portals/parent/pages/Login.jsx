@@ -155,7 +155,7 @@ export default function Login() {
               )}
               <form onSubmit={handleResetSubmit} className="space-y-4">
                 <div>
-                  <label className="text-sm font-medium text-ink-primary">Email Address</label>
+                  <label className="text-sm font-medium text-ink-primary">Email Address (*)</label>
                   <input
                     required
                     type="email"
@@ -205,7 +205,7 @@ export default function Login() {
               {step === 1 ? (
                 <form onSubmit={handleCredentials} className="space-y-4">
                   <div>
-                    <label className="text-sm font-medium text-ink-primary">Email or username</label>
+                    <label className="text-sm font-medium text-ink-primary">Email or username (*)</label>
                     <input
                       required
                       value={email}
@@ -220,7 +220,7 @@ export default function Login() {
                     )}
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-ink-primary">Password</label>
+                    <label className="text-sm font-medium text-ink-primary">Password (*)</label>
                     <input
                       required
                       type="password"
@@ -255,7 +255,7 @@ export default function Login() {
                     <ShieldCheck size={16} /> OTP sent to your registered email
                   </div>
                   <div>
-                    <label className="text-sm font-medium text-ink-primary">6-digit code</label>
+                    <label className="text-sm font-medium text-ink-primary">6-digit code (*)</label>
                     <input
                       required
                       maxLength={6}

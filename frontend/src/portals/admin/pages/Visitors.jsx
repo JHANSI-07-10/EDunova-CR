@@ -44,11 +44,11 @@ export default function Visitors() {
         <SectionTitle>Check in a visitor</SectionTitle>
         <form onSubmit={checkIn} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div className="flex flex-col gap-1">
-            <input required placeholder="Visitor name" value={form.visitor_name} onChange={(e) => setForm({ ...form, visitor_name: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.visitor_name ? "border-danger" : "border-slate-200"}`} />
+            <input required placeholder="Visitor name (*)" value={form.visitor_name} onChange={(e) => setForm({ ...form, visitor_name: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.visitor_name ? "border-danger" : "border-slate-200"}`} />
             {validationErrors.visitor_name && <p className="text-xs text-danger">{validationErrors.visitor_name}</p>}
           </div>
           <div className="flex flex-col gap-1">
-            <input required placeholder="Purpose of visit" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.purpose ? "border-danger" : "border-slate-200"}`} />
+            <input required placeholder="Purpose of visit (*)" value={form.purpose} onChange={(e) => setForm({ ...form, purpose: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.purpose ? "border-danger" : "border-slate-200"}`} />
             {validationErrors.purpose && <p className="text-xs text-danger">{validationErrors.purpose}</p>}
           </div>
           <input placeholder="Host (staff user ID, optional)" value={form.host_user_id} onChange={(e) => setForm({ ...form, host_user_id: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />

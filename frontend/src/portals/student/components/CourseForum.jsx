@@ -319,7 +319,7 @@ export default function CourseForum({ api, courseId, role = "student", onClose }
             <form onSubmit={askAiTutor} className="flex gap-2">
               <input
                 required
-                placeholder="Ask a question about this subject..."
+                placeholder="Ask a question about this subject... (*)"
                 value={newAiQuery}
                 onChange={(e) => setNewAiQuery(e.target.value)}
                 disabled={aiLoading}

@@ -68,11 +68,11 @@ export default function Library() {
           <SectionTitle>Issue a book (barcode/ID)</SectionTitle>
           <form onSubmit={issue} className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <input required placeholder="Book ID" value={issueForm.book_id} onChange={(e) => setIssueForm({ ...issueForm, book_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${issueErrors.book_id ? "border-danger" : "border-slate-200"}`} />
+              <input required placeholder="Book ID (*)" value={issueForm.book_id} onChange={(e) => setIssueForm({ ...issueForm, book_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${issueErrors.book_id ? "border-danger" : "border-slate-200"}`} />
               {issueErrors.book_id && <p className="text-xs text-danger">{issueErrors.book_id}</p>}
             </div>
             <div className="flex flex-col gap-1">
-              <input required placeholder="Borrower user ID" value={issueForm.borrower_id} onChange={(e) => setIssueForm({ ...issueForm, borrower_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${issueErrors.borrower_id ? "border-danger" : "border-slate-200"}`} />
+              <input required placeholder="Borrower user ID (*)" value={issueForm.borrower_id} onChange={(e) => setIssueForm({ ...issueForm, borrower_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${issueErrors.borrower_id ? "border-danger" : "border-slate-200"}`} />
               {issueErrors.borrower_id && <p className="text-xs text-danger">{issueErrors.borrower_id}</p>}
             </div>
             <input type="number" placeholder="Loan days" value={issueForm.loan_days} onChange={(e) => setIssueForm({ ...issueForm, loan_days: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
@@ -83,7 +83,7 @@ export default function Library() {
           <SectionTitle>Return a book</SectionTitle>
           <form onSubmit={returnBook} className="grid grid-cols-2 gap-3">
             <div className="flex flex-col gap-1">
-              <input required placeholder="Transaction ID" value={returnId} onChange={(e) => setReturnId(e.target.value)} className={`rounded-xl border px-3 py-2 text-sm ${returnErrors.returnId ? "border-danger" : "border-slate-200"}`} />
+              <input required placeholder="Transaction ID (*)" value={returnId} onChange={(e) => setReturnId(e.target.value)} className={`rounded-xl border px-3 py-2 text-sm ${returnErrors.returnId ? "border-danger" : "border-slate-200"}`} />
               {returnErrors.returnId && <p className="text-xs text-danger">{returnErrors.returnId}</p>}
             </div>
             <button className="bg-academic-green text-white rounded-xl py-2 font-medium">Return (auto fine calc)</button>
@@ -96,11 +96,11 @@ export default function Library() {
         <SectionTitle>Add book to catalogue</SectionTitle>
         <form onSubmit={addBook} className="grid sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <div className="flex flex-col gap-1">
-            <input required placeholder="Title" value={bookForm.title} onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${bookErrors.title ? "border-danger" : "border-slate-200"}`} />
+            <input required placeholder="Title (*)" value={bookForm.title} onChange={(e) => setBookForm({ ...bookForm, title: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${bookErrors.title ? "border-danger" : "border-slate-200"}`} />
             {bookErrors.title && <p className="text-xs text-danger">{bookErrors.title}</p>}
           </div>
           <div className="flex flex-col gap-1">
-            <input required placeholder="Author" value={bookForm.author} onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${bookErrors.author ? "border-danger" : "border-slate-200"}`} />
+            <input required placeholder="Author (*)" value={bookForm.author} onChange={(e) => setBookForm({ ...bookForm, author: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${bookErrors.author ? "border-danger" : "border-slate-200"}`} />
             {bookErrors.author && <p className="text-xs text-danger">{bookErrors.author}</p>}
           </div>
           <input placeholder="ISBN" value={bookForm.isbn} onChange={(e) => setBookForm({ ...bookForm, isbn: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />

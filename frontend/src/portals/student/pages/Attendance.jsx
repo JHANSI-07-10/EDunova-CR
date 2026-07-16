@@ -196,7 +196,7 @@ export default function Attendance() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-ink-secondary">Start Date</label>
+                  <label className="text-xs font-medium text-ink-secondary">Start Date (*)</label>
                   <input
                     required
                     type="date"
@@ -206,7 +206,7 @@ export default function Attendance() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-medium text-ink-secondary">End Date</label>
+                  <label className="text-xs font-medium text-ink-secondary">End Date (*)</label>
                   <input
                     required
                     type="date"
@@ -223,7 +223,7 @@ export default function Attendance() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-ink-secondary">Reason</label>
+                <label className="text-xs font-medium text-ink-secondary">Reason (*)</label>
                 <textarea
                   required
                   rows={3}

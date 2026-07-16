@@ -394,7 +394,7 @@ export default function Classes() {
               <SectionTitle>Enroll Student in Class</SectionTitle>
               <form onSubmit={handleEnroll} className="space-y-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Student</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Student (*)</label>
                   <select
                     required
                     value={enrollForm.student_id}
@@ -409,7 +409,7 @@ export default function Classes() {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Class</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Class (*)</label>
                   <select
                     required
                     value={enrollForm.class_id}
@@ -435,11 +435,11 @@ export default function Classes() {
                     />
                   </div>
                   <div className="flex flex-col gap-1">
-                    <label className="text-xs font-semibold text-slate-500 uppercase">Academic Year</label>
+                    <label className="text-xs font-semibold text-slate-500 uppercase">Academic Year (*)</label>
                     <input
                       required
                       type="text"
-                      placeholder="e.g. 2025-26"
+                      placeholder="e.g. 2025-26 (*)"
                       value={enrollForm.academic_year}
                       onChange={(e) => setEnrollForm({ ...enrollForm, academic_year: e.target.value })}
                       className="rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus-ring"
@@ -505,7 +505,7 @@ export default function Classes() {
               <SectionTitle>Assign Class Teacher</SectionTitle>
               <form onSubmit={handleTeacherAssign} className="space-y-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Class</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Class (*)</label>
                   <select
                     required
                     value={teacherAssignForm.class_id}
@@ -520,7 +520,7 @@ export default function Classes() {
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Class Teacher</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase">Select Class Teacher (*)</label>
                   <select
                     required
                     value={teacherAssignForm.teacher_id}

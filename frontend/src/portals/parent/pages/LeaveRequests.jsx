@@ -67,11 +67,11 @@ export default function LeaveRequests() {
           </div>
           <div />
           <div>
-            <label className="text-xs text-ink-secondary block mb-1">Start Date</label>
+            <label className="text-xs text-ink-secondary block mb-1">Start Date (*)</label>
             <input required type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm w-full font-sub outline-none focus-ring" />
           </div>
           <div>
-            <label className="text-xs text-ink-secondary block mb-1">End Date</label>
+            <label className="text-xs text-ink-secondary block mb-1">End Date (*)</label>
             <input required type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })}
               className={`rounded-xl border px-3 py-2 text-sm w-full font-sub outline-none focus-ring ${
                 validationErrors.end_date ? "border-danger" : "border-slate-200"
@@ -81,8 +81,8 @@ export default function LeaveRequests() {
             )}
           </div>
           <div className="sm:col-span-2">
-            <label className="text-xs text-ink-secondary block mb-1">Reason</label>
-            <textarea required placeholder="Reason" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}
+            <label className="text-xs text-ink-secondary block mb-1">Reason (*)</label>
+            <textarea required placeholder="Reason (*)" value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })}
               className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus-ring resize-none ${
                 validationErrors.reason ? "border-danger" : "border-slate-200"
               }`} rows={3} />

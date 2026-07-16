@@ -222,7 +222,7 @@ export default function Profile() {
 
               {/* Phone Input */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 block">Phone Number:</label>
+                <label className="text-xs font-bold text-slate-500 block">Phone Number: (*)</label>
                 <input
                   type="text"
                   required
@@ -240,7 +240,7 @@ export default function Profile() {
 
               {/* Address Input */}
               <div className="space-y-1">
-                <label className="text-xs font-bold text-slate-500 block">Residential Address:</label>
+                <label className="text-xs font-bold text-slate-500 block">Residential Address: (*)</label>
                 <textarea
                   rows={3}
                   required

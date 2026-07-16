@@ -259,7 +259,7 @@ export default function ExamResults() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Class Target</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Class Target (*)</label>
                       <select
                         required
                         value={planningForm.class_id}
@@ -273,7 +273,7 @@ export default function ExamResults() {
                       </select>
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Subject Target</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Subject Target (*)</label>
                       <select
                         required
                         value={planningForm.subject_id}
@@ -289,7 +289,7 @@ export default function ExamResults() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Date</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Date (*)</label>
                       <input
                         type="date"
                         required
@@ -299,7 +299,7 @@ export default function ExamResults() {
                       />
                     </div>
                     <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Start Time</label>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Start Time (*)</label>
                       <input
                         type="time"
                         required
@@ -437,7 +437,7 @@ export default function ExamResults() {
                 <SectionTitle icon={MapPin}>Assign Room &amp; Invigilator</SectionTitle>
                 <form onSubmit={handleAssignSeating} className="space-y-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Select Examination</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Select Examination (*)</label>
                     <select
                       required
                       value={seatingForm.exam_schedule_id}
@@ -464,18 +464,18 @@ export default function ExamResults() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Room/Hall Location</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Room/Hall Location (*)</label>
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Block-A Hall 1"
+                      placeholder="e.g. Block-A Hall 1 (*)"
                       value={seatingForm.room_name}
                       onChange={e => setSeatingForm({ ...seatingForm, room_name: e.target.value })}
                       className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-academic-blue"
                     />
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Assign Invigilator</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Assign Invigilator (*)</label>
                     <select
                       required
                       value={seatingForm.invigilator_id}
@@ -771,11 +771,11 @@ export default function ExamResults() {
                 <SectionTitle icon={Award}>Generate Academic Documents</SectionTitle>
                 <form onSubmit={handleIssueCertificate} className="space-y-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Student User ID</label>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-ink-secondary">Student User ID (*)</label>
                     <input
                       type="number"
                       required
-                      placeholder="e.g. 5"
+                      placeholder="e.g. 5 (*)"
                       value={certForm.student_id}
                       onChange={e => setCertForm({ ...certForm, student_id: e.target.value })}
                       className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-academic-blue"
@@ -851,7 +851,7 @@ export default function ExamResults() {
               </div>
               {revalForm.status === "Completed" && (
                 <div>
-                  <label className="text-xs font-semibold uppercase text-ink-secondary">Updated Marks Obtained</label>
+                  <label className="text-xs font-semibold uppercase text-ink-secondary">Updated Marks Obtained (*)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -863,11 +863,11 @@ export default function ExamResults() {
                 </div>
               )}
               <div>
-                <label className="text-xs font-semibold uppercase text-ink-secondary">Teacher / Admin Comments</label>
+                <label className="text-xs font-semibold uppercase text-ink-secondary">Teacher / Admin Comments (*)</label>
                 <textarea
                   rows={3}
                   required
-                  placeholder="Review results notes..."
+                  placeholder="Review results notes... (*)"
                   value={revalForm.teacher_remarks}
                   onChange={e => setRevalForm({ ...revalForm, teacher_remarks: e.target.value })}
                   className="w-full mt-1 border border-slate-200 rounded-xl px-3 py-2 text-sm outline-none resize-none focus:border-academic-blue"
@@ -909,7 +909,7 @@ export default function ExamResults() {
               </div>
               {suppForm.status === "Completed" && (
                 <div>
-                  <label className="text-xs font-semibold uppercase text-ink-secondary">Supplementary Marks Obtained</label>
+                  <label className="text-xs font-semibold uppercase text-ink-secondary">Supplementary Marks Obtained (*)</label>
                   <input
                     type="number"
                     step="0.01"

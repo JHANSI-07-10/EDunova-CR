@@ -393,7 +393,7 @@ export default function Exams() {
             <SectionTitle icon={Plus}>Generate Question Paper</SectionTitle>
             <form onSubmit={handleCreatePaper} className="space-y-4">
               <div>
-                <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wider">Select Scheduled Exam</label>
+                <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wider">Select Scheduled Exam (*)</label>
                 <select
                   required
                   value={selectedExamForPaper}
@@ -407,11 +407,11 @@ export default function Exams() {
                 </select>
               </div>
               <div>
-                <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wider">Question Paper Title</label>
+                <label className="text-xs font-semibold text-ink-secondary uppercase tracking-wider">Question Paper Title (*)</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Midterm Physics Paper A"
+                  placeholder="e.g. Midterm Physics Paper A (*)"
                   value={paperTitle}
                   onChange={e => setPaperTitle(e.target.value)}
                   className="w-full mt-1 border rounded-xl px-3 py-2 text-sm outline-none"
@@ -630,11 +630,11 @@ export default function Exams() {
             </div>
             <form onSubmit={handleSaveQuestion} className="p-6 space-y-4">
               <div>
-                <label className="text-xs font-semibold uppercase text-ink-secondary">Chapter / Section</label>
+                <label className="text-xs font-semibold uppercase text-ink-secondary">Chapter / Section (*)</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Chapter-1 Kinematics"
+                  placeholder="e.g. Chapter-1 Kinematics (*)"
                   value={questionForm.chapter}
                   onChange={e => setQuestionForm({ ...questionForm, chapter: e.target.value })}
                   className="w-full mt-1 border rounded-xl px-3 py-2 text-sm outline-none"
@@ -663,11 +663,11 @@ export default function Exams() {
                 </div>
               </div>
               <div>
-                <label className="text-xs font-semibold uppercase text-ink-secondary">Question Text</label>
+                <label className="text-xs font-semibold uppercase text-ink-secondary">Question Text (*)</label>
                 <textarea
                   rows={2}
                   required
-                  placeholder="Type question content here..."
+                  placeholder="Type question content here... (*)"
                   value={questionForm.question_text}
                   onChange={e => setQuestionForm({ ...questionForm, question_text: e.target.value })}
                   className="w-full mt-1 border rounded-xl px-3 py-2 text-sm outline-none resize-none"
@@ -696,11 +696,11 @@ export default function Exams() {
                 </div>
               )}
               <div>
-                <label className="text-xs font-semibold uppercase text-ink-secondary">Correct Answer / Correct Option</label>
+                <label className="text-xs font-semibold uppercase text-ink-secondary">Correct Answer / Correct Option (*)</label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Option 1 or Option content"
+                  placeholder="e.g. Option 1 or Option content (*)"
                   value={questionForm.correct_answer}
                   onChange={e => setQuestionForm({ ...questionForm, correct_answer: e.target.value })}
                   className="w-full mt-1 border rounded-xl px-3 py-2 text-sm outline-none"
@@ -743,7 +743,7 @@ export default function Exams() {
               </div>
               {revalForm.status === "Completed" && (
                 <div>
-                  <label className="text-xs font-semibold uppercase text-ink-secondary">Updated Marks Obtained</label>
+                  <label className="text-xs font-semibold uppercase text-ink-secondary">Updated Marks Obtained (*)</label>
                   <input
                     type="number"
                     step="0.01"
@@ -755,11 +755,11 @@ export default function Exams() {
                 </div>
               )}
               <div>
-                <label className="text-xs font-semibold uppercase text-ink-secondary">Review Marks Details / Comments</label>
+                <label className="text-xs font-semibold uppercase text-ink-secondary">Review Marks Details / Comments (*)</label>
                 <textarea
                   rows={2}
                   required
-                  placeholder="Explain resolution comments..."
+                  placeholder="Explain resolution comments... (*)"
                   value={revalForm.teacher_remarks}
                   onChange={e => setRevalForm({ ...revalForm, teacher_remarks: e.target.value })}
                   className="w-full mt-1 border rounded-xl px-3 py-2 text-sm outline-none resize-none"

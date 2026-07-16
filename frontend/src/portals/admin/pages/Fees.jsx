@@ -37,11 +37,11 @@ export default function Fees() {
         <SectionTitle>Create fee structure</SectionTitle>
         <form onSubmit={addStructure} className="grid sm:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="flex flex-col gap-1">
-            <input required placeholder="Class ID" value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.class_id ? "border-danger" : "border-slate-200"}`} />
+            <input required placeholder="Class ID (*)" value={form.class_id} onChange={(e) => setForm({ ...form, class_id: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.class_id ? "border-danger" : "border-slate-200"}`} />
             {validationErrors.class_id && <p className="text-xs text-danger">{validationErrors.class_id}</p>}
           </div>
           <div className="flex flex-col gap-1">
-            <input required placeholder="Term name" value={form.term_name} onChange={(e) => setForm({ ...form, term_name: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.term_name ? "border-danger" : "border-slate-200"}`} />
+            <input required placeholder="Term name (*)" value={form.term_name} onChange={(e) => setForm({ ...form, term_name: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm ${validationErrors.term_name ? "border-danger" : "border-slate-200"}`} />
             {validationErrors.term_name && <p className="text-xs text-danger">{validationErrors.term_name}</p>}
           </div>
           <input type="number" min="0" placeholder="Tuition ₹" value={form.tuition_fee} onChange={(e) => setForm({ ...form, tuition_fee: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />

@@ -148,7 +148,7 @@ export default function Scholarships() {
               <SectionTitle>New Scholarship Program</SectionTitle>
               <form onSubmit={handleAddProgram} className="space-y-4">
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 block">Program Name:</label>
+                  <label className="text-xs font-bold text-slate-500 block">Program Name: (*)</label>
                   <input type="text" required value={form.name}
                     onChange={(e) => setForm({ ...form, name: e.target.value })}
                     placeholder="E.g., STEM Excellence Grant"
@@ -157,7 +157,7 @@ export default function Scholarships() {
                   {validationErrors.name && <p className="text-[10px] text-danger font-semibold">{validationErrors.name}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 block">Description:</label>
+                  <label className="text-xs font-bold text-slate-500 block">Description: (*)</label>
                   <textarea rows={3} required value={form.description}
                     onChange={(e) => setForm({ ...form, description: e.target.value })}
                     placeholder="Describe program objectives and details..."
@@ -166,7 +166,7 @@ export default function Scholarships() {
                   {validationErrors.description && <p className="text-[10px] text-danger font-semibold">{validationErrors.description}</p>}
                 </div>
                 <div className="space-y-1">
-                  <label className="text-xs font-bold text-slate-500 block">Eligibility Criteria:</label>
+                  <label className="text-xs font-bold text-slate-500 block">Eligibility Criteria: (*)</label>
                   <input type="text" required value={form.eligibility}
                     onChange={(e) => setForm({ ...form, eligibility: e.target.value })}
                     placeholder="E.g., GPA > 9.0 or family income threshold"

@@ -363,7 +363,7 @@ export default function Performance() {
                     
                     <form onSubmit={handleSubmitFeedback} className="space-y-3.5">
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-600 block">Performance Feedback:</label>
+                        <label className="text-xs font-semibold text-slate-600 block">Performance Feedback: (*)</label>
                         <textarea
                           rows={3}
                           required
@@ -380,7 +380,7 @@ export default function Performance() {
                       </div>
 
                       <div className="space-y-1">
-                        <label className="text-xs font-semibold text-slate-600 block">Improvement Strategy:</label>
+                        <label className="text-xs font-semibold text-slate-600 block">Improvement Strategy: (*)</label>
                         <textarea
                           rows={3}
                           required

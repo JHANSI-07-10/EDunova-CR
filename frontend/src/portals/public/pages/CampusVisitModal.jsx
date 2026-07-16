@@ -131,7 +131,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
 
             {/* Campus Selection */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Target Campus</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Target Campus (*)</label>
               <select
                 required
                 value={form.campus_id}
@@ -161,7 +161,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                   <input
                     required
                     type="text"
-                    placeholder="John Doe"
+                    placeholder="John Doe (*)"
                     value={form.visitor_name}
                     onChange={(e) => setForm({ ...form, visitor_name: e.target.value })}
                     className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
@@ -183,7 +183,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                   <input
                     required
                     type="tel"
-                    placeholder="+91 98765 43210"
+                    placeholder="+91 98765 43210 (*)"
                     value={form.visitor_phone}
                     onChange={(e) => setForm({ ...form, visitor_phone: e.target.value })}
                     className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
@@ -206,7 +206,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                 <input
                   required
                   type="email"
-                  placeholder="name@example.com"
+                  placeholder="name@example.com (*)"
                   value={form.visitor_email}
                   onChange={(e) => setForm({ ...form, visitor_email: e.target.value })}
                   className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${

@@ -439,7 +439,7 @@ export default function ContactPage() {
               <div>
                 <input 
                   required 
-                  placeholder="Full Name" 
+                  placeholder="Full Name (*)" 
                   value={contactForm.name} 
                   onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                   className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${
@@ -455,7 +455,7 @@ export default function ContactPage() {
                   <input 
                     required 
                     type="email" 
-                    placeholder="Email" 
+                    placeholder="Email (*)" 
                     value={contactForm.email} 
                     onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
                     className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${
@@ -469,7 +469,7 @@ export default function ContactPage() {
                 <div>
                   <input 
                     required
-                    placeholder="Phone" 
+                    placeholder="Phone (*)" 
                     value={contactForm.phone} 
                     onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
                     className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${
@@ -484,7 +484,7 @@ export default function ContactPage() {
               <div>
                 <textarea 
                   required 
-                  placeholder="Your message details..." 
+                  placeholder="Your message details... (*)" 
                   rows={4} 
                   value={contactForm.message} 
                   onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}

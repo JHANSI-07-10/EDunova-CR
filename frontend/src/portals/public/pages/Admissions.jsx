@@ -346,7 +346,7 @@ export default function Admissions() {
                           <div>
                             <input
                               required
-                              placeholder="Applicant full name"
+                              placeholder="Applicant full name (*)"
                               value={form.applicant_name}
                               onChange={update('applicant_name')}
                               className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
@@ -387,7 +387,7 @@ export default function Admissions() {
                           <div>
                             <input
                               required
-                              placeholder="Parent / Guardian name"
+                              placeholder="Parent / Guardian name (*)"
                               value={form.parent_name}
                               onChange={update('parent_name')}
                               className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
@@ -402,7 +402,7 @@ export default function Admissions() {
                           <div>
                             <input
                               required
-                              placeholder="Parent phone number"
+                              placeholder="Parent phone number (*)"
                               value={form.parent_phone}
                               onChange={update('parent_phone')}
                               className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
@@ -420,7 +420,7 @@ export default function Admissions() {
                         <input
                           required
                           type="email"
-                          placeholder="Parent email address"
+                          placeholder="Parent email address (*)"
                           value={form.parent_email}
                           onChange={update('parent_email')}
                           className={`w-full border rounded-xl px-4 py-3 focus:outline-none focus:border-primary text-sm ${
@@ -435,7 +435,7 @@ export default function Admissions() {
                       <div>
                         <textarea
                           required
-                          placeholder="Full home address"
+                          placeholder="Full home address (*)"
                           rows={3}
                           value={form.address}
                           onChange={update('address')}

@@ -51,7 +51,7 @@ export default function Alumni() {
         <SectionTitle>Add / update alumni record</SectionTitle>
         <form onSubmit={save} className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <div>
-            <input required placeholder="Former student user ID" value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })}
+            <input required placeholder="Former student user ID (*)" value={form.student_id} onChange={(e) => setForm({ ...form, student_id: e.target.value })}
               className={`w-full rounded-xl border px-3 py-2 text-sm ${
                 validationErrors.student_id ? "border-danger" : "border-slate-200"
               }`} />
@@ -60,7 +60,7 @@ export default function Alumni() {
             )}
           </div>
           <div>
-            <input required type="number" placeholder="Graduation year" value={form.graduation_year} onChange={(e) => setForm({ ...form, graduation_year: e.target.value })}
+            <input required type="number" placeholder="Graduation year (*)" value={form.graduation_year} onChange={(e) => setForm({ ...form, graduation_year: e.target.value })}
               className={`w-full rounded-xl border px-3 py-2 text-sm ${
                 validationErrors.graduation_year ? "border-danger" : "border-slate-200"
               }`} />

@@ -188,7 +188,7 @@ export default function Scholarships() {
               <form onSubmit={handleApply} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 block">Current GPA / %:</label>
+                    <label className="text-xs font-bold text-slate-500 block">Current GPA / %: (*)</label>
                     <input type="number" step="0.01" required value={form.academic_gpa}
                       onChange={(e) => setForm({ ...form, academic_gpa: e.target.value })}
                       placeholder="e.g. 9.4"
@@ -196,7 +196,7 @@ export default function Scholarships() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 block">Attendance %:</label>
+                    <label className="text-xs font-bold text-slate-500 block">Attendance %: (*)</label>
                     <input type="number" step="0.01" required value={form.attendance_percentage}
                       onChange={(e) => setForm({ ...form, attendance_percentage: e.target.value })}
                       placeholder="e.g. 95"
@@ -239,14 +239,14 @@ export default function Scholarships() {
               <form onSubmit={handleRenew} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 block">Current GPA:</label>
+                    <label className="text-xs font-bold text-slate-500 block">Current GPA: (*)</label>
                     <input type="number" step="0.01" required value={renewForm.academic_gpa}
                       onChange={(e) => setRenewForm({ ...renewForm, academic_gpa: e.target.value })}
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus-ring outline-none"
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-xs font-bold text-slate-500 block">Attendance %:</label>
+                    <label className="text-xs font-bold text-slate-500 block">Attendance %: (*)</label>
                     <input type="number" step="0.01" required value={renewForm.attendance_percentage}
                       onChange={(e) => setRenewForm({ ...renewForm, attendance_percentage: e.target.value })}
                       className="w-full rounded-xl border border-slate-200 px-3 py-2 text-xs focus-ring outline-none"

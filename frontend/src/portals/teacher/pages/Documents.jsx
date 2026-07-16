@@ -147,7 +147,7 @@ function DocForm({ classes, onClose, onSaved }) {
           </div>
 
           <div>
-            <input required placeholder="Title" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+            <input required placeholder="Title (*)" value={form.title} onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
                 validationErrors.title ? "border-danger" : "border-slate-200"
               }`} />
@@ -157,7 +157,7 @@ function DocForm({ classes, onClose, onSaved }) {
           </div>
 
           <div>
-            <input required placeholder="Resource URL (upload to lms-resources bucket first)" value={form.resource_url}
+            <input required placeholder="Resource URL (upload to lms-resources bucket first) (*)" value={form.resource_url}
               onChange={(e) => setForm((f) => ({ ...f, resource_url: e.target.value }))}
               className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
                 validationErrors.resource_url ? "border-danger" : "border-slate-200"

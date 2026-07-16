@@ -151,7 +151,7 @@ function ReviewModal({ enquiry, onClose, onSaved }) {
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs font-semibold text-ink-secondary uppercase">Interview Remarks & Feedback</label>
+            <label className="text-xs font-semibold text-ink-secondary uppercase">Interview Remarks & Feedback (*)</label>
             <textarea
               required
               rows={4}

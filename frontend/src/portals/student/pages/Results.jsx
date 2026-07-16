@@ -271,7 +271,7 @@ export default function Results() {
                 <SectionTitle icon={RefreshCw}>File Revaluation Request</SectionTitle>
                 <form onSubmit={handleRevalSubmit} className="space-y-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase text-ink-secondary">Select Result to Review</label>
+                    <label className="text-xs font-semibold uppercase text-ink-secondary">Select Result to Review (*)</label>
                     <select
                       required
                       value={revalForm.result_id}
@@ -287,11 +287,11 @@ export default function Results() {
                     </select>
                   </div>
                   <div>
-                    <label className="text-xs font-semibold uppercase text-ink-secondary">Reason for Revaluation</label>
+                    <label className="text-xs font-semibold uppercase text-ink-secondary">Reason for Revaluation (*)</label>
                     <textarea
                       rows={4}
                       required
-                      placeholder="Type details why re-checking is requested (e.g. calculation mismatch in Section B)..."
+                      placeholder="Type details why re-checking is requested (e.g. calculation mismatch in Section B)... (*)"
                       value={revalForm.reason}
                       onChange={e => setRevalForm({ ...revalForm, reason: e.target.value })}
                       className="w-full mt-1 border rounded-xl px-3 py-2 text-sm outline-none resize-none"
