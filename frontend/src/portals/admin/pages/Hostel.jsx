@@ -92,7 +92,8 @@ function Btn({ variant = "primary", size = "md", className = "", children, ...pr
 // Tab: Overview & Reports
 // ---------------------------------------------------------------------------
 function OverviewTab({ reports, refresh }) {
-  if (!reports) return <Loader rows={4} />;
+  if (reports === null) return <Loader rows={4} />;
+  if (reports === false) return <EmptyState label="Could not load reports. Please try again later." />;
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
@@ -766,7 +767,7 @@ export default function Hostel() {
     api.get("/admin-portal/hostels/").then(({ data }) => setHostels(data)).catch(() => setHostels([]));
     api.get("/admin-portal/rooms/").then(({ data }) => setRooms(data)).catch(() => setRooms([]));
     api.get("/admin-portal/hostel-allocations/").then(({ data }) => setAllocations(data)).catch(() => setAllocations([]));
-    api.get("/hostels/reports/").then(({ data }) => setReports(data)).catch(() => setReports(null));
+    api.get("/hostels/reports/").then(({ data }) => setReports(data)).catch(() => setReports(false));
   }
 
   useEffect(() => { loadAll(); }, []);
