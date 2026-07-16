@@ -16,10 +16,6 @@ export default function Login() {
   const [userId, setUserId] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
-
-  const [resetting, setResetting] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
-  const [resetSuccess, setResetSuccess] = useState("");
   const [validationErrors, setValidationErrors] = useState({});
 
 
@@ -43,21 +39,7 @@ export default function Login() {
       setUserId(data.user_id);
       setStep(2);
     } catch (err) {
-      setError(
-        <span>
-          Invalid credentials. Please check your username/password and try again. Or{" "}
-          <button
-            type="button"
-            onClick={() => {
-              setResetting(true);
-              setError("");
-            }}
-            className="underline font-semibold"
-          >
-            Reset Password
-          </button>
-        </span>
-      );
+      setError("Invalid credentials. Please check your username/password and try again.");
     } finally {
       setLoading(false);
     }
@@ -80,21 +62,7 @@ export default function Login() {
       await verifyOtp(userId, otp);
       navigate("/teacher");
     } catch (err) {
-      setError(
-        <span>
-          Incorrect OTP. Please check the code and retry or{" "}
-          <button
-            type="button"
-            onClick={() => {
-              setResetting(true);
-              setError("");
-            }}
-            className="underline font-semibold"
-          >
-            Reset Password
-          </button>
-        </span>
-      );
+      setError("Incorrect OTP. Please check the code and retry");
     } finally {
       setLoading(false);
     }
@@ -103,19 +71,6 @@ export default function Login() {
   async function handleResend() {
     setError("");
     await resendOtp(userId);
-  }
-
-  function handleResetSubmit(e) {
-    e.preventDefault();
-    const errs = {};
-    if (!isValidEmail(resetEmail)) {
-      errs.resetEmail = "Please enter a valid email address.";
-      setValidationErrors(errs);
-      return;
-    }
-    setValidationErrors({});
-    setResetSuccess("A password reset link has been sent to your registered email address.");
-    setResetEmail("");
   }
 
   return (
@@ -142,50 +97,7 @@ export default function Login() {
 
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          {resetting ? (
-            <div>
-              <h2 className="font-heading text-2xl font-bold mb-1">Reset Password</h2>
-              <p className="text-ink-secondary text-sm mb-6 font-sub">
-                Enter your registered email address to receive a password reset link.
-              </p>
-              {resetSuccess && (
-                <div className="mb-4 text-sm text-academic-green bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
-                  {resetSuccess}
-                </div>
-              )}
-              <form onSubmit={handleResetSubmit} className="space-y-4">
-                <div>
-                  <label className="text-sm font-medium text-ink-primary">Email Address (*)</label>
-                  <input
-                    required
-                    type="email"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
-                      validationErrors.resetEmail ? "border-danger" : "border-slate-200"
-                    }`}
-                    placeholder="teacher@example.com"
-                  />
-                  {validationErrors.resetEmail && (
-                    <p className="text-xs text-danger mt-1">{validationErrors.resetEmail}</p>
-                  )}
-                </div>
-                <button className="w-full bg-academic-blue text-white rounded-xl py-2.5 font-medium hover:bg-academic-blue/90 transition-colors">
-                  Request Reset Link
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setResetting(false);
-                    setResetSuccess("");
-                  }}
-                  className="w-full text-center text-sm text-ink-secondary hover:underline"
-                >
-                  Back to Login
-                </button>
-              </form>
-            </div>
-          ) : (
+          
             <div>
               <h2 className="font-heading text-2xl font-bold mb-1">
                 {step === 1 ? "Teacher login" : "Verify your identity"}
@@ -236,18 +148,7 @@ export default function Login() {
                   >
                     {loading ? "Checking…" : "Continue"}
                   </button>
-                  <div className="text-center mt-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setResetting(true);
-                        setError("");
-                      }}
-                      className="text-xs text-academic-blue hover:underline"
-                    >
-                      Forgot / Reset Password?
-                    </button>
-                  </div>
+                  
                 </form>
               ) : (
                 <form onSubmit={handleOtp} className="space-y-4">
@@ -287,7 +188,7 @@ export default function Login() {
                 </form>
               )}
             </div>
-          )}
+          
         </div>
       </div>
     </div>
