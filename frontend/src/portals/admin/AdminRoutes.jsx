@@ -22,6 +22,7 @@ import Inventory from "./pages/Inventory";
 import Visitors from "./pages/Visitors";
 import Alumni from "./pages/Alumni";
 import MedicalRecords from "./pages/MedicalRecords";
+import Examinations from "./pages/Examinations";
 import ExamResults from "./pages/ExamResults";
 import Payroll from "./pages/Payroll";
 import RolesPermissions from "./pages/RolesPermissions";
@@ -64,6 +65,7 @@ export default function AdminRoutes() {
           <Route path="visitors" element={<Visitors />} />
           <Route path="alumni" element={<Alumni />} />
           <Route path="medical-records" element={<MedicalRecords />} />
+          <Route path="examinations" element={<Examinations />} />
           <Route path="exam-results" element={<ExamResults />} />
           <Route path="payroll" element={<Payroll />} />
           <Route path="campuses" element={<Campuses />} />

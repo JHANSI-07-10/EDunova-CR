@@ -9,6 +9,7 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/cms/", include("apps.cms.urls")),
     path("api/admissions/", include("apps.admissions.urls")),
+    path("api/examination/", include("apps.examination.urls")),
     path("api/", include("portal.urls")),
 ]
 

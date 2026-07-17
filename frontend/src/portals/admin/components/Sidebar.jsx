@@ -18,6 +18,7 @@ const NAV = [
   { to: "/admin/fees", label: "Fees", icon: Wallet },
   { to: "/admin/scholarships", label: "Scholarships", icon: Trophy },
   { to: "/admin/payroll", label: "Payroll", icon: Banknote },
+  { to: "/admin/examinations", label: "Examinations Setup", icon: BookOpen },
   { to: "/admin/exam-results", label: "Rank Lists & Report Cards", icon: Trophy },
   { to: "/admin/transport", label: "Transport", icon: Bus },
   { to: "/admin/library", label: "Library", icon: LibraryBig },

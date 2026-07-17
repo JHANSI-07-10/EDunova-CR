@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     "django_filters",
     "apps.cms",
     "apps.admissions",
+    "apps.examination",
     "portal",
 ]
 
