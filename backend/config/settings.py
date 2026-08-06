@@ -42,7 +42,6 @@ INSTALLED_APPS = [
     "django_filters",
     "apps.cms",
     "apps.admissions",
-    "apps.examination",
     "portal",
 ]
 MIDDLEWARE = [ "corsheaders.middleware.CorsMiddleware", "django.middleware.security.SecurityMiddleware", "portal.middleware.ExceptionLoggingMiddleware", "django.contrib.sessions.middleware.SessionMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware", "django.contrib.auth.middleware.AuthenticationMiddleware", "django.contrib.messages.middleware.MessageMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware", ]
