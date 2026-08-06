@@ -138,7 +138,7 @@ export default function Departments() {
       {/* Hero */}
       <section className="relative overflow-hidden text-white">
         <img
-          src="/building.jpeg"
+          src="/images/building.jpeg"
           alt="EduNova departments"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -220,7 +220,7 @@ export default function Departments() {
 
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
               <img
-                src="/Campus.jpeg"
+                src="/images/Campus.jpeg"
                 alt="EduNova campus departments"
                 className="w-full h-[430px] object-cover"
               />
@@ -296,7 +296,7 @@ export default function Departments() {
         <FadeIn>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/student.jpeg"
+              src="/images/student.jpeg"
               alt="EduNova student services"
               className="w-full h-[420px] object-cover"
             />

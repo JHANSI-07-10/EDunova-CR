@@ -68,8 +68,8 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
       })
-      const data = await response.json()
       if (response.ok) {
+        const data = await response.json()
         setStatus('sent')
         setForm({
           campus_id: '',
@@ -81,7 +81,16 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
           purpose: ''
         })
       } else {
-        setErrorMessage(data.detail || 'Failed to submit booking.')
+        let errorMsg = 'Failed to submit booking.'
+        try {
+          const data = await response.json()
+          errorMsg = data.detail || errorMsg
+        } catch (_) {
+          if (response.status === 500) {
+            errorMsg = 'Server error (500). Please contact administration or check server logs.'
+          }
+        }
+        setErrorMessage(errorMsg)
         setStatus('error')
       }
     } catch (err) {

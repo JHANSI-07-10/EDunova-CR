@@ -98,7 +98,7 @@ export default function Profile() {
 
       // Submit Admin Approval ticket via messages endpoint
       const msgText = `[Profile Update Request] Phone: ${phone} | Address: ${address} | Profile Picture: ${uploadedAvatarUrl}`;
-      await api.post("/teacher/messages/", {
+      await api.post("/student/messages/", {
         receiver: 1, // Admin User
         message_text: msgText
       });

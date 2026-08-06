@@ -37,6 +37,20 @@ def _email_not_configured_response():
         status=status.HTTP_503_SERVICE_UNAVAILABLE,
     )
 
+
+def _static_otp_enabled() -> bool:
+    """Static OTP (\"123456\") is a LOCAL-DEV ONLY escape hatch.
+
+    It is honored only when BOTH DEBUG and DEV_STATIC_OTP are true, so a
+    production server can never accept the public code even if the env var
+    is accidentally left on a host. Production login always requires a real
+    emailed OTP.
+    """
+    return bool(
+        getattr(settings, "DEBUG", False)
+        and getattr(settings, "DEV_STATIC_OTP", False)
+    )
+
 # ---------------------------------------------------------------------------
 # Throttle classes (unchanged)
 # ---------------------------------------------------------------------------
@@ -172,15 +186,24 @@ def login_step1(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    if getattr(settings, "DEV_STATIC_OTP", False):
+    static_otp = _static_otp_enabled()
+    if static_otp:
         otp = "123456"
     else:
         otp = _generate_otp()
 
     _store_otp(user.id, otp)
 
-    if getattr(settings, "DEV_STATIC_OTP", False):
-        pass
+    if static_otp:
+        # Local-dev escape hatch only (DEBUG must be True). Production never
+        # takes this path, so real OTP emails are always required there.
+        return Response({
+            "user_id": user.id,
+            "user_type": get_user_role(user),
+            "email_sent": False,
+            "email_error": "Static OTP enabled locally (DEV_STATIC_OTP). Use 123456 — no email was sent.",
+            "detail": "Static OTP active (dev only).",
+        })
     elif _email_is_console_only():
         return _email_not_configured_response()
     else:
@@ -195,6 +218,8 @@ def login_step1(request):
                 return Response({
                     "user_id": user.id,
                     "user_type": get_user_role(user),
+                    "email_sent": False,
+                    "email_error": "OTP email could not be delivered (SMTP refused from this server/IP). Check the Brevo SMTP IP allowlist and sender verification.",
                     "detail": f"OTP generated in debug mode (check console: {otp}).",
                 })
             return Response(
@@ -205,6 +230,7 @@ def login_step1(request):
     return Response({
         "user_id": user.id,
         "user_type": get_user_role(user),
+        "email_sent": True,
         "detail": "OTP sent successfully.",
     })
 
@@ -223,7 +249,10 @@ def login_step2_verify_otp(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    is_static = getattr(settings, "DEV_STATIC_OTP", False) and otp == "123456"
+    # Static OTP is honored only when DEBUG is also True (local dev escape
+    # hatch). In production the public code 123456 can never verify, even if
+    # DEV_STATIC_OTP is accidentally left in the env — real emailed OTP only.
+    is_static = _static_otp_enabled() and otp == "123456"
 
     cached = cache.get(f"portal_login_otp:{user_id}")
     if not is_static and (not cached or otp != str(cached)):
@@ -260,9 +289,11 @@ def resend_otp(request):
 
     cache.delete(f"portal_login_otp:{user.id}")
 
-    if getattr(settings, "DEV_STATIC_OTP", False):
+    static_otp = _static_otp_enabled()
+    if static_otp:
         otp = "123456"
         _store_otp(user.id, otp)
+        return Response({"detail": "Static OTP active (dev only).", "email_sent": False})
     elif _email_is_console_only():
         return _email_not_configured_response()
     else:
@@ -276,10 +307,13 @@ def resend_otp(request):
                 print("\n" + "=" * 50)
                 print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
                 print("=" * 50 + "\n")
-                return Response({"detail": "OTP resent successfully (check console)."})
+                return Response({
+                    "detail": "OTP resent successfully (check console).",
+                    "email_sent": False,
+                })
             return Response(
                 {"detail": "Unable to send verification email."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    return Response({"detail": "OTP resent successfully."})
+    return Response({"detail": "OTP resent successfully.", "email_sent": True})

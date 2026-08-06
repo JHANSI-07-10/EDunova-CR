@@ -4,6 +4,8 @@ import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 import AIChatbot from "./AIChatbot";
 
+import GlobalPopup from "../../../components/GlobalPopup";
+
 const TITLES = {
   "/": "Dashboard",
   "/attendance": "Attendance",
@@ -39,6 +41,7 @@ export default function Layout() {
         </main>
       </div>
       <AIChatbot />
+      <GlobalPopup />
     </div>
   );
 }

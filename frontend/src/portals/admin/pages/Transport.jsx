@@ -251,6 +251,7 @@ function VehiclesTab({ vehicles, drivers, refresh, setToast }) {
 
   async function save() {
     if (!form.vehicle_number.trim()) { setErrors({ vehicle_number: "Required" }); return; }
+    if (form.capacity && (isNaN(parseInt(form.capacity)) || parseInt(form.capacity) < 1)) { setErrors({ capacity: "Capacity must be at least 1" }); return; }
     setSaving(true);
     try {
       if (modal === "add") await api.post("/admin-portal/vehicles/", form);

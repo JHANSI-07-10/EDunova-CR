@@ -200,7 +200,7 @@ export default function Transport() {
     setValidationErrors({});
     setSubmitting(true);
     try {
-      await api.post("/teacher/messages/", {
+      await api.post("/student/messages/", {
         receiver: 1,
         message_text: `[Transport ${requestType} Request] ${requestDetails}`
       });

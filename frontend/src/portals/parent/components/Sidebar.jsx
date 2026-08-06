@@ -9,6 +9,7 @@ import { useAuth } from "../context/AuthContext";
 const NAV = [
   { to: "/parent", label: "Dashboard", icon: Home, end: true },
   { to: "/parent/attendance", label: "Attendance", icon: CalendarDays },
+  { to: "/parent/timetable", label: "Timetable", icon: CalendarDays },
   { to: "/parent/lms", label: "Child Progress", icon: BookOpen },
   { to: "/parent/homework", label: "Homework", icon: NotebookPen },
   { to: "/parent/results", label: "Exam Results", icon: ScrollText },

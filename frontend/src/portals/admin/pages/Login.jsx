@@ -14,6 +14,7 @@ export default function Login() {
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
   const [userId, setUserId] = useState(null);
+  const [emailSent, setEmailSent] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [validationErrors, setValidationErrors] = useState({});
@@ -37,9 +38,18 @@ export default function Login() {
     try {
       const data = await requestOtp(email, password);
       setUserId(data.user_id);
+      setEmailSent(data.email_sent !== false);
+      if (data.email_sent === false) {
+        setError(
+          <span className="text-amber-700">
+            ⚠️ {data.email_error || "OTP could not be sent to your email. Please contact the administrator for your one-time code."}
+          </span>
+        );
+      }
       setStep(2);
     } catch (err) {
-      setError("Invalid credentials. Please check your username/password and try again.");
+      const detail = err?.response?.data?.detail;
+      setError(detail || "Invalid credentials. Please check your username/password and try again.");
     } finally {
       setLoading(false);
     }
@@ -70,7 +80,8 @@ export default function Login() {
 
   async function handleResend() {
     setError("");
-    await resendOtp(userId);
+    const data = await resendOtp(userId);
+    if (data) setEmailSent(data.email_sent !== false);
   }
 
   return (
@@ -97,77 +108,86 @@ export default function Login() {
 
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-sm">
-          
-            <div>
-              <h2 className="font-heading text-2xl font-bold mb-1">
-                {step === 1 ? "Admin login" : "Verify your identity"}
-              </h2>
-              <p className="text-ink-secondary text-sm mb-6 font-sub">
-                {step === 1 ? "Restricted to authorized school administrators." : "Enter the 6-digit code sent to your registered email."}
-              </p>
 
-              {error && (
-                <div className="mb-4 text-sm text-danger bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</div>
-              )}
+          <div>
+            <h2 className="font-heading text-2xl font-bold mb-1">
+              {step === 1 ? "Admin login" : "Verify your identity"}
+            </h2>
+            <p className="text-ink-secondary text-sm mb-6 font-sub">
+              {step === 1 ? "Restricted to authorized school administrators." : "Enter the 6-digit code sent to your registered email."}
+            </p>
 
-              {step === 1 ? (
-                <form onSubmit={handleCredentials} className="space-y-4">
-                  <div>
-                    <label className="text-sm font-medium text-ink-primary">Email or username (*)</label>
-                    <input
-                      required
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
-                        validationErrors.email ? "border-danger" : "border-slate-200"
+            {error && (
+              <div className="mb-4 text-sm text-danger bg-red-50 border border-red-100 rounded-xl px-3 py-2">{error}</div>
+            )}
+
+            {step === 1 ? (
+              <form onSubmit={handleCredentials} className="space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-ink-primary">Email or username (*)</label>
+                  <input
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${validationErrors.email ? "border-danger" : "border-slate-200"
                       }`}
-                      placeholder="admin@edunovaacademy.edu.in"
-                    />
-                    {validationErrors.email && (
-                      <p className="text-xs text-danger mt-1">{validationErrors.email}</p>
-                    )}
+                    placeholder="admin@edunovaacademy.edu.in"
+                  />
+                  {validationErrors.email && (
+                    <p className="text-xs text-danger mt-1">{validationErrors.email}</p>
+                  )}
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-ink-primary">Password (*)</label>
+                  <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none" placeholder="••••••••" />
+                </div>
+                <button disabled={loading} className="w-full bg-bg-dark text-white rounded-xl py-2.5 font-medium hover:bg-bg-dark/90 transition-colors disabled:opacity-60">
+                  {loading ? "Checking…" : "Continue"}
+                </button>
+                <div className="flex justify-center text-sm mt-4">
+                  <button type="button" onClick={() => navigate('/login')} className="text-ink-secondary hover:underline">← Back to role selection</button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={handleOtp} className="space-y-4">
+                <div className="flex items-center gap-2 text-academic-green text-sm bg-emerald-50 rounded-xl px-3 py-2">
+                  <ShieldCheck size={16} /> Credentials verified — enter your OTP below
+                </div>
+                {emailSent ? (
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2 text-xs text-emerald-800">
+                    <strong>OTP sent:</strong> A 6-digit code has been emailed to <strong>{email}</strong>. Check your inbox (and spam folder) — it expires in 5 minutes.
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-ink-primary">Password (*)</label>
-                    <input required type="password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none" placeholder="••••••••" />
+                ) : (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-800">
+                    <strong>Note:</strong> The OTP could not be emailed right now. Contact the administrator for your one-time code.
                   </div>
-                  <button disabled={loading} className="w-full bg-bg-dark text-white rounded-xl py-2.5 font-medium hover:bg-bg-dark/90 transition-colors disabled:opacity-60">
-                    {loading ? "Checking…" : "Continue"}
-                  </button>
-                  
-                </form>
-              ) : (
-                <form onSubmit={handleOtp} className="space-y-4">
-                  <div className="flex items-center gap-2 text-academic-green text-sm bg-emerald-50 rounded-xl px-3 py-2">
-                    <ShieldCheck size={16} /> OTP sent to your registered email
-                  </div>
-                  <div>
-                    <label className="text-sm font-medium text-ink-primary">6-digit code (*)</label>
-                    <input
-                      required
-                      maxLength={6}
-                      value={otp}
-                      onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                      className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-center tracking-[0.5em] text-lg font-numeric focus-ring outline-none ${
-                        validationErrors.otp ? "border-danger" : "border-slate-200"
+                )}
+                <div>
+                  <label className="text-sm font-medium text-ink-primary">6-digit code (*)</label>
+                  <input
+                    required
+                    maxLength={6}
+                    value={otp}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
+                    className={`mt-1 w-full rounded-xl border px-3 py-2.5 text-center tracking-[0.5em] text-lg font-numeric focus-ring outline-none ${validationErrors.otp ? "border-danger" : "border-slate-200"
                       }`}
-                      placeholder="••••••"
-                    />
-                    {validationErrors.otp && (
-                      <p className="text-xs text-danger mt-1 text-center tracking-normal">{validationErrors.otp}</p>
-                    )}
-                  </div>
-                  <button disabled={loading} className="w-full bg-bg-dark text-white rounded-xl py-2.5 font-medium hover:bg-bg-dark/90 transition-colors disabled:opacity-60">
-                    {loading ? "Verifying…" : "Verify & continue"}
-                  </button>
-                  <div className="flex justify-between text-sm">
-                    <button type="button" onClick={() => setStep(1)} className="text-ink-secondary hover:underline">← Back</button>
-                    <button type="button" onClick={handleResend} className="text-academic-blue hover:underline">Resend code</button>
-                  </div>
-                </form>
-              )}
-            </div>
-          
+                    placeholder="••••••"
+                  />
+                  {validationErrors.otp && (
+                    <p className="text-xs text-danger mt-1 text-center tracking-normal">{validationErrors.otp}</p>
+                  )}
+                </div>
+                <button disabled={loading} className="w-full bg-bg-dark text-white rounded-xl py-2.5 font-medium hover:bg-bg-dark/90 transition-colors disabled:opacity-60">
+                  {loading ? "Verifying…" : "Verify & continue"}
+                </button>
+                <div className="flex justify-between text-sm">
+                  <button type="button" onClick={() => setStep(1)} className="text-ink-secondary hover:underline">← Back</button>
+                  <button type="button" onClick={handleResend} className="text-academic-blue hover:underline">Resend code</button>
+                </div>
+              </form>
+            )}
+          </div>
+
         </div>
       </div>
     </div>

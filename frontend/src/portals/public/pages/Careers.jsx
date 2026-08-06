@@ -10,7 +10,9 @@ import {
   Clock,
   ArrowRight,
   CheckCircle2,
+  X,
 } from 'lucide-react'
+import { useState } from 'react'
 import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
@@ -69,6 +71,30 @@ const BENEFITS = [
 export default function Careers() {
   const { data, loading } = useFetch(fetchJobs, [])
   const jobs = data && data.length > 0 ? data : fallbackJobs
+
+  const [selectedJob, setSelectedJob] = useState(null)
+  const [formData, setFormData] = useState({ applicant_name: '', email: '', phone: '', cover_letter: '' })
+  const [resumeFile, setResumeFile] = useState(null)
+  const [applying, setApplying] = useState(false)
+  const [success, setSuccess] = useState(false)
+
+  const handleApply = async (e) => {
+    e.preventDefault()
+    setApplying(true)
+    try {
+      const data = new FormData()
+      data.append('job_posting', selectedJob.id)
+      Object.keys(formData).forEach(k => data.append(k, formData[k]))
+      if (resumeFile) data.append('resume_file', resumeFile)
+      
+      await cmsApi.submitJobApplication(data)
+      setSuccess(true)
+    } catch (err) {
+      console.error(err)
+      alert('Failed to submit application. Please try again.')
+    }
+    setApplying(false)
+  }
 
   return (
     <main className="bg-white">
@@ -254,12 +280,12 @@ export default function Careers() {
                     </div>
                   </div>
 
-                  <Link
-                    to="/contact"
+                  <button
+                    onClick={() => { setSelectedJob(job); setSuccess(false); }}
                     className="inline-flex items-center gap-2 font-subheading font-bold text-accent hover:text-primary transition-colors"
                   >
-                    Apply / Contact HR <Send size={16} />
-                  </Link>
+                    Apply Now <Send size={16} />
+                  </button>
                 </div>
               </FadeIn>
             ))}
@@ -285,6 +311,60 @@ export default function Careers() {
           </FadeIn>
         </div>
       </section>
+
+      {/* Apply Modal */}
+      {selectedJob && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white p-6 border-b flex justify-between items-center z-10 rounded-t-3xl">
+              <h3 className="text-2xl font-bold font-heading">Apply for {selectedJob.title}</h3>
+              <button onClick={() => setSelectedJob(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={24} /></button>
+            </div>
+            <div className="p-6">
+              {success ? (
+                <div className="text-center py-10">
+                  <CheckCircle2 size={64} className="mx-auto text-green-500 mb-4" />
+                  <h4 className="text-2xl font-bold mb-2">Application Submitted!</h4>
+                  <p className="text-text-secondary mb-6">Thank you for your interest in joining EduNova. Our HR team will review your application and get back to you soon.</p>
+                  <button onClick={() => setSelectedJob(null)} className="btn-primary">Close</button>
+                </div>
+              ) : (
+                <form onSubmit={handleApply} className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Full Name *</label>
+                      <input type="text" required className="w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors" value={formData.applicant_name} onChange={e => setFormData({...formData, applicant_name: e.target.value})} />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold mb-1">Email Address *</label>
+                      <input type="email" required className="w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Phone Number *</label>
+                    <input type="tel" required className="w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Cover Letter</label>
+                    <textarea rows="4" className="w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors" value={formData.cover_letter} onChange={e => setFormData({...formData, cover_letter: e.target.value})}></textarea>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-semibold mb-1">Resume (PDF/Doc) *</label>
+                    <input type="file" required accept=".pdf,.doc,.docx" className="w-full border rounded-xl p-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20 transition-colors" onChange={e => setResumeFile(e.target.files[0])} />
+                  </div>
+                  <div className="pt-4 border-t flex justify-end gap-3">
+                    <button type="button" onClick={() => setSelectedJob(null)} className="px-6 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button type="submit" disabled={applying} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
+                      {applying ? 'Submitting...' : 'Submit Application'}
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </main>
   )
 }

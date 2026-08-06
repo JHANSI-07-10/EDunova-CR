@@ -23,6 +23,10 @@ export default function Payroll() {
   }
 
   async function save(record) {
+    const allowances = parseFloat(record.allowances);
+    const deductions = parseFloat(record.deductions);
+    if (isNaN(allowances) || allowances < 0) { setToast("Allowances must be a non-negative number."); return; }
+    if (isNaN(deductions) || deductions < 0) { setToast("Deductions must be a non-negative number."); return; }
     try {
       await api.patch("/admin-portal/payroll/", {
         id: record.id,

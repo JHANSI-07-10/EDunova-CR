@@ -13,21 +13,21 @@ const fallbackNews = [
     title: 'EduNova Launches Digital Learning Enhancement Program',
     content: 'EduNova Global Academy continues its digital transformation with smart classrooms, online assessments, and learning analytics.',
     published_date: '2026-06-10',
-    cover_image: '/Campus.jpeg',
+    cover_image: '/images/Campus.jpeg',
   },
   {
     id: '2',
     title: 'Students Participate in STEM and Robotics Innovation Week',
     content: 'Students explored robotics, innovation challenges, project-based learning, and collaborative STEM activities.',
     published_date: '2026-06-18',
-    cover_image: '/student.jpeg',
+    cover_image: '/images/student.jpeg',
   },
   {
     id: '3',
     title: 'Academic Excellence Program Announced for Board Preparation',
     content: 'EduNova introduces structured academic support, mentoring, and exam readiness programs for senior students.',
     published_date: '2026-06-25',
-    cover_image: '/building.jpeg',
+    cover_image: '/images/building.jpeg',
   },
 ]
 
@@ -41,7 +41,7 @@ export default function News() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/building.jpeg"
+          src="/images/building.jpeg"
           alt="EduNova News"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -79,7 +79,7 @@ export default function News() {
               <div className="grid lg:grid-cols-2 gap-10 items-center mb-14">
                 <div className="relative rounded-3xl overflow-hidden shadow-2xl">
                   <img
-                    src={getMediaUrl(featured.cover_image || featured.image) || '/Campus.jpeg'}
+                    src={getMediaUrl(featured.cover_image || featured.image) || '/images/Campus.jpeg'}
                     alt={featured.title}
                     className="w-full h-[420px] object-cover"
                   />
@@ -125,7 +125,7 @@ export default function News() {
                   <article className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
                     <div className="relative h-56 overflow-hidden">
                       <img
-                        src={getMediaUrl(post.cover_image || post.image) || '/student.jpeg'}
+                        src={getMediaUrl(post.cover_image || post.image) || '/images/student.jpeg'}
                         alt={post.title}
                         className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                       />

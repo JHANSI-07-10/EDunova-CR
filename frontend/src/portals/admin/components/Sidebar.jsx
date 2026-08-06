@@ -1,8 +1,7 @@
 import {
   LayoutDashboard, UserPlus, Users, School, BookOpen, Wallet, Bus,
   LibraryBig, Megaphone, CalendarClock, BarChart3, ShieldCheck, LogOut, X, Database,
-  BedDouble, Boxes, ScanFace, GraduationCap, Stethoscope, Trophy, Banknote, KeyRound, MapPin,
-  CalendarDays
+  BedDouble, Boxes, ScanFace, GraduationCap, Stethoscope, Trophy, Banknote, KeyRound, MapPin, CalendarDays, Briefcase,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -12,13 +11,14 @@ const NAV = [
   { to: "/admin/admissions", label: "Admissions", icon: UserPlus },
   { to: "/admin/users", label: "Users & Roles", icon: Users },
   { to: "/admin/roles-permissions", label: "Roles & Permissions", icon: KeyRound },
+  { to: "/admin/recruitment", label: "Recruitment", icon: Briefcase },
   { to: "/admin/classes", label: "Classes & Subjects", icon: School },
-  { to: "/admin/timetable", label: "Timetables", icon: CalendarDays },
+  { to: "/admin/timetable", label: "Timetable", icon: CalendarDays },
   { to: "/admin/lms", label: "LMS Monitor", icon: BookOpen },
   { to: "/admin/fees", label: "Fees", icon: Wallet },
   { to: "/admin/scholarships", label: "Scholarships", icon: Trophy },
   { to: "/admin/payroll", label: "Payroll", icon: Banknote },
-  { to: "/admin/examinations", label: "Examinations Setup", icon: BookOpen },
+  { to: "/admin/examinations", label: "Examinations", icon: BookOpen },
   { to: "/admin/exam-results", label: "Rank Lists & Report Cards", icon: Trophy },
   { to: "/admin/transport", label: "Transport", icon: Bus },
   { to: "/admin/library", label: "Library", icon: LibraryBig },
@@ -28,6 +28,7 @@ const NAV = [
   { to: "/admin/alumni", label: "Alumni Registry", icon: GraduationCap },
   { to: "/admin/medical-records", label: "Medical Records", icon: Stethoscope },
   { to: "/admin/notices", label: "Notices", icon: Megaphone },
+  { to: "/admin/news-and-events", label: "News & Events", icon: Megaphone },
   { to: "/admin/leaves", label: "Leave Approvals", icon: CalendarClock },
   { to: "/admin/reports", label: "Reports", icon: BarChart3 },
   { to: "/admin/audit-log", label: "Audit Log", icon: ShieldCheck },

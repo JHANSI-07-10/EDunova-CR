@@ -21,6 +21,7 @@ import Feedback from "./pages/Feedback";
 import Profile from "./pages/Profile";
 import LmsProgress from "./pages/LmsProgress";
 import Scholarships from "./pages/Scholarships";
+import Timetable from "./pages/Timetable";
 
 export default function ParentRoutes() {
   return (
@@ -36,6 +37,7 @@ export default function ParentRoutes() {
         >
           <Route index element={<Dashboard />} />
           <Route path="attendance" element={<Attendance />} />
+          <Route path="timetable" element={<Timetable />} />
           <Route path="homework" element={<Homework />} />
           <Route path="results" element={<Results />} />
           <Route path="fees" element={<Fees />} />

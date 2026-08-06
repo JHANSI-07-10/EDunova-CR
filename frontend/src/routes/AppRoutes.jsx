@@ -5,6 +5,10 @@ import Home from '../portals/public/Home'
 import About from '../portals/public/pages/About'
 import Admissions from '../portals/public/pages/Admissions'
 import Academics from '../portals/public/pages/Academics'
+import ClassesPublic from '../portals/public/pages/Classes'
+import ClassDetail from '../portals/public/pages/ClassDetail'
+import Subjects from '../portals/public/pages/Subjects'
+import SubjectDetail from '../portals/public/pages/SubjectDetail'
 import Departments from '../portals/public/pages/Departments'
 import Faculty from '../portals/public/pages/Faculty'
 import Infrastructure from '../portals/public/pages/Infrastructure'
@@ -54,6 +58,10 @@ export default function AppRoutes() {
           <Route path="/about" element={<About />} />
           <Route path="/admissions" element={<Admissions />} />
           <Route path="/academics" element={<Academics />} />
+          <Route path="/academics/classes" element={<ClassesPublic />} />
+          <Route path="/academics/classes/:id" element={<ClassDetail />} />
+          <Route path="/academics/subjects" element={<Subjects />} />
+          <Route path="/academics/subjects/:id" element={<SubjectDetail />} />
           <Route path="/departments" element={<Departments />} />
           <Route path="/faculty" element={<Faculty />} />
           <Route path="/infrastructure" element={<Infrastructure />} />

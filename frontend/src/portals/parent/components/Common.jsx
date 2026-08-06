@@ -27,10 +27,13 @@ export function Card({ children, className = "" }) {
   return <div className={`bg-white rounded-card shadow-card p-5 ${className}`}>{children}</div>;
 }
 
-export function SectionTitle({ children, action }) {
+export function SectionTitle({ children, action, icon: Icon }) {
   return (
     <div className="flex items-center justify-between mb-3">
-      <h2 className="font-heading font-semibold text-ink-primary">{children}</h2>
+      <h2 className="font-heading font-semibold text-ink-primary flex items-center gap-2">
+        {Icon && <Icon size={18} className="text-slate-400" />}
+        {children}
+      </h2>
       {action}
     </div>
   );

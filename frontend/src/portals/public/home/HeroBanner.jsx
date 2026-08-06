@@ -13,7 +13,7 @@ export default function HeroBanner() {
   return (
     <section className="relative overflow-hidden text-white min-h-[88vh] flex items-center bg-primary">
       <img
-        src="/campus-building-1.jpeg"
+        src="/images/campus-building-1.jpeg"
         alt="EduNova Global Academy campus"
         className="absolute inset-0 w-full h-full object-cover brightness-110 contrast-110 saturate-125"
       />
@@ -28,14 +28,6 @@ export default function HeroBanner() {
           <p className="inline-flex items-center gap-2 font-subheading font-semibold text-highlight mb-5 uppercase tracking-wide text-sm bg-white/20 px-4 py-2 rounded-full backdrop-blur-md border border-white/30 shadow-lg">
             <Sparkles size={15} /> Inspiring Minds. Building Futures.
           </p>
-          
-          <div className="mb-6 relative w-32 h-32 md:w-40 md:h-40">
-            <img 
-              src="/logo.png" 
-              alt="EduNova Animated Logo" 
-              className="absolute inset-0 w-full h-full object-contain drop-shadow-2xl animate-[spin_10s_linear_infinite]" 
-            />
-          </div>
 
           <h1 className="font-heading text-4xl md:text-5xl lg:text-6xl font-extrabold leading-tight mb-6 drop-shadow-2xl">
             Where Academic

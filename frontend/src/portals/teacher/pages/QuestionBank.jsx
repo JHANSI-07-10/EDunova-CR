@@ -25,7 +25,7 @@ export default function QuestionBank() {
   }, []);
 
   async function remove(id) {
-    await api.delete(`/teacher/question-bank/${id}/`);
+    await api.delete(`/teacher/question-bank/?id=${id}`);
     load();
   }
 

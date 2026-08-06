@@ -37,7 +37,7 @@ export default function AboutSchoolSnippet() {
 
             <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-gray-100">
               <img
-                src="/Campus.jpeg"
+                src="/images/Campus.jpeg"
                 alt="EduNova Global Academy Campus"
                 className="w-full h-[380px] object-cover"
               />

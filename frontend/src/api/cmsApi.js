@@ -17,6 +17,7 @@ export const cmsApi = {
   getFAQs: () => client.get('/cms/faqs/').then(r => r.data.results || []),
   getDocuments: (audience = 'public') => client.get(`/cms/documents/?audience=${audience}`).then(r => r.data.results || []),
   getJobs: () => client.get('/cms/jobs/').then(r => r.data.results || []),
-  getScholarships: () => client.get('/cms/scholarships/').then(r => r.data.results || []),
+  submitJobApplication: (formData) => client.post('/cms/jobs/apply/', formData, { headers: { 'Content-Type': 'multipart/form-data' } }).then(r => r.data),
+  getScholarships: () => client.get('/cms/scholarships/').then(r => Array.isArray(r.data) ? r.data : (r.data.results || [])),
   submitContact: (payload) => client.post('/cms/contact/', payload).then(r => r.data),
 }

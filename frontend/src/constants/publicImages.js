@@ -3,11 +3,11 @@ export const publicImages = {
   walkingVideo: '/videos/walking.mp4',
   paintingVideo: '/videos/painting.mp4',
 
-  campus: '/Campus.jpeg',
-  building: '/building.jpeg',
-  exterior: '/exterior.jpeg',
-  edunova: '/EduNova.jpeg',
-  student: '/student.jpeg',
+  campus: '/images/Campus.jpeg',
+  building: '/images/building.jpeg',
+  exterior: '/images/exterior.jpeg',
+  edunova: '/images/EduNova.jpeg',
+  student: '/images/student.jpeg',
 
   campusBuilding1: '/images/campus-building-1.jpeg',
   campusBuilding2: '/images/campus-building-2.jpeg',

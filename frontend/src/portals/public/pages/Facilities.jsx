@@ -19,49 +19,49 @@ const FACILITIES = [
     title: 'Smart Classrooms',
     desc: 'Technology-enabled classrooms with digital boards, multimedia learning, and interactive teaching.',
     icon: Monitor,
-    image: '/tablet-learning.jpeg',
+    image: '/images/tablet-learning.jpeg',
   },
   {
     title: 'Science Labs',
     desc: 'Modern laboratories for Physics, Chemistry, Biology, practical learning, and experimentation.',
     icon: FlaskConical,
-    image: '/physics-2.jpeg',
+    image: '/images/physics-2.jpeg',
   },
   {
     title: 'Computer Labs',
     desc: 'Advanced computer labs supporting digital literacy, coding, online learning, and academic technology.',
     icon: Cpu,
-    image: '/student-1.jpeg',
+    image: '/images/student-1.jpeg',
   },
   {
     title: 'Innovation Centers',
     desc: 'Creative spaces for research, projects, STEM learning, and student innovation.',
     icon: Lightbulb,
-    image: '/physics-1.jpeg',
+    image: '/images/physics-1.jpeg',
   },
   {
     title: 'Robotics Lab',
     desc: 'Hands-on robotics and STEM-based learning to develop problem-solving and technical skills.',
     icon: Bot,
-    image: '/physics-3.jpeg',
+    image: '/images/physics-3.jpeg',
   },
   {
     title: 'Digital Library',
     desc: 'Physical and digital learning resources, e-books, reference materials, and academic support.',
     icon: BookOpenText,
-    image: '/library-1.jpeg',
+    image: '/images/library-1.jpeg',
   },
   {
     title: 'Sports Complex',
     desc: 'Facilities for indoor and outdoor sports, fitness, teamwork, discipline, and physical development.',
     icon: Dumbbell,
-    image: '/trophy-1.jpeg',
+    image: '/images/trophy-1.jpeg',
   },
   {
     title: 'Medical Center',
     desc: 'Student health support, wellness checks, basic medical assistance, and emergency care coordination.',
     icon: Stethoscope,
-    image: '/campus-building-4.jpeg',
+    image: '/images/campus-building-4.jpeg',
   },
 ]
 
@@ -70,7 +70,7 @@ export default function Facilities() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/building.jpeg"
+          src="/images/building.jpeg"
           alt="EduNova campus facilities"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -146,7 +146,7 @@ export default function Facilities() {
         <FadeIn delay={100}>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/Campus.jpeg"
+              src="/images/Campus.jpeg"
               alt="EduNova campus"
               className="w-full h-[430px] object-cover"
             />

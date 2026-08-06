@@ -5,7 +5,7 @@ import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../compone
 import api from "../lib/api";
 import {
   Download, Send, X, ArrowRight, BookOpen, CalendarCheck, FileSpreadsheet,
-  TrendingUp, User, Award, ShieldAlert, CheckCircle2, AlertCircle
+  TrendingUp, User, Award, ShieldAlert, CheckCircle2, AlertCircle, Loader2
 } from "lucide-react";
 import { isNonEmptyString } from "../../../utils/validation";
 

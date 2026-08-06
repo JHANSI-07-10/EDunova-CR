@@ -27,10 +27,12 @@ import ExamResults from "./pages/ExamResults";
 import Payroll from "./pages/Payroll";
 import RolesPermissions from "./pages/RolesPermissions";
 import LmsMonitor from "./pages/LmsMonitor";
+import LmsSettings from "./pages/LmsSettings";
+import NewsAndEvents from "./pages/NewsAndEvents";
 import Campuses from "./pages/Campuses";
 import Scholarships from "./pages/Scholarships";
-
 import Timetable from "./pages/Timetable";
+import Recruitment from "./pages/Recruitment";
 
 export default function AdminRoutes() {
   return (
@@ -51,9 +53,11 @@ export default function AdminRoutes() {
           <Route path="classes" element={<Classes />} />
           <Route path="timetable" element={<Timetable />} />
           <Route path="lms" element={<LmsMonitor />} />
+          <Route path="lms/settings" element={<LmsSettings />} />
           <Route path="fees" element={<Fees />} />
           <Route path="scholarships" element={<Scholarships />} />
           <Route path="notices" element={<Notices />} />
+          <Route path="news-and-events" element={<NewsAndEvents />} />
           <Route path="leaves" element={<Leaves />} />
           <Route path="reports" element={<Reports />} />
           <Route path="audit-log" element={<AuditLog />} />
@@ -69,10 +73,10 @@ export default function AdminRoutes() {
           <Route path="exam-results" element={<ExamResults />} />
           <Route path="payroll" element={<Payroll />} />
           <Route path="campuses" element={<Campuses />} />
+          <Route path="recruitment" element={<Recruitment />} />
           <Route path="*" element={<PortalNotFound homePath="/admin" />} />
         </Route>
       </Routes>
     </AuthProvider>
   );
 }
-

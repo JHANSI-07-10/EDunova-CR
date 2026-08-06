@@ -15,14 +15,15 @@ import {
   Settings,
   Shield,
   Layers,
-  MapPin
+  MapPin,
+  CheckCircle2
 } from 'lucide-react'
 import FadeIn from '../../../components/FadeIn'
 
 const LEADERSHIP = [
   { name: 'Dr. Rajesh Malhotra', role: 'Founder & Chairman' },
   { name: 'Anita Kapoor', role: 'Managing Director' },
-  { name: 'Dr. Meera Sharma', role: 'Principal' },
+  { name: 'Dr. Meera Sharma', role: 'Principal', image: '/images/meera.jpeg' },
   { name: 'Arjun Verma', role: 'Academic Director' },
   { name: 'Nisha Bansal', role: 'Vice Principal' },
   { name: 'Rohan Khanna', role: 'IT Director' },
@@ -73,7 +74,7 @@ export default function About() {
       {/* Hero Section */}
       <section className="relative overflow-hidden text-white bg-primary">
         <img
-          src="/Campus.jpeg"
+          src="/images/Campus.jpeg"
           alt="EduNova Global Academy Campus"
           className="absolute inset-0 w-full h-full object-cover brightness-[0.4]"
         />
@@ -135,7 +136,7 @@ export default function About() {
         <FadeIn delay={100}>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/EduNova.jpeg"
+              src="/images/EduNova.jpeg"
               alt="EduNova Classroom"
               className="w-full h-[450px] object-cover"
             />
@@ -276,9 +277,13 @@ export default function About() {
             {LEADERSHIP.map((member, idx) => (
               <FadeIn key={member.name} delay={idx * 40}>
                 <div className="bg-white rounded-2xl p-6 text-center border border-slate-200/50 shadow-sm hover:shadow-md transition-all duration-300">
-                  <div className="w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">
-                    {member.name.split(' ').map(n => n[0]).join('')}
-                  </div>
+                  {member.image ? (
+                    <img src={member.image} alt={member.name} className="w-14 h-14 rounded-full object-cover mx-auto mb-4 border-2 border-primary/20" />
+                  ) : (
+                    <div className="w-14 h-14 bg-primary/10 text-primary rounded-full flex items-center justify-center mx-auto mb-4 text-lg font-bold">
+                      {member.name.split(' ').map(n => n[0]).join('')}
+                    </div>
+                  )}
                   <h4 className="font-heading font-bold text-base text-ink-primary">{member.name}</h4>
                   <p className="text-xs text-secondary font-semibold mt-1">{member.role}</p>
                 </div>

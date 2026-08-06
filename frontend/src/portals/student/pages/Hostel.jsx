@@ -56,8 +56,8 @@ export default function Hostel() {
       .then(({ data }) => {
         setData(data);
         if (!data || !data.allocation) {
-          // If not allocated, load available hostels and past applications
-          api.get("/admin-portal/hostels/").then(res => setHostels(res.data)).catch(() => {});
+          // Use available hostels from student endpoint
+          if (data.available_hostels) setHostels(data.available_hostels);
           api.get("/hostels/applications/").then(res => setApplications(res.data)).catch(() => {});
         }
       })

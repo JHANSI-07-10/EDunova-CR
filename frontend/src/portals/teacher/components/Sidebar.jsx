@@ -15,6 +15,7 @@ const NAV = [
   { to: "/teacher/assignments", label: "Assignments", icon: BookOpenCheck },
   { to: "/teacher/question-bank", label: "Question Bank", icon: FileStack },
   { to: "/teacher/exams", label: "Exam Creation", icon: ScrollText },
+  { to: "/teacher/invigilation", label: "Invigilation Duties", icon: ClipboardList },
   { to: "/teacher/marks-entry", label: "Marks Entry", icon: ClipboardList },
   { to: "/teacher/performance", label: "Student Performance", icon: GraduationCap },
   { to: "/teacher/messages", label: "Messages", icon: Mail },

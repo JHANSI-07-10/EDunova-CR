@@ -2,14 +2,12 @@ import { Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader } from "../components/Common";
-import { isNonEmptyString } from "../../../utils/validation";
 
 export default function Messages() {
   const [teachers, setTeachers] = useState(null);
   const [activeTeacher, setActiveTeacher] = useState(null);
   const [thread, setThread] = useState([]);
   const [text, setText] = useState("");
-  const [sendError, setSendError] = useState("");
   const bottomRef = useRef(null);
 
   useEffect(() => {
@@ -30,13 +28,15 @@ export default function Messages() {
 
   async function send(e) {
     e.preventDefault();
-    if (!isNonEmptyString(text)) { setSendError("Message cannot be empty."); return; }
-    if (!activeTeacher) return;
-    setSendError("");
-    await api.post("/parent/messages/", { receiver: activeTeacher.id, message_text: text });
-    setText("");
-    const { data } = await api.get(`/parent/messages/?with=${activeTeacher.id}`);
-    setThread(data);
+    if (!text.trim() || !activeTeacher) return;
+    try {
+      await api.post("/parent/messages/", { receiver: activeTeacher.id, message_text: text });
+      setText("");
+      const { data } = await api.get(`/parent/messages/?with=${activeTeacher.id}`);
+      setThread(data);
+    } catch {
+      // message failed — keep text so user can retry
+    }
   }
 
   if (!teachers) return <Loader rows={4} />;
@@ -72,17 +72,14 @@ export default function Messages() {
           ))}
           <div ref={bottomRef} />
         </div>
-        <form onSubmit={send} className="flex gap-2 flex-col">
-          {sendError && <p className="text-xs text-danger">{sendError}</p>}
-          <div className="flex gap-2">
-            <input
-              value={text}
-              onChange={(e) => { setText(e.target.value); if (sendError) setSendError(""); }}
-              placeholder="Type a message…"
-              className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none"
-            />
-            <button className="bg-academic-green text-white px-4 rounded-xl"><Send size={16} /></button>
-          </div>
+        <form onSubmit={send} className="flex gap-2">
+          <input
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            placeholder="Type a message…"
+            className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none"
+          />
+          <button className="bg-academic-green text-white px-4 rounded-xl"><Send size={16} /></button>
         </form>
       </Card>
     </div>

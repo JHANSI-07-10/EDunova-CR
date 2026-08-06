@@ -13,14 +13,14 @@ import { Link } from 'react-router-dom'
 import FadeIn from '../../../components/FadeIn'
 
 const FACILITIES = [
-  { name: 'Smart Classrooms', icon: Monitor, desc: 'Technology-enabled digital classrooms for interactive learning.', image: '/tablet-learning.jpeg' },
-  { name: 'Science Labs', icon: FlaskConical, desc: 'Modern science labs for practical experiments and innovation.', image: '/physics-2.jpeg' },
-  { name: 'Computer Labs', icon: Cpu, desc: 'Advanced computer labs supporting digital learning and coding.', image: '/student-1.jpeg' },
-  { name: 'Innovation Centers', icon: Lightbulb, desc: 'Creative spaces for research, projects, and future-ready learning.', image: '/physics-1.jpeg' },
-  { name: 'Robotics Lab', icon: Bot, desc: 'Robotics and STEM learning for problem-solving skills.', image: '/physics-3.jpeg' },
-  { name: 'Digital Library', icon: BookOpenText, desc: 'Digital resources, e-books, and academic learning support.', image: '/library-1.jpeg' },
-  { name: 'Sports Complex', icon: Dumbbell, desc: 'Sports facilities for physical development and discipline.', image: '/trophy-1.jpeg' },
-  { name: 'Medical Center', icon: Stethoscope, desc: 'Health support and student wellness facilities on campus.', image: '/campus-building-4.jpeg' },
+  { name: 'Smart Classrooms', icon: Monitor, desc: 'Technology-enabled digital classrooms for interactive learning.', image: '/images/tablet-learning.jpeg' },
+  { name: 'Science Labs', icon: FlaskConical, desc: 'Modern science labs for practical experiments and innovation.', image: '/images/physics-2.jpeg' },
+  { name: 'Computer Labs', icon: Cpu, desc: 'Advanced computer labs supporting digital learning and coding.', image: '/images/student-1.jpeg' },
+  { name: 'Innovation Centers', icon: Lightbulb, desc: 'Creative spaces for research, projects, and future-ready learning.', image: '/images/physics-1.jpeg' },
+  { name: 'Robotics Lab', icon: Bot, desc: 'Robotics and STEM learning for problem-solving skills.', image: '/images/physics-3.jpeg' },
+  { name: 'Digital Library', icon: BookOpenText, desc: 'Digital resources, e-books, and academic learning support.', image: '/images/library-1.jpeg' },
+  { name: 'Sports Complex', icon: Dumbbell, desc: 'Sports facilities for physical development and discipline.', image: '/images/trophy-1.jpeg' },
+  { name: 'Medical Center', icon: Stethoscope, desc: 'Health support and student wellness facilities on campus.', image: '/images/campus-building-4.jpeg' },
 ]
 
 export default function FacilitiesGrid() {
@@ -62,7 +62,7 @@ export default function FacilitiesGrid() {
 
               <div className="relative rounded-3xl overflow-hidden shadow-2xl border border-white">
                 <img
-                  src="/building.jpeg"
+                  src="/images/building.jpeg"
                   alt="EduNova modern campus facilities"
                   className="w-full h-[400px] object-cover"
                 />

@@ -52,7 +52,7 @@ export default function Infrastructure() {
       {/* Hero */}
       <section className="relative overflow-hidden text-white">
         <img
-          src="/building.jpeg"
+          src="/images/building.jpeg"
           alt="EduNova infrastructure"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -134,7 +134,7 @@ export default function Infrastructure() {
 
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
               <img
-                src="/Campus.jpeg"
+                src="/images/Campus.jpeg"
                 alt="EduNova campus"
                 className="w-full h-[430px] object-cover"
               />
@@ -206,7 +206,7 @@ export default function Infrastructure() {
         <FadeIn>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/exterior.jpeg"
+              src="/images/exterior.jpeg"
               alt="EduNova exterior infrastructure"
               className="w-full h-[420px] object-cover"
             />

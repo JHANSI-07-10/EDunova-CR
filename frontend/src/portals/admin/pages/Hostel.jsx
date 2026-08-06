@@ -6,6 +6,7 @@ import {
 import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard, Toast } from "../components/Common";
+import { isNonEmptyString } from "../../../utils/validation";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -161,7 +162,8 @@ function HostelsTab({ hostels, refresh, setToast }) {
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    if (!form.name.trim()) return;
+    if (!isNonEmptyString(form.name)) { setToast("Hostel name is required."); return; }
+    if (!isNonEmptyString(form.type)) { setToast("Hostel type is required."); return; }
     setSaving(true);
     try {
       if (modal === "add") await api.post("/admin-portal/hostels/", form);
@@ -249,7 +251,10 @@ function RoomsTab({ rooms, hostels, refresh, setToast }) {
   const [saving, setSaving] = useState(false);
 
   async function save() {
-    if (!form.hostel_id || !form.room_number.trim()) return;
+    if (!form.hostel_id) { setToast("Please select a hostel."); return; }
+    if (!isNonEmptyString(form.room_number)) { setToast("Room number is required."); return; }
+    const cap = parseInt(form.capacity);
+    if (isNaN(cap) || cap < 1) { setToast("Capacity must be at least 1."); return; }
     setSaving(true);
     try {
       if (modal === "add") await api.post("/admin-portal/rooms/", form);

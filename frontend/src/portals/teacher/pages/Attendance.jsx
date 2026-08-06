@@ -71,6 +71,8 @@ export default function Attendance() {
         records: rows.map((r) => ({ student: r.student, status: r.status, remarks: r.remarks })),
       });
       setToast(data.detail);
+    } catch (err) {
+      setToast(err?.response?.data?.detail || "Could not save attendance.");
     } finally {
       setSaving(false);
     }

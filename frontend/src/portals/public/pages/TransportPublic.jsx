@@ -49,7 +49,7 @@ export default function TransportPublic() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/exterior.jpeg"
+          src="/images/exterior.jpeg"
           alt="EduNova transport"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -125,7 +125,7 @@ export default function TransportPublic() {
         <FadeIn delay={100}>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/Campus.jpeg"
+              src="/images/Campus.jpeg"
               alt="EduNova transport service"
               className="w-full h-[430px] object-cover"
             />

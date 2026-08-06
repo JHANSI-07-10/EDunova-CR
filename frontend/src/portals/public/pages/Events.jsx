@@ -14,7 +14,7 @@ const fallbackEvents = [
     description: 'Students present robotics, science, technology, and innovation projects.',
     event_date: '2026-07-12',
     venue: 'Innovation Center',
-    cover_image: '/student.jpeg',
+    cover_image: '/images/student.jpeg',
   },
   {
     id: '2',
@@ -22,7 +22,7 @@ const fallbackEvents = [
     description: 'A celebration of fitness, discipline, teamwork, sportsmanship, and student achievement.',
     event_date: '2026-08-05',
     venue: 'EduNova Sports Ground',
-    cover_image: '/Campus.jpeg',
+    cover_image: '/images/Campus.jpeg',
   },
   {
     id: '3',
@@ -30,7 +30,7 @@ const fallbackEvents = [
     description: 'Orientation for parents about digital learning, LMS, assessments, and communication systems.',
     event_date: '2026-08-20',
     venue: 'Main Auditorium',
-    cover_image: '/building.jpeg',
+    cover_image: '/images/building.jpeg',
   },
 ]
 
@@ -42,7 +42,7 @@ export default function Events() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/exterior.jpeg"
+          src="/images/exterior.jpeg"
           alt="EduNova Events"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -99,7 +99,7 @@ export default function Events() {
                 <article className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
                   <div className="relative h-64 overflow-hidden">
                     <img
-                      src={getMediaUrl(event.cover_image || event.image) || '/Campus.jpeg'}
+                      src={getMediaUrl(event.cover_image || event.image) || '/images/Campus.jpeg'}
                       alt={event.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
@@ -146,7 +146,7 @@ export default function Events() {
           <FadeIn>
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
               <img
-                src="/student.jpeg"
+                src="/images/student.jpeg"
                 alt="EduNova student events"
                 className="w-full h-[420px] object-cover"
               />

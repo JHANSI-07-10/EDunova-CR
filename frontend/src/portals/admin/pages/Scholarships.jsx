@@ -29,19 +29,19 @@ export default function Scholarships() {
 
   function loadSchemes() {
     api.get("/cms/scholarships/")
-      .then(({ data }) => setPrograms(data || []))
+      .then(({ data }) => setPrograms(Array.isArray(data) ? data : data?.results || []))
       .catch(() => setPrograms([]));
   }
 
   function loadApplications() {
     api.get("/admin-portal/scholarships/")
-      .then(({ data }) => setApplications(data || []))
+      .then(({ data }) => setApplications(Array.isArray(data) ? data : data?.results || []))
       .catch(() => setApplications([]));
   }
 
   function loadRenewals() {
     api.get("/admin-portal/scholarships/renew/")
-      .then(({ data }) => setRenewals(data || []))
+      .then(({ data }) => setRenewals(Array.isArray(data) ? data : data?.results || []))
       .catch(() => setRenewals([]));
   }
 

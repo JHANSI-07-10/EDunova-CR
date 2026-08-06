@@ -46,16 +46,17 @@ export default function LmsMonitor() {
   const stats = data.stats || {};
   const uploads = data.uploads || [];
 
+  const q = (searchQuery || "").toLowerCase();
   const filteredUploads = uploads.filter(u => 
-    u.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.teacher_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.subject_name.toLowerCase().includes(searchQuery.toLowerCase())
+    (u.title || "").toLowerCase().includes(q) ||
+    (u.teacher_name || "").toLowerCase().includes(q) ||
+    (u.subject_name || "").toLowerCase().includes(q)
   );
 
   const filteredAiLogs = aiLogs.filter(log => 
-    log.student_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.subject_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    log.question.toLowerCase().includes(searchQuery.toLowerCase())
+    (log.student_name || "").toLowerCase().includes(q) ||
+    (log.subject_name || "").toLowerCase().includes(q) ||
+    (log.question || "").toLowerCase().includes(q)
   );
 
   return (

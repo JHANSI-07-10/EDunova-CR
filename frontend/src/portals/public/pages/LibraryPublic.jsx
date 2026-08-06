@@ -49,7 +49,7 @@ export default function LibraryPublic() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/EduNova.jpeg"
+          src="/images/EduNova.jpeg"
           alt="EduNova digital library"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -125,7 +125,7 @@ export default function LibraryPublic() {
         <FadeIn delay={100}>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/student.jpeg"
+              src="/images/student.jpeg"
               alt="Students using library resources"
               className="w-full h-[430px] object-cover"
             />

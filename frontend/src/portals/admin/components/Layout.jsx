@@ -9,6 +9,8 @@ const TITLES = {
   "/users": "Users & Roles",
   "/roles-permissions": "Roles & Permissions",
   "/classes": "Classes & Subjects",
+  "/timetable": "Timetable Management",
+  "/lms": "LMS Monitor",
   "/fees": "Fees",
   "/scholarships": "Scholarships",
   "/payroll": "Payroll",

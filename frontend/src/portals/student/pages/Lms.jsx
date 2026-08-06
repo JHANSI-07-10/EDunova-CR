@@ -353,7 +353,8 @@ export default function Lms() {
             onClick={() => {
               loadCourses();
               api.get("/student/courses/").then(({ data }) => {
-                const updated = data.find(c => c.id === selectedCourse.id);
+                const list = Array.isArray(data) ? data : (data.courses || data.enrollments || []);
+                const updated = list.find(c => c.id === selectedCourse.id);
                 if (updated) setSelectedCourse(updated);
               });
               setToast("Syllabus synced with teacher updates!");

@@ -157,6 +157,8 @@ export default function Transport() {
   const [toast, setToast] = useState("");
   const [requestType, setRequestType] = useState("Route Change");
   const [requestDetails, setRequestDetails] = useState("");
+  const [complaintType, setComplaintType] = useState("Delay Issue");
+  const [complaintDetails, setComplaintDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
   function load() {
@@ -183,6 +185,24 @@ export default function Transport() {
       setRequestDetails("");
     } catch {
       setToast("Could not submit request. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleComplaint(e) {
+    e.preventDefault();
+    if (!complaintDetails.trim() || !activeChildId) return;
+    setSubmitting(true);
+    try {
+      await api.post("/parent/messages/", {
+        receiver: 1,
+        message_text: `[Parent Transport Complaint — ${complaintType} for Child ID ${activeChildId}] ${complaintDetails}`
+      });
+      setToast("Complaint ticket submitted to the Transport Desk.");
+      setComplaintDetails("");
+    } catch {
+      setToast("Could not submit complaint. Please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -342,18 +362,18 @@ export default function Transport() {
         <Card>
           <p className="font-heading font-semibold mb-1">Transport Complaint Ticket</p>
           <p className="text-sm text-ink-secondary mb-4">Report delay alerts, vehicle issues, or driver misconduct.</p>
-          <form onSubmit={handleRequest} className="space-y-3">
+          <form onSubmit={handleComplaint} className="space-y-3">
             <div className="flex gap-4 flex-wrap">
               {["Delay Issue", "Driver Complaint", "Other Incident"].map((t) => (
                 <label key={t} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
-                  <input type="radio" name="reqtype2" checked={requestType === t} onChange={() => setRequestType(t)} className="w-4 h-4 text-academic-blue" />
+                  <input type="radio" name="reqtype2" checked={complaintType === t} onChange={() => setComplaintType(t)} className="w-4 h-4 text-academic-blue" />
                   {t}
                 </label>
               ))}
             </div>
             <textarea
-              required rows={3} value={requestDetails}
-              onChange={(e) => setRequestDetails(e.target.value)}
+              required rows={3} value={complaintDetails}
+              onChange={(e) => setComplaintDetails(e.target.value)}
               placeholder="Describe the complaint or concern..."
               className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-academic-blue resize-none"
             />

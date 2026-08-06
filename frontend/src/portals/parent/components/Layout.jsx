@@ -3,6 +3,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar";
 import Topbar from "./Topbar";
 
+import GlobalPopup from "../../../components/GlobalPopup";
+
 const TITLES = {
   "/": "Dashboard",
   "/attendance": "Attendance",
@@ -34,6 +36,7 @@ export default function Layout() {
           <Outlet />
         </main>
       </div>
+      <GlobalPopup />
     </div>
   );
 }

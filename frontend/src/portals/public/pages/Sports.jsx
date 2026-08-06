@@ -50,7 +50,7 @@ export default function Sports() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/student.jpeg"
+          src="/images/student.jpeg"
           alt="EduNova Sports"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -122,7 +122,7 @@ export default function Sports() {
         <FadeIn delay={100}>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/Campus.jpeg"
+              src="/images/Campus.jpeg"
               alt="EduNova sports campus"
               className="w-full h-[430px] object-cover"
             />

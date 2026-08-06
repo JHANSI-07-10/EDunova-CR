@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import api from "../lib/api";
 import * as otpAuth from "../../../lib/useOtpAuth";
+import SessionTimeout from "../../../components/SessionTimeout";
 
 const AuthContext = createContext(null);
 
@@ -97,6 +98,7 @@ export function AuthProvider({ children }) {
     <AuthContext.Provider
       value={{ user, kids, activeChildId, selectChild, requestOtp, verifyOtp, resendOtp, logout }}
     >
+      {user && <SessionTimeout logout={logout} />}
       {children}
     </AuthContext.Provider>
   );

@@ -50,7 +50,7 @@ export default function HostelPublic() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/building.jpeg"
+          src="/images/building.jpeg"
           alt="EduNova hostel"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -126,7 +126,7 @@ export default function HostelPublic() {
         <FadeIn delay={100}>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/exterior.jpeg"
+              src="/images/exterior.jpeg"
               alt="EduNova hostel campus"
               className="w-full h-[430px] object-cover"
             />

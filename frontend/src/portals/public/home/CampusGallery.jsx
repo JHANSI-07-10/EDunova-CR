@@ -7,42 +7,42 @@ import FadeIn from '../../../components/FadeIn'
 const fallbackImages = [
   {
     id: 'campus',
-    image: '/Campus.jpeg',
+    image: '/images/Campus.jpeg',
     caption: 'EduNova Campus',
   },
   {
     id: 'building',
-    image: '/building.jpeg',
+    image: '/images/building.jpeg',
     caption: 'School Building',
   },
   {
     id: 'exterior',
-    image: '/exterior.jpeg',
+    image: '/images/exterior.jpeg',
     caption: 'Campus Exterior',
   },
   {
     id: 'classroom',
-    image: '/tablet-learning.jpeg',
+    image: '/images/tablet-learning.jpeg',
     caption: 'Digital Classroom',
   },
   {
     id: 'library',
-    image: '/library-1.jpeg',
+    image: '/images/library-1.jpeg',
     caption: 'Digital Library',
   },
   {
     id: 'innovation',
-    image: '/physics-1.jpeg',
+    image: '/images/physics-1.jpeg',
     caption: 'Innovation Symposium',
   },
   {
     id: 'sports',
-    image: '/trophy-1.jpeg',
+    image: '/images/trophy-1.jpeg',
     caption: 'Student Achievements',
   },
   {
     id: 'edunova',
-    image: '/EduNova.jpeg',
+    image: '/images/EduNova.jpeg',
     caption: 'EduNova Global Academy',
   },
 ]

@@ -9,6 +9,7 @@ import api from "../lib/api";
 import { isNonEmptyString, isPositiveNumber } from "../../../utils/validation";
 import CourseForum from "../../student/components/CourseForum";
 
+const chr = (n) => String.fromCharCode(n);
 
 const RESOURCE_TYPES = [
   { value: "PDF", label: "📄 PDF Notes", desc: "Upload syllabus notes or slides" },
@@ -35,6 +36,7 @@ export default function Lms() {
   const [showChapterModal, setShowChapterModal] = useState(false);
   const [showLessonModal, setShowLessonModal] = useState(false);
   const [showResourceModal, setShowResourceModal] = useState(false);
+  const [showCourseModal, setShowCourseModal] = useState(false);
   
   // Selected targets
   const [targetChapterId, setTargetChapterId] = useState(null);
@@ -45,6 +47,8 @@ export default function Lms() {
   const [lessonForm, setLessonForm] = useState({ title: "", description: "" });
   const [editingChapterId, setEditingChapterId] = useState(null);
   const [editingLessonId, setEditingLessonId] = useState(null);
+  const [editingCourseId, setEditingCourseId] = useState(null);
+  const [courseForm, setCourseForm] = useState({ title: "", description: "", class_id: "", subject_id: "" });
   const [resourceForm, setResourceForm] = useState({
     title: "",
     content_type: "PDF",
@@ -65,11 +69,19 @@ export default function Lms() {
   const [chapterErrors, setChapterErrors] = useState({});
   const [lessonErrors, setLessonErrors] = useState({});
   const [resourceErrors, setResourceErrors] = useState({});
-
+  const [courseErrors, setCourseErrors] = useState({});
+  const [allocations, setAllocations] = useState([]);
 
   useEffect(() => {
     loadCourses();
+    loadAllocations();
   }, []);
+
+  function loadAllocations() {
+    api.get("/teacher/classes/")
+      .then(({ data }) => setAllocations(data.filter(a => a.subject_id > 0)))
+      .catch(() => setAllocations([]));
+  }
 
   function loadCourses() {
     setLoading(true);
@@ -77,6 +89,75 @@ export default function Lms() {
       .then(({ data }) => setCourses(data))
       .catch(() => setCourses([]))
       .finally(() => setLoading(false));
+  }
+
+  async function handleAddCourse(e) {
+    e.preventDefault();
+    const errs = {};
+    if (!isNonEmptyString(courseForm.title)) {
+      errs.title = "Course title is required.";
+    }
+    if (!editingCourseId && !courseForm.class_id) {
+      errs.class_id = "Please select a target class.";
+    }
+    if (!editingCourseId && !courseForm.subject_id) {
+      errs.subject_id = "Please select a subject.";
+    }
+    if (Object.keys(errs).length > 0) {
+      setCourseErrors(errs);
+      return;
+    }
+    setCourseErrors({});
+
+    setUploading(true);
+    try {
+      if (editingCourseId) {
+        await api.put("/teacher/lms/courses/", {
+          id: editingCourseId,
+          title: courseForm.title,
+          description: courseForm.description
+        });
+        setToast("Course updated successfully!");
+        if (selectedCourse?.id === editingCourseId) {
+          setSelectedCourse(prev => ({
+            ...prev,
+            title: courseForm.title,
+            description: courseForm.description,
+            subject_name: courseForm.title
+          }));
+        }
+      } else {
+        await api.post("/teacher/lms/courses/", {
+          class_id: courseForm.class_id,
+          subject_id: courseForm.subject_id,
+          title: courseForm.title,
+          description: courseForm.description
+        });
+        setToast("Course created successfully!");
+      }
+      setCourseForm({ title: "", description: "", class_id: "", subject_id: "" });
+      setEditingCourseId(null);
+      setShowCourseModal(false);
+      loadCourses();
+    } catch (err) {
+      const msg = err.response?.data?.detail || "Failed to save course.";
+      setToast(msg);
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  async function handleDeleteCourse(id, e) {
+    if (e) e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this course? Doing so will permanently delete all its chapters, lessons, and resources.")) return;
+    try {
+      await api.delete(`/teacher/lms/courses/?id=${id}`);
+      setToast("Course deleted successfully.");
+      setSelectedCourse(null);
+      loadCourses();
+    } catch {
+      setToast("Failed to delete course.");
+    }
   }
 
   useEffect(() => {
@@ -366,9 +447,21 @@ export default function Lms() {
   if (!selectedCourse) {
     return (
       <div className="space-y-6">
-        <div>
-          <h2 className="font-heading text-2xl font-bold text-ink-primary">LMS Course Content</h2>
-          <p className="text-sm text-ink-secondary">Select a course to author chapters, lessons, and study materials.</p>
+        <div className="flex justify-between items-center">
+          <div>
+            <h2 className="font-heading text-2xl font-bold text-ink-primary">LMS Course Content</h2>
+            <p className="text-sm text-ink-secondary">Select a course to author chapters, lessons, and study materials.</p>
+          </div>
+          <button
+            onClick={() => {
+              setCourseForm({ title: "", description: "", class_id: "", subject_id: "" });
+              setEditingCourseId(null);
+              setShowCourseModal(true);
+            }}
+            className="flex items-center gap-1.5 bg-academic-blue text-white rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-academic-blue/90 transition-all shadow-raised"
+          >
+            <Plus size={16} /> New Course
+          </button>
         </div>
         {!courses?.length ? (
           <EmptyState label="You are not assigned to teach any subjects yet." />
@@ -378,13 +471,44 @@ export default function Lms() {
               <div 
                 key={c.id}
                 onClick={() => setSelectedCourse(c)}
-                className="bg-white hover:border-academic-blue border border-slate-100 rounded-card shadow-card hover:shadow-raised transition-all duration-200 cursor-pointer p-6 flex flex-col justify-between"
+                className="bg-white hover:border-academic-blue border border-slate-100 rounded-card shadow-card hover:shadow-raised transition-all duration-200 cursor-pointer p-6 flex flex-col justify-between group relative"
               >
                 <div>
-                  <div className="w-10 h-10 rounded-xl bg-academic-blue/10 text-academic-blue flex items-center justify-center mb-4">
-                    <BookOpen size={20} />
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="w-10 h-10 rounded-xl bg-academic-blue/10 text-academic-blue flex items-center justify-center">
+                      <BookOpen size={20} />
+                    </div>
+                    <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCourseForm({
+                            title: c.title,
+                            description: c.description || "",
+                            class_id: c.class_id,
+                            subject_id: c.subject_id
+                          });
+                          setEditingCourseId(c.id);
+                          setShowCourseModal(true);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-academic-blue hover:bg-slate-50 transition-colors"
+                        title="Edit Course"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteCourse(c.id, e);
+                        }}
+                        className="p-1.5 rounded-lg text-slate-400 hover:text-danger hover:bg-slate-50 transition-colors"
+                        title="Delete Course"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
-                  <h3 className="font-heading font-semibold text-ink-primary text-lg mb-1">{c.subject_name}</h3>
+                  <h3 className="font-heading font-semibold text-ink-primary text-lg mb-1">{c.title || c.subject_name}</h3>
                   <p className="text-xs font-semibold text-academic-blue tracking-wide uppercase mb-3">{c.class_name}</p>
                   <p className="text-sm text-ink-secondary line-clamp-2">{c.description || "Course syllabus & lessons."}</p>
                 </div>
@@ -421,6 +545,29 @@ export default function Lms() {
           {chapters.length} Chapters Published
         </div>
         <div className="flex gap-2">
+          <button
+            onClick={() => {
+              setCourseForm({
+                title: selectedCourse.title || selectedCourse.subject_name,
+                description: selectedCourse.description || "",
+                class_id: selectedCourse.class_id,
+                subject_id: selectedCourse.subject_id
+              });
+              setEditingCourseId(selectedCourse.id);
+              setShowCourseModal(true);
+            }}
+            className="flex items-center gap-1.5 bg-white border border-slate-200 text-slate-600 rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
+            title="Edit Course"
+          >
+            <Pencil size={15} /> Edit Course
+          </button>
+          <button
+            onClick={() => handleDeleteCourse(selectedCourse.id)}
+            className="flex items-center gap-1.5 bg-white border border-slate-200 text-danger rounded-xl px-3 py-2.5 text-sm font-semibold hover:bg-red-50 hover:border-red-100 transition-all shadow-sm"
+            title="Delete Course"
+          >
+            <Trash2 size={15} /> Delete Course
+          </button>
           <button
             onClick={() => setForumCourseId(selectedCourse.id)}
             className="flex items-center gap-1.5 bg-white border border-slate-200 text-academic-blue rounded-xl px-4 py-2.5 text-sm font-semibold hover:bg-slate-50 transition-all shadow-sm"
@@ -943,6 +1090,86 @@ export default function Lms() {
         </div>
       )}
 
+      {/* Course Modal */}
+      {showCourseModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 animate-[fadeIn_.2s_ease]">
+          <div className="bg-white rounded-card w-full max-w-md p-6 shadow-raised">
+            <h3 className="font-heading text-lg font-bold text-ink-primary mb-4">
+              {editingCourseId ? "Edit Course Details" : "Create New LMS Course"}
+            </h3>
+            <form onSubmit={handleAddCourse} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-ink-secondary block mb-1">Course Title (*)</label>
+                <input 
+                  required
+                  placeholder="e.g. Grade 8 Mathematics (Advanced) (*)"
+                  value={courseForm.title}
+                  onChange={e => setCourseForm(f => ({ ...f, title: e.target.value }))}
+                  className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                    courseErrors.title ? "border-danger" : "border-slate-200"
+                  }`}
+                />
+                {courseErrors.title && (
+                  <p className="text-xs text-danger mt-1">{courseErrors.title}</p>
+                )}
+              </div>
+              
+              {!editingCourseId && (
+                <div>
+                  <label className="text-xs font-semibold text-ink-secondary block mb-1">Select Target Allocation</label>
+                  <select
+                    value={`${courseForm.class_id}-${courseForm.subject_id}`}
+                    onChange={e => {
+                      const [classId, subjectId] = e.target.value.split("-");
+                      setCourseForm(f => ({ ...f, class_id: classId, subject_id: subjectId }));
+                    }}
+                    className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${
+                      courseErrors.class_id ? "border-danger" : "border-slate-200"
+                    }`}
+                  >
+                    <option value="">-- Choose Class & Subject --</option>
+                    {allocations.map(a => (
+                      <option key={`${a.class_id}-${a.subject_id}`} value={`${a.class_id}-${a.subject_id}`}>
+                        {a.class_name} - {a.subject_name}
+                      </option>
+                    ))}
+                  </select>
+                  {courseErrors.class_id && (
+                    <p className="text-xs text-danger mt-1">{courseErrors.class_id}</p>
+                  )}
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs font-semibold text-ink-secondary block mb-1">Description (Optional)</label>
+                <textarea 
+                  placeholder="Describe the course curriculum, target goals..."
+                  value={courseForm.description}
+                  onChange={e => setCourseForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none h-24"
+                />
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button 
+                  type="button" 
+                  onClick={() => setShowCourseModal(false)}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-sm font-semibold hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit" 
+                  disabled={uploading}
+                  className="px-4 py-2 bg-academic-blue text-white rounded-xl text-sm font-semibold hover:bg-academic-blue/90 shadow-raised disabled:opacity-50"
+                >
+                  {uploading ? "Saving..." : editingCourseId ? "Save Changes" : "Create Course"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {forumCourseId && <CourseForum api={api} courseId={forumCourseId} role="teacher" onClose={() => setForumCourseId(null)} />}
       <Toast message={toast} onClose={() => setToast("")} />
     </div>
@@ -1026,5 +1253,4 @@ function LessonResourcesList({ lessonId }) {
   );
 }
 
-// Utility char conversion
-const chr = (n) => String.fromCharCode(n);
+

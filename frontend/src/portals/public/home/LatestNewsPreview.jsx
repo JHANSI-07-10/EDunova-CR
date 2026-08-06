@@ -24,13 +24,7 @@ export default function LatestNewsPreview() {
             {latest.map((n, i) => (
               <FadeIn key={n.id} delay={i * 50} className="h-full">
                 <div className="card h-full overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="-mx-6 -mt-6 mb-4 h-36 overflow-hidden">
-                    <img
-                      src={getMediaUrl(n.cover_image) || ['/images/physics-3.jpeg', '/images/student-1.jpeg', '/building.jpeg'][i % 3]}
-                      alt={n.title}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
+
                   <p className="font-subheading text-sm text-text-secondary">{n.published_date}</p>
                   <h3 className="font-heading font-bold mt-1 text-primary">{n.title}</h3>
                 </div>

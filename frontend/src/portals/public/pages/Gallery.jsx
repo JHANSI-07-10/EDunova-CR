@@ -5,14 +5,14 @@ import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
 
 const fallbackImages = [
-  { id: '1', image: '/Campus.jpeg', caption: 'EduNova Campus' },
-  { id: '2', image: '/building.jpeg', caption: 'Modern School Building' },
-  { id: '3', image: '/tablet-learning.jpeg', caption: 'Student Learning Experience' },
-  { id: '4', image: '/exterior.jpeg', caption: 'Campus Exterior' },
-  { id: '5', image: '/library-1.jpeg', caption: 'Digital Library' },
-  { id: '6', image: '/physics-1.jpeg', caption: 'Innovation Symposium' },
-  { id: '7', image: '/trophy-1.jpeg', caption: 'Student Achievements' },
-  { id: '8', image: '/EduNova.jpeg', caption: 'EduNova Global Academy' },
+  { id: '1', image: '/images/Campus.jpeg', caption: 'EduNova Campus' },
+  { id: '2', image: '/images/building.jpeg', caption: 'Modern School Building' },
+  { id: '3', image: '/images/tablet-learning.jpeg', caption: 'Student Learning Experience' },
+  { id: '4', image: '/images/exterior.jpeg', caption: 'Campus Exterior' },
+  { id: '5', image: '/images/library-1.jpeg', caption: 'Digital Library' },
+  { id: '6', image: '/images/physics-1.jpeg', caption: 'Innovation Symposium' },
+  { id: '7', image: '/images/trophy-1.jpeg', caption: 'Student Achievements' },
+  { id: '8', image: '/images/EduNova.jpeg', caption: 'EduNova Global Academy' },
 ]
 
 export default function Gallery() {
@@ -32,7 +32,7 @@ export default function Gallery() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/Campus.jpeg"
+          src="/images/Campus.jpeg"
           alt="EduNova Gallery"
           className="absolute inset-0 w-full h-full object-cover"
         />

@@ -14,6 +14,7 @@ const NAV = [
   { to: "/student/assignments", label: "Assignments", icon: BookOpenCheck },
   { to: "/student/lms", label: "LMS / Courses", icon: GraduationCap },
   { to: "/student/exams", label: "Exams", icon: ScrollText },
+  { to: "/student/hall-tickets", label: "Hall Tickets", icon: ScrollText },
   { to: "/student/results", label: "Results", icon: GraduationCap },
   { to: "/student/fees", label: "Fee Payments", icon: Wallet },
   { to: "/student/scholarships", label: "Scholarships", icon: Award },

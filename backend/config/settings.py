@@ -23,13 +23,19 @@ def _cast_debug(val):
     return str(val).lower() in ("true", "1", "yes")
 
 DEBUG = config("DEBUG", default=False, cast=_cast_debug)
-ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
+    if h.strip()
+]
 
 # SECURITY: separate, explicit opt-in — never tied to DEBUG. A rushed deploy
 # with DEBUG=True left on would otherwise make every account reachable via a
 # publicly-known static OTP ("123456"). Defaults to False; keep it False
 # everywhere except your own local machine.
-DEV_STATIC_OTP = config("DEV_STATIC_OTP", default=False, cast=bool)
+# Same robust casting as DEBUG: decouple's cast=bool (strtobool) crashes on
+# non-boolean env values like "release" (a real production incident).
+DEV_STATIC_OTP = config("DEV_STATIC_OTP", default=False, cast=_cast_debug)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -187,6 +193,9 @@ SUPABASE_BUCKET_BACKUPS = "database-backups"
 
 # Use Supabase Storage as the default storage backend
 DEFAULT_FILE_STORAGE = "config.storage.SupabaseStorage"
+_STORAGE_MISCONFIGURED = not (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
+
+
 
 # Symmetric key (Fernet, 32 url-safe base64 bytes) used to encrypt the local
 # JSON backup file before it's written to disk / uploaded to Supabase
@@ -240,4 +249,35 @@ if "console" in str(EMAIL_BACKEND).lower() and not DEBUG:
         "emailed, so users cannot complete login. Set EMAIL_BACKEND="
         "django.core.mail.backends.smtp.EmailBackend plus EMAIL_HOST/"
         "EMAIL_HOST_USER/EMAIL_HOST_PASSWORD (Brevo or Gmail app password)."
+    )
+
+_local_hosts = {"localhost", "127.0.0.1", "::1"}
+if not DEBUG and set(ALLOWED_HOSTS) <= _local_hosts:
+    _startup_warn(
+        "ALLOWED_HOSTS is still the local default (localhost,127.0.0.1). In a "
+        "non-DEBUG deployment Django rejects every request with '400 "
+        "DisallowedHost'. Set ALLOWED_HOSTS on the host, e.g. "
+        "ALLOWED_HOSTS=edunova-cr-ax7h.onrender.com"
+    )
+
+if DEBUG and any(h not in _local_hosts for h in ALLOWED_HOSTS):
+    _startup_warn(
+        "DEBUG=True with a non-local ALLOWED_HOSTS. Never run with DEBUG on a "
+        "reachable host: Django serves the full debug traceback (source code, "
+        "secrets) to anyone who triggers an error."
+    )
+
+if DEV_STATIC_OTP:
+    _startup_warn(
+        "DEV_STATIC_OTP is True: every OTP login code is the public value "
+        "'123456'. This must NEVER be enabled on a reachable server — anyone "
+        "can log in to any account."
+    )
+
+if _STORAGE_MISCONFIGURED and not DEBUG:
+    _startup_warn(
+        "SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not configured. Uploaded "
+        "files (CMS images, admissions documents, portal uploads) fall back to "
+        "local disk, which is EPHEMERAL on Render and will be lost on redeploy. "
+        "Set both vars and pre-create the storage buckets in the Supabase project."
     )

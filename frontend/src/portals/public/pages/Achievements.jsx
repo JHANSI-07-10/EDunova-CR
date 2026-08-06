@@ -50,7 +50,7 @@ export default function Achievements() {
     <main className="bg-white">
       <section className="relative overflow-hidden text-white">
         <img
-          src="/Campus.jpeg"
+          src="/images/Campus.jpeg"
           alt="EduNova Achievements"
           className="absolute inset-0 w-full h-full object-cover"
         />
@@ -122,7 +122,7 @@ export default function Achievements() {
                 <article className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
                   <div className="relative h-64 overflow-hidden">
                     <img
-                      src={getMediaUrl(item.cover_image || item.image) || '/student.jpeg'}
+                      src={getMediaUrl(item.cover_image || item.image) || '/images/student.jpeg'}
                       alt={item.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                     />
