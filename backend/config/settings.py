@@ -6,6 +6,7 @@ Database target: Supabase PostgreSQL using DATABASE_URL.
 from datetime import timedelta
 from pathlib import Path
 import dj_database_url
+import sys
 from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -148,8 +149,31 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
 }
-CORS_ALLOWED_ORIGINS = [ "https://edunova-school-iumy.vercel.app", ]
-CSRF_TRUSTED_ORIGINS = [ "https://edunova-school-iumy.vercel.app", ]
+def _split_csv_env(var_name, default):
+    """Parse a comma-separated env var into a list of origins; fall back to
+    `default` when the var is unset/empty. Lets operators change the allowed
+    frontend origins on Render/Supabase without a code deploy."""
+    raw = config(var_name, default="").strip()
+    if not raw:
+        return list(default)
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+CORS_ALLOWED_ORIGINS = _split_csv_env(
+    "CORS_ALLOWED_ORIGINS",
+    ["https://edunova-school-iumy.vercel.app"],
+)
+CSRF_TRUSTED_ORIGINS = _split_csv_env(
+    "CSRF_TRUSTED_ORIGINS",
+    ["https://edunova-school-iumy.vercel.app"],
+)
+# Local dev servers can always talk to the API without extra env config.
+if DEBUG:
+    for _origin in ("http://localhost:5173", "http://127.0.0.1:5173"):
+        if _origin not in CORS_ALLOWED_ORIGINS:
+            CORS_ALLOWED_ORIGINS.append(_origin)
+        if _origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(_origin)
 CORS_ALLOW_CREDENTIALS = True
 
 # Supabase Storage/API — server-side only. Never place service role keys in frontend.
@@ -185,3 +209,35 @@ BREVO_API_KEY = config("BREVO_API_KEY", default=EMAIL_HOST_PASSWORD)
 
 OTP_EXPIRY_SECONDS = 300
 OTP_LENGTH = 6
+
+# ---------------------------------------------------------------------------
+# Startup diagnostics — loud, actionable warnings for the two most common
+# production misconfigurations that silently break OTP login. Written to
+# stderr so they always surface in the host's logs (Render, Railway, ...).
+# ---------------------------------------------------------------------------
+def _startup_warn(message: str) -> None:
+    print(f"\n[EduNova config warning] {message}\n", file=sys.stderr)
+
+
+_db_host = str(DATABASES.get("default", {}).get("HOST") or "").lower()
+if _db_host.endswith(".supabase.co"):
+    # New Supabase projects only publish an IPv6 AAAA record for the direct
+    # host (db.<ref>.supabase.co). Render and most PaaS providers have no IPv6
+    # egress, so Django can never connect -> the app can't serve login.
+    _startup_warn(
+        f"DATABASE_URL host '{_db_host}' is a Supabase DIRECT host, which is "
+        "IPv6-only for new projects. If this server has no IPv6 (e.g. Render), "
+        "use the IPv4 POOLER host instead:\n"
+        "  postgresql://postgres.<PROJECT_REF>:<DB_PASSWORD>@aws-0-<REGION>.pooler.supabase.com:5432/postgres\n"
+        "(find the exact string under Supabase Dashboard > Project Settings > "
+        "Database > Connection string > Pooler, port 5432 session mode.)"
+    )
+
+if "console" in str(EMAIL_BACKEND).lower() and not DEBUG:
+    _startup_warn(
+        "EMAIL_BACKEND is the console backend in a non-DEBUG environment. "
+        "OTP login codes would only be printed to the server log and never "
+        "emailed, so users cannot complete login. Set EMAIL_BACKEND="
+        "django.core.mail.backends.smtp.EmailBackend plus EMAIL_HOST/"
+        "EMAIL_HOST_USER/EMAIL_HOST_PASSWORD (Brevo or Gmail app password)."
+    )

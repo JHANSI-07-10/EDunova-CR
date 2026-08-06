@@ -1,5 +1,6 @@
 import logging
 import secrets
+import sys
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
@@ -15,6 +16,26 @@ from .services.email_service import send_login_otp_email
 
 
 logger = logging.getLogger(__name__)
+
+
+def _email_is_console_only() -> bool:
+    """True when the configured EMAIL_BACKEND is the console backend and we
+    are NOT in DEBUG. In that state an OTP email would only be printed to the
+    server log and never delivered, so login must refuse loudly instead of
+    pretending the OTP was sent."""
+    if getattr(settings, "DEBUG", False):
+        return False
+    return "console" in str(getattr(settings, "EMAIL_BACKEND", "")).lower()
+
+
+def _email_not_configured_response():
+    return Response(
+        {
+            "detail": "Verification email service is not configured on this server. "
+            "Please contact the administrator (SMTP/EMAIL_BACKEND env vars)."
+        },
+        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+    )
 
 # ---------------------------------------------------------------------------
 # Throttle classes (unchanged)
@@ -160,6 +181,8 @@ def login_step1(request):
 
     if getattr(settings, "DEV_STATIC_OTP", False):
         pass
+    elif _email_is_console_only():
+        return _email_not_configured_response()
     else:
         try:
             send_login_otp_email(user, otp)
@@ -240,6 +263,8 @@ def resend_otp(request):
     if getattr(settings, "DEV_STATIC_OTP", False):
         otp = "123456"
         _store_otp(user.id, otp)
+    elif _email_is_console_only():
+        return _email_not_configured_response()
     else:
         otp = _generate_otp()
         _store_otp(user.id, otp)
@@ -248,9 +273,9 @@ def resend_otp(request):
         except Exception:
             logger.exception("Failed to send OTP email")
             if settings.DEBUG:
-                print("\n" + "="*50)
+                print("\n" + "=" * 50)
                 print(f"DEBUG OTP FOR {user.username} ({user.email}): {otp}")
-                print("="*50 + "\n")
+                print("=" * 50 + "\n")
                 return Response({"detail": "OTP resent successfully (check console)."})
             return Response(
                 {"detail": "Unable to send verification email."},
