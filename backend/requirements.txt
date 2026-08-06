@@ -12,4 +12,5 @@ Pillow==10.3.0
 gunicorn==22.0.0
 cryptography==42.0.8
 pypdf==4.2.0
-
+sib-api-v3-sdk==7.6.0
+urllib3<2.0.0

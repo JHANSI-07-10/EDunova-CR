@@ -7,9 +7,6 @@ from datetime import timedelta
 from pathlib import Path
 import dj_database_url
 from decouple import config
-print("=" * 50)
-print("DATABASE_URL:", config("DATABASE_URL", default="NOT FOUND"))
-print("=" * 50)
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = config("DJANGO_SECRET_KEY", default="dev-secret-key-change-in-production")
@@ -45,19 +42,10 @@ INSTALLED_APPS = [
     "django_filters",
     "apps.cms",
     "apps.admissions",
+    "apps.examination",
     "portal",
 ]
-
-MIDDLEWARE = [
-    "django.middleware.security.SecurityMiddleware",
-    "corsheaders.middleware.CorsMiddleware",
-    "django.contrib.sessions.middleware.SessionMiddleware",
-    "django.middleware.common.CommonMiddleware",
-    "django.middleware.csrf.CsrfViewMiddleware",
-    "django.contrib.auth.middleware.AuthenticationMiddleware",
-    "django.contrib.messages.middleware.MessageMiddleware",
-    "django.middleware.clickjacking.XFrameOptionsMiddleware",
-]
+MIDDLEWARE = [ "corsheaders.middleware.CorsMiddleware", "django.middleware.security.SecurityMiddleware", "portal.middleware.ExceptionLoggingMiddleware", "django.contrib.sessions.middleware.SessionMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware", "django.contrib.auth.middleware.AuthenticationMiddleware", "django.contrib.messages.middleware.MessageMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware", ]
 
 ROOT_URLCONF = "config.urls"
 
@@ -161,12 +149,8 @@ SIMPLE_JWT = {
     "USER_ID_FIELD": "id",
     "USER_ID_CLAIM": "user_id",
 }
-
-CORS_ALLOW_ALL_ORIGINS = DEBUG  # allows any localhost port in dev; False in production (DEBUG=False)
-CORS_ALLOWED_ORIGINS = [] if DEBUG else config(
-    "CORS_ALLOWED_ORIGINS",
-    default="http://localhost:5173,http://127.0.0.1:5173",
-).split(",")
+CORS_ALLOWED_ORIGINS = [ "https://edunova-school-iumy.vercel.app", ]
+CSRF_TRUSTED_ORIGINS = [ "https://edunova-school-iumy.vercel.app", ]
 CORS_ALLOW_CREDENTIALS = True
 
 # Supabase Storage/API — server-side only. Never place service role keys in frontend.
@@ -177,6 +161,9 @@ SUPABASE_BUCKET_SUBMISSIONS = "assignmentsubmissions"
 SUPABASE_BUCKET_CERTS = "officialdocuments"
 SUPABASE_BUCKET_AVATARS = "studentavatars"
 SUPABASE_BUCKET_BACKUPS = "database-backups"
+
+# Use Supabase Storage as the default storage backend
+DEFAULT_FILE_STORAGE = "config.storage.SupabaseStorage"
 
 # Symmetric key (Fernet, 32 url-safe base64 bytes) used to encrypt the local
 # JSON backup file before it's written to disk / uploaded to Supabase
@@ -193,7 +180,9 @@ EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="no-reply@edunovaacademy.edu.in")
+DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="EduNova Academy <mandugulajhansilakshmi@gmail.com>")
+
+BREVO_API_KEY = config("BREVO_API_KEY", default=EMAIL_HOST_PASSWORD)
 
 OTP_EXPIRY_SECONDS = 300
 OTP_LENGTH = 6
