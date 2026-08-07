@@ -5,12 +5,48 @@ import sys
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.core.cache import cache
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
+from drf_spectacular.utils import OpenApiTypes, extend_schema
+
+
+# ---------------------------------------------------------------------------
+# OpenAPI documentation schemas for the OTP login flow (docs only — the views
+# keep reading request.data directly; these serializers are never instantiated
+# at runtime). They give the Swagger UI an editable request body and proper
+# response shapes for /api/auth/login/, /api/auth/verify-otp/ and
+# /api/auth/resend-otp/.
+# ---------------------------------------------------------------------------
+class LoginRequestSerializer(serializers.Serializer):
+    email = serializers.CharField(help_text="Registered email address or username.")
+    password = serializers.CharField(write_only=True, help_text="Account password.")
+
+
+class OtpRequestSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(help_text="user_id returned by POST /api/auth/login/.")
+    otp = serializers.CharField(help_text="6-digit code emailed by login/resend.")
+
+
+class ResendRequestSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField(help_text="user_id returned by POST /api/auth/login/.")
+
+
+class LoginResponseSerializer(serializers.Serializer):
+    user_id = serializers.IntegerField()
+    user_type = serializers.CharField()
+    email_sent = serializers.BooleanField()
+    detail = serializers.CharField(required=False)
+    email_error = serializers.CharField(required=False)
+
+
+class TokenResponseSerializer(serializers.Serializer):
+    refresh = serializers.CharField()
+    access = serializers.CharField()
+    user = serializers.DictField()
 
 from .services.email_service import send_login_otp_email
 
@@ -145,6 +181,11 @@ def _store_otp(user_id: int, otp: str) -> None:
 # Views
 # ---------------------------------------------------------------------------
 
+@extend_schema(
+    tags=["auth"],
+    request=LoginRequestSerializer,
+    responses={200: LoginResponseSerializer, 400: OpenApiTypes.OBJECT, 500: OpenApiTypes.OBJECT, 503: OpenApiTypes.OBJECT},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([LoginAccountThrottle, LoginIPThrottle])
@@ -235,6 +276,11 @@ def login_step1(request):
     })
 
 
+@extend_schema(
+    tags=["auth"],
+    request=OtpRequestSerializer,
+    responses={200: TokenResponseSerializer, 400: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([OtpVerifyAccountThrottle, OtpVerifyIPThrottle])
@@ -276,6 +322,11 @@ def login_step2_verify_otp(request):
     })
 
 
+@extend_schema(
+    tags=["auth"],
+    request=ResendRequestSerializer,
+    responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT, 503: OpenApiTypes.OBJECT},
+)
 @api_view(["POST"])
 @permission_classes([AllowAny])
 @throttle_classes([OtpResendAccountThrottle, OtpResendIPThrottle])

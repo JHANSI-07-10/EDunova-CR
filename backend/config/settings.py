@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "django_filters",
+    "drf_spectacular",
     "apps.cms",
     "apps.admissions",
     "portal",
@@ -74,14 +75,26 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASE_URL = config("DATABASE_URL", default="")
+# Reuse DB connections across requests instead of opening a fresh TCP+TLS
+# connection to the (often remote) database for every request. With the
+# Supabase pooler this cuts typical request latency from ~3-5s to well under
+# a second. Tune via DB_CONN_MAX_AGE; keep it modest so the pooler's session
+# count stays small. Workers each keep their own pooled connections.
+DB_CONN_MAX_AGE = config("DB_CONN_MAX_AGE", default=60, cast=int)
 if DATABASE_URL:
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
-            conn_max_age=0,
+            conn_max_age=DB_CONN_MAX_AGE,
             ssl_require=config("DB_SSL_REQUIRE", default=True, cast=bool),
         )
     }
+    # The Supabase pooler (PgBouncer) silently drops idle sessions, which would
+    # otherwise surface as "server closed the connection unexpectedly" on the
+    # next reused connection. CONN_HEALTH_CHECKS runs a cheap SELECT 1 before
+    # handing a pooled connection back to Django, so stale sockets are replaced
+    # instead of raising 500s.
+    DATABASES["default"]["CONN_HEALTH_CHECKS"] = True
 else:
     DATABASES = {
         "default": {
@@ -91,10 +104,32 @@ else:
             "PASSWORD": config("DB_PASSWORD", default="changeme123"),
             "HOST": config("DB_HOST", default="localhost"),
             "PORT": config("DB_PORT", default="5432"),
+            # Local Postgres doesn't drop idle sessions, but keeping health
+            # checks on in every environment costs one cheap SELECT per reuse.
+            "CONN_HEALTH_CHECKS": True,
         }
     }
 
-# Uses Django's default auth_user table. This matches the Supabase schema shared in this chat.
+# ---------------------------------------------------------------------------
+# Production security hardening — HTTPS + secure cookies. These are enforced
+# only when DEBUG is off, so local dev keeps its plain-HTTP convenience while
+# any reachable host is forced onto TLS with hardened cookies/HSTS.
+# ---------------------------------------------------------------------------
+if not DEBUG:
+    # Render sits behind a TLS-terminating proxy; without this header Django
+    # thinks every request is plain HTTP and would redirect-loop on
+    # SECURE_SSL_REDIRECT.
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 year
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
+
+# Use Django's default auth_user table. This matches the Supabase schema shared in this chat.
 # Portal roles are stored in portal_user_profile and Django groups.
 
 AUTH_PASSWORD_VALIDATORS = [
@@ -127,6 +162,14 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    # Convert unhandled API exceptions (and IntegrityError/ValueError) into
+    # clean JSON errors instead of Django's HTML 500 page, and never leak
+    # internal details to API clients. See config/exceptions.py.
+    "EXCEPTION_HANDLER": "config.exceptions.custom_exception_handler",
+    # OpenAPI 3 schema generation for the Swagger UI / ReDoc docs. Uses a
+    # custom AutoSchema that keeps serializer-less raw-SQL portal views
+    # documented (see config/schemas.py).
+    "DEFAULT_SCHEMA_CLASS": "config.schemas.EduNovaAutoSchema",
     # Brute-force protection on the OTP login flow. Two layers per endpoint:
     # a tight per-account limit (the real defense — caps attempts against one
     # account regardless of how many IPs an attacker spreads across) and a
@@ -181,6 +224,29 @@ if DEBUG:
         if _origin not in CSRF_TRUSTED_ORIGINS:
             CSRF_TRUSTED_ORIGINS.append(_origin)
 CORS_ALLOW_CREDENTIALS = True
+
+# ---------------------------------------------------------------------------
+# OpenAPI / Swagger documentation (drf-spectacular)
+# ---------------------------------------------------------------------------
+SPECTACULAR_SETTINGS = {
+    "TITLE": "EduNova Global Academy API",
+    "DESCRIPTION": (
+        "Public website CMS + admissions, and the Student / Teacher / Parent / "
+        "Admin portal APIs. Authenticate with a JWT Bearer token obtained via "
+        "POST /api/auth/login/ + POST /api/auth/verify-otp/ (or use the "
+        "Authorize button with a token generated after OTP verification)."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    # Strip the /api prefix from paths so tags group cleanly (admin-portal,
+    # teacher, auth, cms, admissions, ...).
+    "SCHEMA_PATH_PREFIX": "/api",
+    "SWAGGER_UI_SETTINGS": {
+        "persistAuthorization": True,
+        "docExpansion": "none",
+    },
+}
 
 # Supabase Storage/API — server-side only. Never place service role keys in frontend.
 SUPABASE_URL = config("SUPABASE_URL", default="")

@@ -51,6 +51,17 @@ html {
   outline-offset: 2px;
 }
 
+/* Keyboard accessibility: every interactive element gets a visible focus ring
+   when reached via keyboard. :where() keeps specificity at zero so components
+   that define their own focus style (e.g. Tailwind focus:outline-none) still
+   win; everything else gets the standard navy ring instead of the browser's
+   default (or nothing). */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid #1e3a8a;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
 .shimmer {
   background: linear-gradient(90deg, #eef1f6 25%, #f7f9fc 37%, #eef1f6 63%);
   background-size: 400% 100%;

@@ -360,6 +360,7 @@ export default function Results() {
                     </div>
                   )}
 
+                  <div className="overflow-x-auto print:overflow-visible">
                   <table className="w-full text-sm mb-4">
                     <thead>
                       <tr className="text-left text-ink-secondary border-b border-slate-100">
@@ -388,6 +389,7 @@ export default function Results() {
                       ))}
                     </tbody>
                   </table>
+                  </div>
 
                   <div className="flex items-center justify-between border-t border-slate-100 pt-4 bg-slate-50 p-4 rounded-xl">
                     <div>

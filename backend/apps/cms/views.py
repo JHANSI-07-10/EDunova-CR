@@ -1,3 +1,5 @@
+from django.utils.decorators import method_decorator
+from django.views.decorators.cache import cache_page
 from rest_framework import viewsets, mixins
 from .models import (
     SchoolSettings, Campus, AcademicProgram, Department, LeadershipMember,
@@ -8,90 +10,104 @@ from .models import (
 from . import serializers as ser
 
 
+class PublicReadViewSet(viewsets.ReadOnlyModelViewSet):
+    """Read-only public CMS endpoint with a 60s response cache.
+
+    The public website renders dozens of these per page load and they are
+    identical for every visitor, so caching the rendered JSON cuts remote-DB
+    round trips (each ~1s against the Supabase pooler) down to a local cache
+    hit. Content edits show up within 60 seconds.
+    """
+
+    @method_decorator(cache_page(60))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+
 class SchoolSettingsViewSet(viewsets.ReadOnlyModelViewSet):
     """Singleton — frontend calls /api/cms/settings/1/ or /api/cms/settings/ and takes first result."""
     queryset = SchoolSettings.objects.all()
     serializer_class = ser.SchoolSettingsSerializer
 
 
-class CampusViewSet(viewsets.ReadOnlyModelViewSet):
+class CampusViewSet(PublicReadViewSet):
     queryset = Campus.objects.all()
     serializer_class = ser.CampusSerializer
 
 
-class AcademicProgramViewSet(viewsets.ReadOnlyModelViewSet):
+class AcademicProgramViewSet(PublicReadViewSet):
     queryset = AcademicProgram.objects.all()
     serializer_class = ser.AcademicProgramSerializer
 
 
-class DepartmentViewSet(viewsets.ReadOnlyModelViewSet):
+class DepartmentViewSet(PublicReadViewSet):
     queryset = Department.objects.all()
     serializer_class = ser.DepartmentSerializer
 
 
-class LeadershipMemberViewSet(viewsets.ReadOnlyModelViewSet):
+class LeadershipMemberViewSet(PublicReadViewSet):
     queryset = LeadershipMember.objects.all()
     serializer_class = ser.LeadershipMemberSerializer
 
 
-class SchoolStatViewSet(viewsets.ReadOnlyModelViewSet):
+class SchoolStatViewSet(PublicReadViewSet):
     queryset = SchoolStat.objects.all()
     serializer_class = ser.SchoolStatSerializer
 
 
-class WhyChooseItemViewSet(viewsets.ReadOnlyModelViewSet):
+class WhyChooseItemViewSet(PublicReadViewSet):
     queryset = WhyChooseItem.objects.all()
     serializer_class = ser.WhyChooseItemSerializer
 
 
-class TechnologyPartnerViewSet(viewsets.ReadOnlyModelViewSet):
+class TechnologyPartnerViewSet(PublicReadViewSet):
     queryset = TechnologyPartner.objects.all()
     serializer_class = ser.TechnologyPartnerSerializer
 
 
-class CMSPageViewSet(viewsets.ReadOnlyModelViewSet):
+class CMSPageViewSet(PublicReadViewSet):
     queryset = CMSPage.objects.all()
     serializer_class = ser.CMSPageSerializer
     lookup_field = "slug"
 
 
-class NewsPostViewSet(viewsets.ReadOnlyModelViewSet):
+class NewsPostViewSet(PublicReadViewSet):
     queryset = NewsPost.objects.filter(is_published=True)
     serializer_class = ser.NewsPostSerializer
     lookup_field = "slug"
 
 
-class EventViewSet(viewsets.ReadOnlyModelViewSet):
+class EventViewSet(PublicReadViewSet):
     queryset = Event.objects.all()
     serializer_class = ser.EventSerializer
 
 
-class GalleryAlbumViewSet(viewsets.ReadOnlyModelViewSet):
+class GalleryAlbumViewSet(PublicReadViewSet):
     queryset = GalleryAlbum.objects.all()
     serializer_class = ser.GalleryAlbumSerializer
 
 
-class GalleryImageViewSet(viewsets.ReadOnlyModelViewSet):
+class GalleryImageViewSet(PublicReadViewSet):
     queryset = GalleryImage.objects.all()
     serializer_class = ser.GalleryImageSerializer
 
 
-class AchievementViewSet(viewsets.ReadOnlyModelViewSet):
+class AchievementViewSet(PublicReadViewSet):
     queryset = Achievement.objects.all()
     serializer_class = ser.AchievementSerializer
 
 
-class TestimonialViewSet(viewsets.ReadOnlyModelViewSet):
+class TestimonialViewSet(PublicReadViewSet):
     queryset = Testimonial.objects.filter(is_featured=True)
     serializer_class = ser.TestimonialSerializer
 
 
-class FAQViewSet(viewsets.ReadOnlyModelViewSet):
+class FAQViewSet(PublicReadViewSet):
     queryset = FAQ.objects.all()
     serializer_class = ser.FAQSerializer
 
 
-class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
+class DocumentViewSet(PublicReadViewSet):
     serializer_class = ser.DocumentSerializer
 
     def get_queryset(self):
@@ -102,12 +118,12 @@ class DocumentViewSet(viewsets.ReadOnlyModelViewSet):
         return qs
 
 
-class JobPostingViewSet(viewsets.ReadOnlyModelViewSet):
+class JobPostingViewSet(PublicReadViewSet):
     queryset = JobPosting.objects.filter(is_open=True)
     serializer_class = ser.JobPostingSerializer
 
 
-class ScholarshipInfoViewSet(viewsets.ReadOnlyModelViewSet):
+class ScholarshipInfoViewSet(PublicReadViewSet):
     queryset = ScholarshipInfo.objects.all()
     serializer_class = ser.ScholarshipInfoSerializer
 

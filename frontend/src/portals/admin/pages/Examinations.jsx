@@ -7,6 +7,7 @@ import { isNonEmptyString } from "../../../utils/validation";
 export default function Examinations() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("types");
+  const [search, setSearch] = useState("");
   const [examTypes, setExamTypes] = useState([]);
   const [examinations, setExaminations] = useState([]);
   const [teachers, setTeachers] = useState([]);
@@ -74,6 +75,20 @@ export default function Examinations() {
     } finally { setSubmitting(false); }
   };
 
+  const q = search.trim().toLowerCase();
+  const filteredTypes = q
+    ? examTypes.filter((t) => `${t.name || ""} ${t.description || ""}`.toLowerCase().includes(q))
+    : examTypes;
+  const filteredExams = q
+    ? examinations.filter((e) =>
+        [e.exam_name, e.exam_type, e.class_name, e.subject_name, e.teacher_name]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase()
+          .includes(q)
+      )
+    : examinations;
+
   const openInvigilatorModal = (exam) => {
     setInvigilatorForm({
       exam_schedule_id: exam.id,
@@ -123,11 +138,18 @@ export default function Examinations() {
         <div className="p-4 border-b border-gray-100 flex items-center justify-between">
           <div className="relative max-w-xs w-full">
             <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input type="text" placeholder={`Search ${activeTab}...`} className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-academic-blue focus:ring-1 focus:ring-academic-blue" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder={`Search ${activeTab}...`}
+              className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-academic-blue focus:ring-1 focus:ring-academic-blue"
+            />
           </div>
         </div>
         
         {activeTab === "types" && (
+          <div className="overflow-x-auto">
           <table className="w-full text-left text-sm font-sub">
             <thead className="bg-gray-50/50 text-gray-500 font-medium">
               <tr>
@@ -137,10 +159,10 @@ export default function Examinations() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {examTypes.length === 0 && (
-                <tr><td colSpan="3" className="px-6 py-4 text-center text-gray-500">No Exam Types found.</td></tr>
+              {filteredTypes.length === 0 && (
+                <tr><td colSpan="3" className="px-6 py-4 text-center text-gray-500">{q ? `No Exam Types match "${search.trim()}".` : "No Exam Types found."}</td></tr>
               )}
-              {examTypes.map((type) => (
+              {filteredTypes.map((type) => (
                 <tr key={type.id} className="hover:bg-gray-50/50 transition-colors">
                   <td className="px-6 py-4 font-medium text-gray-900">
                     <div className="flex items-center gap-3">
@@ -156,6 +178,7 @@ export default function Examinations() {
               ))}
             </tbody>
           </table>
+          </div>
         )}
 
         {activeTab === "exams" && (
@@ -172,10 +195,10 @@ export default function Examinations() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {examinations.length === 0 && (
-                  <tr><td colSpan="6" className="px-6 py-4 text-center text-gray-500">No Scheduled Exams found. Teachers must create them first.</td></tr>
+                {filteredExams.length === 0 && (
+                  <tr><td colSpan="6" className="px-6 py-4 text-center text-gray-500">{q ? `No Scheduled Exams match "${search.trim()}".` : "No Scheduled Exams found. Teachers must create them first."}</td></tr>
                 )}
-                {examinations.map((exam) => (
+                {filteredExams.map((exam) => (
                   <tr key={exam.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4 font-medium text-gray-900">
                       <div className="flex items-center gap-3">

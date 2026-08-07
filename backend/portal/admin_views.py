@@ -2,6 +2,8 @@ import json
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 from django.contrib.auth.models import Group
 from django.db import connection, transaction
 from django.utils.crypto import get_random_string
@@ -276,13 +278,20 @@ class UserListView(AdminMixin, APIView):
         role = d.get("role")
         if role not in ("Student", "Teacher", "Parent", "Admin", "Employee"):
             return Response({"detail": "role must be one of Student/Teacher/Parent/Admin/Employee."}, status=400)
-        if User.objects.filter(email__iexact=d.get("email", "")).exists():
+        email = (d.get("email") or "").strip()
+        if not email:
+            return Response({"detail": "Email is required."}, status=400)
+        try:
+            validate_email(email)
+        except ValidationError:
+            return Response({"detail": "Enter a valid email address."}, status=400)
+        if User.objects.filter(email__iexact=email).exists():
             return Response({"detail": "A user with this email already exists."}, status=400)
         temp_password = get_random_string(10)
-        username = _unique_username(d.get("username") or d.get("email", "user").split("@")[0])
+        username = _unique_username(d.get("username") or email.split("@")[0])
         user = User.objects.create_user(
             username=username,
-            email=d.get("email"),
+            email=email,
             password=temp_password,
             first_name=d.get("first_name", ""),
             last_name=d.get("last_name", ""),
@@ -557,7 +566,12 @@ class LibraryIssueView(AdminMixin, APIView):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
         book_id = request.data.get("book_id")
         borrower_id = request.data.get("borrower_id")
-        days = int(request.data.get("loan_days", 14))
+        try:
+            days = int(request.data.get("loan_days", 14))
+        except (TypeError, ValueError):
+            return Response({"detail": "loan_days must be a positive integer."}, status=400)
+        if days < 1:
+            return Response({"detail": "loan_days must be a positive integer."}, status=400)
         book = row("SELECT available_quantity FROM portal_book WHERE id=%s", [book_id])
         if not book or book["available_quantity"] < 1:
             return Response({"detail": "No copies available."}, status=400)

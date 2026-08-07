@@ -1,7 +1,7 @@
 from rest_framework import mixins, viewsets
 from rest_framework.permissions import AllowAny
 from .models import AdmissionEnquiry
-from .serializers import AdmissionEnquirySerializer
+from .serializers import AdmissionEnquirySerializer, AdmissionStatusSerializer
 
 
 class AdmissionEnquiryViewSet(mixins.CreateModelMixin,
@@ -14,6 +14,12 @@ class AdmissionEnquiryViewSet(mixins.CreateModelMixin,
     this app is public-facing only, matching the Flowchart's Visitor scope.)
     """
     queryset = AdmissionEnquiry.objects.all()
-    serializer_class = AdmissionEnquirySerializer
     lookup_field = "registration_number"
     permission_classes = [AllowAny]
+
+    def get_serializer_class(self):
+        # The public status check must never expose admin pipeline fields
+        # (fees, interview/counselling notes, allocation, rejection reason).
+        if self.action == "retrieve":
+            return AdmissionStatusSerializer
+        return AdmissionEnquirySerializer
