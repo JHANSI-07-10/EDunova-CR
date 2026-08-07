@@ -11,7 +11,6 @@ from drf_spectacular.utils import (
     extend_schema,
     inline_serializer,
 )
-from drf_spectacular.openapi import AutoSchema
 from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -24,6 +23,7 @@ from .doc_schemas import (
     IdDetailResponseSerializer,
     LeaveRequestSerializer,
     LeaveSubmitResponseSerializer,
+    MultiRouteAutoSchema,
     ERROR_RESPONSES,
 )
 
@@ -668,46 +668,27 @@ _ResourceUpdateRequest = inline_serializer(
 # Path-aware operation ids for APIViews registered on BOTH a list and a detail
 # route (QuestionBankView, AssignmentSubmissionsView). drf-spectacular would
 # otherwise emit operationId collision warnings and auto-suffix the ids.
+# The base MultiRouteAutoSchema lives in doc_schemas.py and is reused by the
+# admin portal views that share the same multi-route shape.
 # ---------------------------------------------------------------------------
 
-class _MultiRouteAutoSchema(AutoSchema):
-    """AutoSchema whose operationId is derived from the concrete URL route.
-
-    Used only for views that are mounted on two paths (a collection path and a
-    detail path). drf-spectacular auto-generates the same operationId for both
-    because both share the same handler methods, so we hand out unique ids here.
-    """
-
-    OPERATION_IDS = {}
-
-    def get_operation_id(self):
-        key = (self.method, self._is_detail_route())
-        operation_id = self.OPERATION_IDS.get(key)
-        if operation_id:
-            return operation_id
-        return super().get_operation_id()
-
-    def _is_detail_route(self):
-        return self.path.rstrip("/").endswith("}")
-
-
-class _QuestionBankRouteSchema(_MultiRouteAutoSchema):
+class _QuestionBankRouteSchema(MultiRouteAutoSchema):
     OPERATION_IDS = {
-        ("GET", False): "TeacherQuestionBankList",
-        ("POST", False): "TeacherQuestionBankCreate",
-        ("DELETE", False): "TeacherQuestionBankRemoveAll",
-        ("GET", True): "TeacherQuestionBankDetail",
-        ("POST", True): "TeacherQuestionBankDetailCreate",
-        ("DELETE", True): "TeacherQuestionBankDelete",
+        ("GET", ("teacher", "question-bank")): "TeacherQuestionBankList",
+        ("POST", ("teacher", "question-bank")): "TeacherQuestionBankCreate",
+        ("DELETE", ("teacher", "question-bank")): "TeacherQuestionBankRemoveAll",
+        ("GET", ("teacher", "question-bank", "{question_id}")): "TeacherQuestionBankDetail",
+        ("POST", ("teacher", "question-bank", "{question_id}")): "TeacherQuestionBankDetailCreate",
+        ("DELETE", ("teacher", "question-bank", "{question_id}")): "TeacherQuestionBankDelete",
     }
 
 
-class _AssignmentSubmissionsRouteSchema(_MultiRouteAutoSchema):
+class _AssignmentSubmissionsMultiViewSchema(MultiRouteAutoSchema):
     OPERATION_IDS = {
-        ("GET", False): "TeacherAssignmentSubmissions",
-        ("PATCH", False): "TeacherAssignmentSubmissionBulk",
-        ("GET", True): "TeacherAssignmentSubmissionView",
-        ("PATCH", True): "TeacherAssignmentSubmissionDetail",
+        ("GET", ("teacher", "assignments", "{assignment_id}", "submissions")): "TeacherAssignmentSubmissions",
+        ("PATCH", ("teacher", "assignments", "{assignment_id}", "submissions")): "TeacherAssignmentSubmissionBulk",
+        ("GET", ("teacher", "assignments", "{assignment_id}", "submissions", "{submission_id}")): "TeacherAssignmentSubmissionView",
+        ("PATCH", ("teacher", "assignments", "{assignment_id}", "submissions", "{submission_id}")): "TeacherAssignmentSubmissionDetail",
     }
 
 
@@ -1224,6 +1205,7 @@ class AssignmentDetailView(TeacherMixin, APIView):
 
 class AssignmentSubmissionsView(TeacherMixin, APIView):
     # Mounted on both the submissions list route and the submission detail route.
+    schema = _AssignmentSubmissionsMultiViewSchema()
     @extend_schema(
         summary="List assignment submissions",
         description="Returns all submissions for an assignment (optionally addressed via the submission detail route).",
@@ -1284,6 +1266,7 @@ class AssignmentSubmissionsView(TeacherMixin, APIView):
 
 class QuestionBankView(TeacherMixin, APIView):
     # Mounted on both the question-bank list route and the question detail route.
+    schema = _QuestionBankRouteSchema()
     @extend_schema(
         summary="List question bank",
         description="Returns every question the teacher authored, or a single question via the detail route.",

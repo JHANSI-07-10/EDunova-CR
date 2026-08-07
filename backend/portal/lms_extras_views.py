@@ -141,6 +141,8 @@ class ForumTopicListView(AuthenticatedMixin, APIView):
 
     @extend_schema(
         operation_id="LmsForumTopicList",
+        summary="List forum topics for a course",
+        description="Returns the forum topics for the given course, each with its reply count.",
         tags=["LMS"],
         parameters=[COURSE_ID_PARAMETER],
         responses={
@@ -167,6 +169,8 @@ class ForumTopicListView(AuthenticatedMixin, APIView):
 
     @extend_schema(
         operation_id="LmsForumTopicCreate",
+        summary="Create a forum topic",
+        description="Posts a new discussion topic to the given course.",
         tags=["LMS"],
         request=ForumTopicCreateSerializer,
         responses={
@@ -196,6 +200,8 @@ class ForumTopicDetailView(AuthenticatedMixin, APIView):
 
     @extend_schema(
         operation_id="LmsForumTopicDetail",
+        summary="Get a forum topic with its replies",
+        description="Returns a single forum topic along with all of its replies.",
         tags=["LMS"],
         parameters=[
             OpenApiParameter(
@@ -246,6 +252,8 @@ class ForumPostView(AuthenticatedMixin, APIView):
 
     @extend_schema(
         operation_id="LmsForumPostCreate",
+        summary="Reply to a forum topic",
+        description="Posts a reply to the given forum topic.",
         tags=["LMS"],
         parameters=[
             OpenApiParameter(
@@ -292,6 +300,8 @@ class DigitalNoteView(AuthenticatedMixin, APIView):
 
     @extend_schema(
         operation_id="LmsDigitalNoteList",
+        summary="List digital notes for a course",
+        description="Returns the shared digital notes for the given course (e.g. teacher-shared study material).",
         tags=["LMS"],
         parameters=[COURSE_ID_PARAMETER],
         responses={
@@ -317,6 +327,8 @@ class DigitalNoteView(AuthenticatedMixin, APIView):
 
     @extend_schema(
         operation_id="LmsDigitalNoteCreate",
+        summary="Create a digital note",
+        description="Adds a new digital note to the given course.",
         tags=["LMS"],
         request=DigitalNoteCreateSerializer,
         responses={
@@ -349,6 +361,8 @@ class MarkContentCompleteView(AuthenticatedMixin, APIView):
 
     @extend_schema(
         operation_id="LmsMarkContentComplete",
+        summary="Mark course content as complete",
+        description="Marks a piece of course content as done for the authenticated student, feeding learning analytics.",
         tags=["LMS"],
         request=MarkCompleteRequestSerializer,
         responses={
@@ -383,6 +397,8 @@ class CourseAnalyticsView(AuthenticatedMixin, APIView):
 
     @extend_schema(
         operation_id="LmsCourseAnalytics",
+        summary="Get course completion analytics",
+        description="Returns each enrolled student's completion percentage for a course (Admin/Teacher only).",
         tags=["LMS"],
         parameters=[COURSE_ID_PARAMETER, STUDENT_ID_PARAMETER],
         responses={

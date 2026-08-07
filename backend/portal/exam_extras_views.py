@@ -114,6 +114,8 @@ class RankListView(AdminMixin, APIView):
 
     @extend_schema(
         operation_id="ExamRankList",
+        summary="List a subject's rank list",
+        description="Returns the per-subject rank list for an exam schedule, including each student's marks and rank position.",
         tags=["Examination"],
         parameters=[EXAM_SCHEDULE_ID_PARAMETER],
         responses={
@@ -142,6 +144,8 @@ class RankListView(AdminMixin, APIView):
 
     @extend_schema(
         operation_id="ExamRankListGenerate",
+        summary="Generate and persist a subject rank list",
+        description="Computes and saves per-subject ranks for an exam schedule (standard competition ranking).",
         tags=["Examination"],
         request=inline_serializer(
             name="ExamRankGenerateRequest",
@@ -189,6 +193,8 @@ class OverallRankListView(AdminMixin, APIView):
 
     @extend_schema(
         operation_id="ExamOverallRankList",
+        summary="List the overall class rank list",
+        description="Aggregates ranks across every subject for a class and exam round to produce the overall class ranking.",
         tags=["Examination"],
         parameters=[CLASS_ID_PARAMETER, EXAM_NAME_PARAMETER],
         responses={
@@ -278,6 +284,8 @@ class ReportCardView(AdminMixin, APIView):
 
     @extend_schema(
         operation_id="ExamAdminReportCard",
+        summary="Generate an admin report card",
+        description="Generates a report card for any student for a given exam round (admin-facing).",
         tags=["Examination"],
         parameters=[STUDENT_ID_PARAMETER, EXAM_NAME_PARAMETER],
         responses={
@@ -300,6 +308,8 @@ class StudentReportCardView(StudentOnlyMixin, APIView):
 
     @extend_schema(
         operation_id="ExamStudentReportCard",
+        summary="Get the student's own report card",
+        description="Returns the authenticated student's own report card for a given exam round.",
         tags=["Examination"],
         parameters=[EXAM_NAME_PARAMETER],
         responses={
