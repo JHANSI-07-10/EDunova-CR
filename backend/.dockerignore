@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Git
+.git/
+.gitignore
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# MySQL/Postgres dumps and backups
+backups/
+
+# Media & static
+media/
+staticfiles/
+
+# Logs
+*.log

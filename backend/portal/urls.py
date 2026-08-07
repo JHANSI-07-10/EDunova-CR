@@ -1,14 +1,15 @@
 from django.urls import path
-from rest_framework_simplejwt.views import TokenRefreshView
 
-from . import auth_views, teacher_views, views, parent_views, admin_views, facilities_views, exam_extras_views, lms_extras_views
+from . import auth_views, teacher_views, views, parent_views, admin_views, facilities_views, exam_extras_views, lms_extras_views, notification_views
 
 urlpatterns = [
     # Auth (credentials -> OTP -> JWT), shared by every portal
     path("auth/login/", auth_views.login_step1, name="login-step1"),
     path("auth/verify-otp/", auth_views.login_step2_verify_otp, name="login-verify-otp"),
     path("auth/resend-otp/", auth_views.resend_otp, name="resend-otp"),
-    path("auth/refresh/", TokenRefreshView.as_view(), name="token-refresh"),
+    path("auth/refresh/", auth_views.TokenRefreshAPIView.as_view(), name="token-refresh"),
+    path("auth/logout/", auth_views.LogoutView.as_view(), name="logout"),
+    path("notifications/preferences/", notification_views.NotificationPreferencesView.as_view(), name="notification-preferences"),
     path("upload/", views.FileUploadView.as_view(), name="file-upload"),
 
     # Student portal

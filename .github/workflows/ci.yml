@@ -2,36 +2,73 @@ name: CI
 
 on:
   push:
-    branches: [main, jhansi]
+    branches: [main, jhansi, develop]
+    paths: ['backend/**', '.github/workflows/**', 'frontend/**']
   pull_request:
+    paths: ['backend/**', '.github/workflows/**', 'frontend/**']
 
 jobs:
   backend:
-    name: Backend — check + tests
+    name: Backend lint, checks, schema validation & tests
     runs-on: ubuntu-latest
+    env:
+      DJANGO_SETTINGS_MODULE: config.settings
+      DJANGO_SECRET_KEY: ci-only-secret-key-not-for-prod
+      DEBUG: 'False'
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
+      DB_SSL_REQUIRE: 'False'
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        health-cmd: pg_isready -U postgres
+        health-options:
+          interval: 10s
+          timeout: 5s
+          retries: 5
+
     defaults:
       run:
         working-directory: backend
-    env:
-      # SQLite stands in for Supabase in CI; the pooler/Postgres config is
-      # exercised by the real deployment.
-      DATABASE_URL: sqlite:///ci.sqlite3
-      DB_SSL_REQUIRE: "False"
-      DJANGO_SECRET_KEY: ci-only-secret-key
-      ALLOWED_HOSTS: ci.example.com
-      EMAIL_BACKEND: django.core.mail.backends.locmem.EmailBackend
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
-          cache: pip
+          python-version: '3.12'
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
       - name: Install dependencies
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.txt ruff
+
+      - name: Compile python sources
+        run: python -m compileall -q .
+
+      - name: Ruff lint
+        run: ruff check config portal apps --output-format=github || true
+
       - name: Django system check
         run: python manage.py check
-      - name: Run portal test suite
-        run: python manage.py test portal
+
+      - name: Validate OpenAPI schema
+        run: python manage.py spectacular --validate
+
+      - name: Run tests
+        run: python manage.py test --verbosity 1
+
+      - name: Apply portal schema idempotency check
+        run: python manage.py apply_portal_schema
 
   frontend:
     name: Frontend — production build

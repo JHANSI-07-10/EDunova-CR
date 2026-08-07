@@ -61,17 +61,24 @@ def get_role(user):
     return "Student"
 
 
-def log_action(actor, action, target_type="", target_id="", details=None):
+def log_action(actor, action, target_type="", target_id="", details=None, ip_address=None):
     """Append a row to portal_audit_log. Silently no-ops if the extension
     SQL hasn't been applied yet, so this is always safe to call."""
     import json
     if not _table_exists("portal_audit_log"):
         return
     with connection.cursor() as cursor:
-        cursor.execute(
-            "INSERT INTO portal_audit_log (actor_id, action, target_type, target_id, details) VALUES (%s,%s,%s,%s,%s)",
-            [getattr(actor, "id", None), action, target_type, str(target_id), json.dumps(details or {})],
-        )
+        if ip_address is not None:
+            cursor.execute(
+                "INSERT INTO portal_audit_log (actor_id, action, target_type, target_id, details, ip_address) "
+                "VALUES (%s,%s,%s,%s,%s,%s)",
+                [getattr(actor, "id", None), action, target_type, str(target_id), json.dumps(details or {}), ip_address],
+            )
+        else:
+            cursor.execute(
+                "INSERT INTO portal_audit_log (actor_id, action, target_type, target_id, details) VALUES (%s,%s,%s,%s,%s)",
+                [getattr(actor, "id", None), action, target_type, str(target_id), json.dumps(details or {})],
+            )
 
 
 class RoleRequired(BasePermission):

@@ -1,11 +1,460 @@
 from uuid import uuid4
 
 from django.db import connection
+
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, inline_serializer
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import serializers
 
+from .doc_schemas import (
+    DetailErrorSerializer,
+    ValidationErrorSerializer,
+    IdDetailResponseSerializer,
+    LeaveRequestSerializer,
+    LeaveSubmitResponseSerializer,
+    ERROR_RESPONSES,
+    MONTH_PARAMETER,
+)
 from .views import table_exists, rows, row, serialise, current_class_for_student
 from .roles import IsParent, log_action
+
+
+# ---------------------------------------------------------------------------
+# Documentation-only schemas for the parent portal views (raw SQL, no DRF
+# serializers). These are never used for (de)serialization — they exist solely
+# so drf-spectacular can render the hand-shaped response/request payloads.
+# ---------------------------------------------------------------------------
+
+CHILD_ID_PARAMETER = OpenApiParameter(
+    name="child_id",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description="Student (auth user) id of one of the parent's children.",
+)
+
+CHILD_ID_REQUIRED_PARAMETER = OpenApiParameter(
+    name="child_id",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.QUERY,
+    required=True,
+    description="Student (auth user) id of one of the parent's children.",
+)
+
+WITH_PARAMETER = OpenApiParameter(
+    name="with",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description="Other user id to filter the conversation thread by.",
+)
+
+_child_item = inline_serializer(
+    name="ParentChildItem",
+    fields={
+        "id": serializers.IntegerField(help_text="Student (auth user) id."),
+        "name": serializers.CharField(help_text="Student display name."),
+        "admission_number": serializers.CharField(allow_null=True, required=False),
+        "qr_id_code": serializers.CharField(allow_null=True, required=False),
+        "date_of_birth": serializers.DateField(allow_null=True, required=False),
+        "gender": serializers.CharField(allow_null=True, required=False),
+        "status": serializers.CharField(allow_null=True, required=False),
+    },
+)
+
+_parent_profile_child_item = inline_serializer(
+    name="ParentProfileChildItem",
+    fields={
+        "id": serializers.IntegerField(help_text="Student (auth user) id."),
+        "name": serializers.CharField(help_text="Student display name."),
+        "admission_number": serializers.CharField(allow_null=True, required=False),
+        "qr_id_code": serializers.CharField(allow_null=True, required=False),
+        "date_of_birth": serializers.DateField(allow_null=True, required=False),
+        "gender": serializers.CharField(allow_null=True, required=False),
+        "status": serializers.CharField(allow_null=True, required=False),
+    },
+)
+
+_parent_profile_response = inline_serializer(
+    name="ParentProfileResponse",
+    fields={
+        "id": serializers.IntegerField(help_text="Auth user id."),
+        "name": serializers.CharField(),
+        "email": serializers.EmailField(allow_blank=True),
+        "user_type": serializers.CharField(help_text="Always 'Parent'."),
+        "phone_number": serializers.CharField(allow_blank=True, required=False),
+        "father_name": serializers.CharField(allow_blank=True, required=False),
+        "mother_name": serializers.CharField(allow_blank=True, required=False),
+        "emergency_contact": serializers.CharField(allow_blank=True, required=False),
+        "address": serializers.CharField(allow_blank=True, required=False),
+        "is_verified": serializers.BooleanField(required=False),
+        "children": serializers.ListSerializer(child=_parent_profile_child_item),
+    },
+)
+
+_child_summary_item = inline_serializer(
+    name="ParentChildSummaryItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "name": serializers.CharField(),
+        "admission_number": serializers.CharField(allow_null=True, required=False),
+        "qr_id_code": serializers.CharField(allow_null=True, required=False),
+        "date_of_birth": serializers.DateField(allow_null=True, required=False),
+        "gender": serializers.CharField(allow_null=True, required=False),
+        "status": serializers.CharField(allow_null=True, required=False),
+        "class_name": serializers.CharField(allow_null=True, required=False),
+        "attendance_percentage": serializers.FloatField(allow_null=True, required=False),
+        "pending_fee_items": serializers.IntegerField(required=False),
+    },
+)
+
+_parent_dashboard_response = inline_serializer(
+    name="ParentDashboardResponse",
+    fields={
+        "children": serializers.ListSerializer(child=_child_summary_item),
+        "unread_messages": serializers.IntegerField(),
+    },
+)
+
+_attendance_summary = inline_serializer(
+    name="ParentAttendanceSummary",
+    fields={
+        "present": serializers.IntegerField(),
+        "absent": serializers.IntegerField(),
+        "late": serializers.IntegerField(),
+        "medical_leave": serializers.IntegerField(),
+        "percentage": serializers.FloatField(allow_null=True, required=False),
+    },
+)
+
+_attendance_record_item = inline_serializer(
+    name="ParentAttendanceRecordItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "date": serializers.DateField(),
+        "status": serializers.CharField(),
+        "remarks": serializers.CharField(allow_null=True, required=False),
+    },
+)
+
+_child_attendance_response = inline_serializer(
+    name="ParentChildAttendanceResponse",
+    fields={
+        "summary": _attendance_summary,
+        "records": serializers.ListSerializer(child=_attendance_record_item),
+    },
+)
+
+_child_homework_item = inline_serializer(
+    name="ParentChildHomeworkItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_null=True, required=False),
+        "assigned_date": serializers.DateField(allow_null=True, required=False),
+        "due_date": serializers.DateField(allow_null=True, required=False),
+        "subject_name": serializers.CharField(),
+        "teacher_name": serializers.CharField(allow_null=True, required=False),
+        "is_overdue": serializers.BooleanField(required=False),
+    },
+)
+
+_exam_ref_item = inline_serializer(
+    name="ParentResultExamItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "exam_name": serializers.CharField(),
+        "max_marks": serializers.FloatField(),
+        "subject_name": serializers.CharField(),
+    },
+)
+
+_child_result_item = inline_serializer(
+    name="ParentChildResultItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "marks_obtained": serializers.FloatField(),
+        "rank_position": serializers.IntegerField(allow_null=True, required=False),
+        "grade_letter": serializers.CharField(allow_null=True, required=False),
+        "remarks": serializers.CharField(allow_null=True, required=False),
+        "percentage": serializers.FloatField(help_text="Marks as a percentage of max marks."),
+        "exam": _exam_ref_item,
+    },
+)
+
+_pending_fee_item = inline_serializer(
+    name="ParentPendingFeeItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "term_name": serializers.CharField(),
+        "tuition_fee": serializers.FloatField(),
+        "transport_fee": serializers.FloatField(),
+        "hostel_fee": serializers.FloatField(),
+        "total_amount": serializers.FloatField(),
+    },
+)
+
+_fee_structure_ref_item = inline_serializer(
+    name="ParentFeeStructureRefItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "term_name": serializers.CharField(),
+        "total_amount": serializers.FloatField(),
+    },
+)
+
+_payment_history_item = inline_serializer(
+    name="ParentPaymentHistoryItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "transaction_id": serializers.CharField(),
+        "amount_paid": serializers.FloatField(),
+        "status": serializers.CharField(),
+        "paid_at": serializers.DateTimeField(allow_null=True, required=False),
+        "fee_structure_detail": _fee_structure_ref_item,
+    },
+)
+
+_child_fees_response = inline_serializer(
+    name="ParentChildFeesResponse",
+    fields={
+        "pending": serializers.ListSerializer(child=_pending_fee_item),
+        "payment_history": serializers.ListSerializer(child=_payment_history_item),
+    },
+)
+
+_fees_pay_request = inline_serializer(
+    name="ParentChildFeesPayRequest",
+    fields={
+        "child_id": serializers.IntegerField(help_text="Child to debit the payment to."),
+        "fee_structure_id": serializers.IntegerField(help_text="Fee structure being paid."),
+        "payment_method": serializers.CharField(required=False, default="Online"),
+    },
+)
+
+_fees_pay_response = inline_serializer(
+    name="ParentChildFeesPayResponse",
+    fields={
+        "detail": serializers.CharField(),
+        "id": serializers.IntegerField(),
+        "transaction_id": serializers.CharField(),
+    },
+)
+
+_child_document_item = inline_serializer(
+    name="ParentChildDocumentItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "certificate_type": serializers.CharField(),
+        "issued_date": serializers.DateField(allow_null=True, required=False),
+        "file_url": serializers.CharField(allow_null=True, required=False, allow_blank=True),
+    },
+)
+
+_transport_allocation_item = inline_serializer(
+    name="ParentTransportAllocationItem",
+    fields={
+        "pickup_point": serializers.CharField(allow_null=True, required=False),
+        "vehicle_id": serializers.IntegerField(),
+        "vehicle_number": serializers.CharField(),
+        "maintenance_status": serializers.CharField(allow_null=True, required=False),
+        "route_name": serializers.CharField(allow_null=True, required=False),
+        "start_point": serializers.CharField(allow_null=True, required=False),
+        "end_point": serializers.CharField(allow_null=True, required=False),
+        "driver_name": serializers.CharField(allow_null=True, required=False),
+    },
+)
+
+_transport_location_item = inline_serializer(
+    name="ParentTransportLocationItem",
+    fields={
+        "latitude": serializers.FloatField(allow_null=True, required=False),
+        "longitude": serializers.FloatField(allow_null=True, required=False),
+        "updated_at": serializers.DateTimeField(allow_null=True, required=False),
+    },
+)
+
+_child_transport_response = inline_serializer(
+    name="ParentChildTransportResponse",
+    fields={
+        "allocation": _transport_allocation_item,
+        "last_location": _transport_location_item,
+    },
+)
+
+_teacher_contact_item = inline_serializer(
+    name="ParentTeacherContactItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "name": serializers.CharField(),
+        "subject_name": serializers.CharField(),
+        "class_name": serializers.CharField(),
+    },
+)
+
+_message_item = inline_serializer(
+    name="ParentMessageItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "sender": serializers.IntegerField(),
+        "receiver": serializers.IntegerField(),
+        "message_text": serializers.CharField(),
+        "created_at": serializers.DateTimeField(allow_null=True, required=False),
+    },
+)
+
+_message_send_request = inline_serializer(
+    name="ParentMessageSendRequest",
+    fields={
+        "receiver": serializers.IntegerField(help_text="Recipient user id (e.g. a teacher)."),
+        "message_text": serializers.CharField(help_text="Message body."),
+    },
+)
+
+_notification_item = inline_serializer(
+    name="ParentNotificationItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "message": serializers.CharField(allow_null=True, required=False),
+        "created_at": serializers.DateTimeField(allow_null=True, required=False),
+    },
+)
+
+_leave_request_payload = inline_serializer(
+    name="ParentLeaveSubmitRequest",
+    fields={
+        "child_id": serializers.IntegerField(help_text="Child (student user id) the leave is for."),
+        "leave_type": serializers.ChoiceField(
+            choices=["Sick", "Casual", "Earned", "Medical", "Other"],
+            help_text="Type of leave.",
+        ),
+        "start_date": serializers.DateField(help_text="Leave start date (YYYY-MM-DD)."),
+        "end_date": serializers.DateField(help_text="Leave end date (YYYY-MM-DD)."),
+        "reason": serializers.CharField(help_text="Reason for leave."),
+    },
+)
+
+_leave_item = inline_serializer(
+    name="ParentLeaveItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "leave_type": serializers.CharField(),
+        "start_date": serializers.DateField(allow_null=True, required=False),
+        "end_date": serializers.DateField(allow_null=True, required=False),
+        "reason": serializers.CharField(allow_null=True, required=False),
+        "status": serializers.CharField(allow_null=True, required=False),
+    },
+)
+
+_ptm_booking_item = inline_serializer(
+    name="ParentPtmBookingItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "meeting_date": serializers.DateField(allow_null=True, required=False),
+        "time_slot": serializers.CharField(allow_null=True, required=False),
+        "status": serializers.CharField(allow_null=True, required=False),
+        "parent_notes": serializers.CharField(allow_null=True, required=False),
+        "teacher_name": serializers.CharField(allow_null=True, required=False),
+        "student_name": serializers.CharField(allow_null=True, required=False),
+    },
+)
+
+_ptm_booking_request = inline_serializer(
+    name="ParentPtmBookingRequest",
+    fields={
+        "teacher_id": serializers.IntegerField(help_text="Teacher user id."),
+        "student_id": serializers.IntegerField(help_text="Student user id."),
+        "meeting_date": serializers.DateField(help_text="Desired meeting date (YYYY-MM-DD)."),
+        "time_slot": serializers.CharField(help_text="Requested meeting time slot."),
+        "parent_notes": serializers.CharField(required=False, default=""),
+    },
+)
+
+_feedback_item = inline_serializer(
+    name="ParentFeedbackItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "category": serializers.CharField(),
+        "feedback_text": serializers.CharField(allow_null=True, required=False),
+        "status": serializers.CharField(allow_null=True, required=False),
+        "created_at": serializers.DateTimeField(allow_null=True, required=False),
+    },
+)
+
+_feedback_request = inline_serializer(
+    name="ParentFeedbackRequest",
+    fields={
+        "category": serializers.CharField(required=False, default="General"),
+        "feedback_text": serializers.CharField(help_text="Feedback body."),
+    },
+)
+
+_lms_upcoming_test_item = inline_serializer(
+    name="ParentLmsUpcomingTestItem",
+    fields={
+        "exam_name": serializers.CharField(),
+        "exam_date": serializers.DateField(allow_null=True, required=False),
+        "start_time": serializers.CharField(allow_null=True, required=False),
+        "max_marks": serializers.FloatField(allow_null=True, required=False),
+    },
+)
+
+_lms_progress_course_item = inline_serializer(
+    name="ParentLmsCourseProgressItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "subject_name": serializers.CharField(),
+        "course_title": serializers.CharField(),
+        "progress_percent": serializers.FloatField(),
+        "total_resources": serializers.IntegerField(),
+        "completed_resources": serializers.IntegerField(),
+        "chapters_total": serializers.IntegerField(),
+        "chapters_completed": serializers.IntegerField(),
+        "attendance_percent": serializers.FloatField(),
+        "assignments_total": serializers.IntegerField(),
+        "assignments_completed": serializers.IntegerField(),
+        "quizzes_total": serializers.IntegerField(),
+        "upcoming_tests": serializers.ListSerializer(child=_lms_upcoming_test_item),
+        "average_score_percent": serializers.FloatField(allow_null=True, required=False),
+        "is_weak": serializers.BooleanField(),
+        "recent_remark": serializers.CharField(),
+    },
+)
+
+_parent_lms_progress_response = inline_serializer(
+    name="ParentLmsProgressResponse",
+    fields={
+        "courses": serializers.ListSerializer(child=_lms_progress_course_item),
+        "detail": serializers.CharField(required=False, allow_blank=True),
+    },
+)
+
+FEES_PAY_EXAMPLE = OpenApiExample(
+    name="FeesPayRequestExample",
+    value={"child_id": 5, "fee_structure_id": 12, "payment_method": "Online"},
+    request_only=True,
+)
+
+LEAVE_SUBMIT_EXAMPLE = OpenApiExample(
+    name="LeaveSubmitRequestExample",
+    value={
+        "child_id": 5,
+        "leave_type": "Medical",
+        "start_date": "2026-08-10",
+        "end_date": "2026-08-11",
+        "reason": "Doctor appointment",
+    },
+    request_only=True,
+)
+
+MESSAGE_SEND_EXAMPLE = OpenApiExample(
+    name="MessageSendRequestExample",
+    value={"receiver": 7, "message_text": "Please share the homework details."},
+    request_only=True,
+)
 
 
 class ParentMixin:
@@ -40,6 +489,13 @@ def _assert_own_child(parent_id, child_id):
 
 
 class ParentProfileView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentProfile",
+        summary="Get parent profile",
+        description="Returns the logged-in parent's profile information along with a list of their linked children.",
+        tags=["Parent"],
+        responses={200: _parent_profile_response, **ERROR_RESPONSES},
+    )
     def get(self, request):
         u = request.user
         profile = {
@@ -71,6 +527,13 @@ class ParentProfileView(ParentMixin, APIView):
 
 
 class ParentDashboardView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentDashboard",
+        summary="Get parent dashboard summary",
+        description="Returns a per-child summary (class, attendance percentage, pending fee item count) plus the parent's unread message count.",
+        tags=["Parent"],
+        responses={200: _parent_dashboard_response, **ERROR_RESPONSES},
+    )
     def get(self, request):
         pid = request.user.id
         children = _children(pid)
@@ -113,11 +576,26 @@ class ParentDashboardView(ParentMixin, APIView):
 
 
 class ChildrenListView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentChildrenList",
+        summary="List parent's children",
+        description="Returns the list of students linked to the logged-in parent.",
+        tags=["Parent"],
+        responses={200: serializers.ListSerializer(child=_child_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         return Response(serialise(_children(request.user.id)))
 
 
 class ChildAttendanceView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentChildAttendance",
+        summary="Get child attendance",
+        description="Returns attendance records for one of the parent's children, optionally filtered by month, along with a computed summary.",
+        tags=["Academic"],
+        parameters=[CHILD_ID_PARAMETER, MONTH_PARAMETER],
+        responses={200: _child_attendance_response, **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -141,6 +619,14 @@ class ChildAttendanceView(ParentMixin, APIView):
 
 
 class ChildHomeworkView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentChildHomework",
+        summary="Get child homework",
+        description="Returns homework assigned to one of the parent's children, with subject, teacher and overdue flag.",
+        tags=["Academic"],
+        parameters=[CHILD_ID_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_child_homework_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -163,6 +649,14 @@ class ChildHomeworkView(ParentMixin, APIView):
 
 
 class ChildResultsView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentChildResults",
+        summary="Get child exam results",
+        description="Returns exam results for one of the parent's children, including marks, percentage and the linked exam details.",
+        tags=["Academic"],
+        parameters=[CHILD_ID_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_child_result_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -185,6 +679,14 @@ class ChildResultsView(ParentMixin, APIView):
 
 
 class ChildFeesView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentChildFees",
+        summary="Get child fees",
+        description="Returns pending fee structures and the payment history for one of the parent's children.",
+        tags=["Finance"],
+        parameters=[CHILD_ID_PARAMETER],
+        responses={200: _child_fees_response, **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -216,6 +718,19 @@ class ChildFeesView(ParentMixin, APIView):
 
 
 class ChildFeesPayView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentChildFeesPay",
+        summary="Pay a child's fee",
+        description="Records a successful payment against a fee structure for one of the parent's children and returns the generated transaction id.",
+        tags=["Finance"],
+        request=_fees_pay_request,
+        examples=[FEES_PAY_EXAMPLE],
+        responses={
+            200: _fees_pay_response,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         child_id = request.data.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -242,6 +757,14 @@ class ChildFeesPayView(ParentMixin, APIView):
 
 
 class ChildDocumentsView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentChildDocuments",
+        summary="Get child certificates",
+        description="Returns certificates/documents issued for one of the parent's children.",
+        tags=["Parent"],
+        parameters=[CHILD_ID_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_child_document_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -257,6 +780,14 @@ class ChildDocumentsView(ParentMixin, APIView):
 class ChildTransportView(ParentMixin, APIView):
     """Bus route/pickup info + most recent known GPS ping for the child's bus."""
 
+    @extend_schema(
+        operation_id="ParentChildTransport",
+        summary="Get child transport info",
+        description="Returns bus route/pickup allocation and the most recent known GPS ping for one of the parent's children.",
+        tags=["Transport"],
+        parameters=[CHILD_ID_PARAMETER],
+        responses={200: _child_transport_response, **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -289,6 +820,13 @@ class TeacherContactsView(ParentMixin, APIView):
     """Teachers currently teaching any of this parent's children — the valid
     set of people a parent may message or book a PTM slot with."""
 
+    @extend_schema(
+        operation_id="ParentTeacherContacts",
+        summary="Get teacher contacts",
+        description="Returns the distinct teachers currently teaching any of this parent's children, with subject and class names.",
+        tags=["Parent"],
+        responses={200: serializers.ListSerializer(child=_teacher_contact_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         pid = request.user.id
         if not table_exists("portal_academic_allocation"):
@@ -312,6 +850,14 @@ class TeacherContactsView(ParentMixin, APIView):
 
 
 class MessageThreadView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentMessageThread",
+        summary="Get message thread / conversation list",
+        description="Returns the parent's latest messages, or a full conversation with a single user when the 'with' parameter is provided.",
+        tags=["Parent"],
+        parameters=[WITH_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_message_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         pid = request.user.id
         other = request.query_params.get("with")
@@ -340,6 +886,19 @@ class MessageThreadView(ParentMixin, APIView):
             )
         return Response(serialise(data))
 
+    @extend_schema(
+        operation_id="ParentMessageSend",
+        summary="Send a message",
+        description="Sends a message from the logged-in parent to the given receiver and returns the new message id.",
+        tags=["Parent"],
+        request=_message_send_request,
+        examples=[MESSAGE_SEND_EXAMPLE],
+        responses={
+            200: IdDetailResponseSerializer,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_message"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -353,6 +912,13 @@ class MessageThreadView(ParentMixin, APIView):
 
 
 class NotificationListView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentNotificationList",
+        summary="Get notifications",
+        description="Returns the 50 most recent notifications targeted at parents (all parents or the classes of the parent's children).",
+        tags=["Parent"],
+        responses={200: serializers.ListSerializer(child=_notification_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         pid = request.user.id
         children = _children(pid)
@@ -371,6 +937,14 @@ class NotificationListView(ParentMixin, APIView):
 class LeaveRequestView(ParentMixin, APIView):
     """Parent submits/views leave requests on behalf of a child."""
 
+    @extend_schema(
+        operation_id="ParentLeaveRequest",
+        summary="Get child leave requests",
+        description="Returns leave requests submitted for one of the parent's children.",
+        tags=["Parent"],
+        parameters=[CHILD_ID_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_leave_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -382,6 +956,19 @@ class LeaveRequestView(ParentMixin, APIView):
             [child_id],
         )))
 
+    @extend_schema(
+        operation_id="ParentLeaveRequestSubmit",
+        summary="Submit a leave request",
+        description="Submits a leave request on behalf of one of the parent's children and returns the new leave request id.",
+        tags=["Parent"],
+        request=_leave_request_payload,
+        examples=[LEAVE_SUBMIT_EXAMPLE],
+        responses={
+            200: LeaveSubmitResponseSerializer,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         child_id = request.data.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -402,6 +989,13 @@ class LeaveRequestView(ParentMixin, APIView):
 
 
 class PtmBookingView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentPtmBooking",
+        summary="Get PTM bookings",
+        description="Returns the parent's parent-teacher meeting bookings with teacher and student names.",
+        tags=["Parent"],
+        responses={200: serializers.ListSerializer(child=_ptm_booking_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_ptm_booking"):
             return Response([])
@@ -419,6 +1013,18 @@ class PtmBookingView(ParentMixin, APIView):
         )
         return Response(serialise(data))
 
+    @extend_schema(
+        operation_id="ParentPtmBookingCreate",
+        summary="Request a PTM booking",
+        description="Creates a parent-teacher meeting booking request and returns the new booking id.",
+        tags=["Parent"],
+        request=_ptm_booking_request,
+        responses={
+            200: IdDetailResponseSerializer,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_ptm_booking"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -437,6 +1043,13 @@ class PtmBookingView(ParentMixin, APIView):
 
 
 class FeedbackView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentFeedback",
+        summary="Get parent feedback submissions",
+        description="Returns the list of feedback submissions made by the logged-in parent.",
+        tags=["Parent"],
+        responses={200: serializers.ListSerializer(child=_feedback_item), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_parent_feedback"):
             return Response([])
@@ -445,6 +1058,18 @@ class FeedbackView(ParentMixin, APIView):
             [request.user.id],
         )))
 
+    @extend_schema(
+        operation_id="ParentFeedbackCreate",
+        summary="Submit parent feedback",
+        description="Submits feedback from the logged-in parent and returns the new feedback id.",
+        tags=["Parent"],
+        request=_feedback_request,
+        responses={
+            200: IdDetailResponseSerializer,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_parent_feedback"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -458,6 +1083,14 @@ class FeedbackView(ParentMixin, APIView):
 
 
 class ParentLmsProgressView(ParentMixin, APIView):
+    @extend_schema(
+        operation_id="ParentLmsProgress",
+        summary="Get child LMS learning progress",
+        description="Returns per-course LMS progress for one of the parent's children: progress percent, resources, chapters, attendance, assignments, quizzes, upcoming tests, weak-subject flag and teacher remarks.",
+        tags=["Academic"],
+        parameters=[CHILD_ID_REQUIRED_PARAMETER],
+        responses={200: _parent_lms_progress_response, **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not child_id:

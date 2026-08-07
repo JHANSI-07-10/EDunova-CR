@@ -47,11 +47,23 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "django_filters",
+    "drf_spectacular",
     "apps.cms",
     "apps.admissions",
     "portal",
 ]
-MIDDLEWARE = [ "corsheaders.middleware.CorsMiddleware", "django.middleware.security.SecurityMiddleware", "portal.middleware.ExceptionLoggingMiddleware", "django.contrib.sessions.middleware.SessionMiddleware", "django.middleware.common.CommonMiddleware", "django.middleware.csrf.CsrfViewMiddleware", "django.contrib.auth.middleware.AuthenticationMiddleware", "django.contrib.messages.middleware.MessageMiddleware", "django.middleware.clickjacking.XFrameOptionsMiddleware", ]
+MIDDLEWARE = [
+    "django.middleware.security.SecurityMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
+    "portal.middleware.ExceptionLoggingMiddleware",
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
+    "portal.middleware.AuditTrailMiddleware",
+]
 
 ROOT_URLCONF = "config.urls"
 
@@ -127,6 +139,11 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
+    # Centralized error handling — every API returns the same JSON envelope
+    # {"detail": ..., "code": ...}. Unexpected errors become generic 500s and
+    # are logged with full context (see portal/exceptions.py).
+    "EXCEPTION_HANDLER": "portal.exceptions.edunova_exception_handler",
     # Brute-force protection on the OTP login flow. Two layers per endpoint:
     # a tight per-account limit (the real defense — caps attempts against one
     # account regardless of how many IPs an attacker spreads across) and a
@@ -145,6 +162,46 @@ REST_FRAMEWORK = {
         "otp_login_ip": "40/min",
         "otp_verify_ip": "40/min",
         "otp_resend_ip": "20/min",
+        # General purpose: authenticated file uploads (throttled per user).
+        "upload": "30/min",
+        # Public website endpoints — spam protection.
+        "contact": "10/min",
+        "admission_enquiry": "5/min",
+        "admission_status": "30/min",
+    },
+}
+
+# Upload validation bounds (see portal/views.py FileUploadView).
+MAX_UPLOAD_SIZE_MB = config("MAX_UPLOAD_SIZE_MB", default=20, cast=int)
+ALLOWED_UPLOAD_TYPES = (
+    "image/jpeg", "image/png", "image/webp", "image/gif",
+    "application/pdf", "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/zip", "text/plain", "text/markdown",
+)
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "EduNova Global Academy API",
+    "DESCRIPTION": (
+        "Integrated API for EduNova Global Academy. Covers the public website "
+        "(CMS + admissions enquiries), the student, teacher and parent portals, "
+        "and the admin portal (admissions, academics, library, hostel, transport, "
+        "timetable, finance, payroll, scholarship, reports and system modules).\n\n"
+        "Authentication uses the OTP login flow: call `auth/login` with your "
+        "credentials to receive a one-time password, then `auth/verify-otp` to "
+        "obtain JWT access and refresh tokens. Click **Authorize** and paste your "
+        "Bearer access token to call protected endpoints."
+    ),
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    "COMPONENT_SPLIT_REQUEST": True,
+    "SCHEMA_PATH_PREFIX": r"/api/",
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "persistAuthorization": True,
+        "displayOperationId": True,
     },
 }
 
@@ -195,7 +252,23 @@ SUPABASE_BUCKET_BACKUPS = "database-backups"
 DEFAULT_FILE_STORAGE = "config.storage.SupabaseStorage"
 _STORAGE_MISCONFIGURED = not (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
 
-
+# ---------------------------------------------------------------------------
+# Production TLS / security hardening. Every flag defaults off so local
+# development over http://localhost is unaffected; enable them in production.
+# ---------------------------------------------------------------------------
+if not DEBUG:
+    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+    SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
+    SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=True, cast=bool)
+    CSRF_COOKIE_SECURE = config("CSRF_COOKIE_SECURE", default=True, cast=bool)
+    SECURE_HSTS_SECONDS = config("SECURE_HSTS_SECONDS", default=0, cast=int)
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+else:
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = "same-origin"
 
 # Symmetric key (Fernet, 32 url-safe base64 bytes) used to encrypt the local
 # JSON backup file before it's written to disk / uploaded to Supabase
@@ -219,7 +292,6 @@ BREVO_API_KEY = config("BREVO_API_KEY", default=EMAIL_HOST_PASSWORD)
 OTP_EXPIRY_SECONDS = 300
 OTP_LENGTH = 6
 
-# ---------------------------------------------------------------------------
 # Startup diagnostics — loud, actionable warnings for the two most common
 # production misconfigurations that silently break OTP login. Written to
 # stderr so they always surface in the host's logs (Render, Railway, ...).
@@ -281,3 +353,65 @@ if _STORAGE_MISCONFIGURED and not DEBUG:
         "local disk, which is EPHEMERAL on Render and will be lost on redeploy. "
         "Set both vars and pre-create the storage buckets in the Supabase project."
     )
+
+# ---------------------------------------------------------------------------
+# Structured logging
+# ---------------------------------------------------------------------------
+# Logs are emitted as JSON-safe key=value lines to stdout (captured by the
+# container/PaaS log pipeline) and, when LOG_FILE is set, also appended to a
+# rotating file. Never log secrets: OTPs, passwords and tokens are excluded by
+# construction from the message strings used in this project.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "structured": {
+            "format": "%(asctime)s level=%(levelname)s logger=%(name)s "
+                      "msg=%(message)s",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "structured",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": config("LOG_LEVEL", default="INFO").upper(),
+    },
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.db.backends": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "edunova": {
+            "handlers": ["console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "edunova.errors": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+LOG_FILE = config("LOG_FILE", default="")
+if LOG_FILE:
+    LOGGING["handlers"]["file"] = {
+        "class": "logging.handlers.RotatingFileHandler",
+        "filename": LOG_FILE,
+        "maxBytes": 5 * 1024 * 1024,
+        "backupCount": 3,
+        "formatter": "structured",
+    }
+    for _logger in list(LOGGING["loggers"]):
+        LOGGING["loggers"][_logger]["handlers"].append("file")

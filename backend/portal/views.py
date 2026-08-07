@@ -1,13 +1,579 @@
 from datetime import date, datetime
 from uuid import uuid4
+import logging
 
 from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from rest_framework import status
+from rest_framework.throttling import ScopedRateThrottle
+from rest_framework import serializers, status
+
+from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, inline_serializer
+
+logger = logging.getLogger("edunova")
+
+from .doc_schemas import (
+    DetailErrorSerializer,
+    ValidationErrorSerializer,
+    IdDetailResponseSerializer,
+    LeaveRequestSerializer,
+    LeaveSubmitResponseSerializer,
+    ChatRequestSerializer,
+    ChatResponseSerializer,
+    ChatRequestExample,
+    MONTH_PARAMETER,
+    SEARCH_QUERY_PARAMETER,
+    ERROR_RESPONSES,
+    FileUploadRequestSerializer,
+    FileUploadResponseSerializer,
+)
 
 from .roles import IsStudent
+
+
+# ---------------------------------------------------------------------------
+# Documentation-only schemas for the student portal views (raw SQL, no DRF
+# serializers). These are never used for (de)serialization — they exist solely
+# so drf-spectacular can render the hand-shaped response/request payloads.
+# ---------------------------------------------------------------------------
+
+_StudentProfileResponse = inline_serializer(
+    name="StudentProfileResponse",
+    fields={
+        "id": serializers.IntegerField(help_text="Django auth user id."),
+        "name": serializers.CharField(help_text="Full name of the student."),
+        "email": serializers.EmailField(allow_blank=True),
+        "phone_number": serializers.CharField(allow_blank=True),
+        "admission_number": serializers.CharField(allow_blank=True),
+        "class_name": serializers.CharField(help_text="Class grade-section, or 'Not assigned'."),
+        "date_of_birth": serializers.DateField(allow_null=True, required=False),
+        "gender": serializers.CharField(allow_blank=True),
+        "blood_group": serializers.CharField(allow_blank=True),
+        "status": serializers.CharField(),
+        "roll_number": serializers.CharField(allow_null=True, required=False),
+        "academic_year": serializers.CharField(allow_null=True, required=False),
+    },
+)
+
+_ExamsDueItem = inline_serializer(
+    name="DashboardUpcomingExamItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "exam_name": serializers.CharField(),
+        "exam_type": serializers.CharField(),
+        "exam_date": serializers.DateField(),
+        "duration_minutes": serializers.IntegerField(),
+        "max_marks": serializers.FloatField(),
+        "subject_name": serializers.CharField(),
+    },
+)
+
+_DashboardAssignmentItem = inline_serializer(
+    name="DashboardAssignmentItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_null=True, required=False),
+        "due_date": serializers.DateTimeField(allow_null=True, required=False),
+        "max_marks": serializers.FloatField(),
+        "subject_name": serializers.CharField(),
+    },
+)
+
+_ExamRefItem = inline_serializer(
+    name="DashboardExamRefItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "exam_name": serializers.CharField(),
+        "max_marks": serializers.FloatField(),
+        "subject_name": serializers.CharField(),
+    },
+)
+
+_DashboardResultItem = inline_serializer(
+    name="DashboardResultItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "marks_obtained": serializers.FloatField(),
+        "rank_position": serializers.IntegerField(allow_null=True, required=False),
+        "grade_letter": serializers.CharField(allow_blank=True),
+        "remarks": serializers.CharField(allow_blank=True),
+        "percentage": serializers.FloatField(),
+        "exam": _ExamRefItem,
+    },
+)
+
+_DashboardHomeworkItem = inline_serializer(
+    name="DashboardHomeworkItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_null=True, required=False),
+        "assigned_date": serializers.DateField(allow_null=True, required=False),
+        "due_date": serializers.DateField(allow_null=True, required=False),
+        "subject_name": serializers.CharField(),
+        "is_overdue": serializers.BooleanField(),
+    },
+)
+
+_DashboardAnnouncementItem = inline_serializer(
+    name="DashboardAnnouncementItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "message": serializers.CharField(allow_blank=True),
+        "created_at": serializers.DateTimeField(),
+        "sender_name": serializers.CharField(),
+    },
+)
+
+_DashboardPendingFeeItem = inline_serializer(
+    name="DashboardPendingFeeItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "term_name": serializers.CharField(),
+        "tuition_fee": serializers.FloatField(),
+        "transport_fee": serializers.FloatField(),
+        "hostel_fee": serializers.FloatField(),
+        "total_amount": serializers.FloatField(),
+    },
+)
+
+_StudentDashboardResponse = inline_serializer(
+    name="StudentDashboardResponse",
+    fields={
+        "attendance_percentage": serializers.FloatField(allow_null=True, required=False),
+        "assignments_due": serializers.ListSerializer(child=_DashboardAssignmentItem),
+        "upcoming_exams": serializers.ListSerializer(child=_ExamsDueItem),
+        "pending_fees": serializers.ListSerializer(child=_DashboardPendingFeeItem),
+        "recent_results": serializers.ListSerializer(child=_DashboardResultItem),
+        "homework_due": serializers.ListSerializer(child=_DashboardHomeworkItem),
+        "announcements": serializers.ListSerializer(child=_DashboardAnnouncementItem),
+    },
+)
+
+_AttendanceSummaryResponse = inline_serializer(
+    name="AttendanceSummaryResponse",
+    fields={
+        "present": serializers.IntegerField(),
+        "absent": serializers.IntegerField(),
+        "late": serializers.IntegerField(),
+        "medical_leave": serializers.IntegerField(),
+        "percentage": serializers.FloatField(allow_null=True, required=False),
+    },
+)
+
+_AttendanceRecordItem = inline_serializer(
+    name="AttendanceRecordItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "date": serializers.DateField(),
+        "status": serializers.CharField(help_text="e.g. Present, Absent, Late, Medical."),
+        "remarks": serializers.CharField(allow_blank=True),
+    },
+)
+
+_AttendanceListResponse = inline_serializer(
+    name="AttendanceListResponse",
+    fields={
+        "summary": _AttendanceSummaryResponse,
+        "records": serializers.ListSerializer(child=_AttendanceRecordItem),
+    },
+)
+
+_TimetableItem = inline_serializer(
+    name="TimetableItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "day_of_week": serializers.CharField(),
+        "start_time": serializers.TimeField(),
+        "end_time": serializers.TimeField(),
+        "subject_name": serializers.CharField(),
+        "teacher_name": serializers.CharField(),
+    },
+)
+
+_HomeworkItem = inline_serializer(
+    name="HomeworkItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_null=True, required=False),
+        "assigned_date": serializers.DateField(allow_null=True, required=False),
+        "due_date": serializers.DateField(allow_null=True, required=False),
+        "subject_name": serializers.CharField(),
+        "teacher_name": serializers.CharField(),
+        "is_overdue": serializers.BooleanField(),
+    },
+)
+
+_AssignmentSubmissionItem = inline_serializer(
+    name="AssignmentSubmissionItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "submission_url": serializers.CharField(allow_blank=True),
+        "submitted_at": serializers.DateTimeField(allow_null=True, required=False),
+        "marks_obtained": serializers.FloatField(allow_null=True, required=False),
+        "teacher_feedback": serializers.CharField(allow_blank=True),
+        "grade": serializers.CharField(allow_blank=True),
+    },
+)
+
+_AssignmentItem = inline_serializer(
+    name="AssignmentItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_null=True, required=False),
+        "file_url": serializers.CharField(allow_null=True, required=False),
+        "max_marks": serializers.FloatField(),
+        "due_date": serializers.DateTimeField(allow_null=True, required=False),
+        "assignment_type": serializers.CharField(),
+        "quiz_questions": serializers.ListField(),
+        "subject_name": serializers.CharField(),
+        "my_submission": _AssignmentSubmissionItem,
+    },
+)
+
+_AssignmentSubmitRequest = inline_serializer(
+    name="AssignmentSubmitRequest",
+    fields={
+        "submission_url": serializers.CharField(help_text="Submission URL or file URL."),
+    },
+)
+
+_AssignmentSubmitResponse = inline_serializer(
+    name="AssignmentSubmitResponse",
+    fields={
+        "detail": serializers.CharField(),
+        "id": serializers.IntegerField(),
+        "marks_obtained": serializers.FloatField(allow_null=True, required=False),
+        "grade": serializers.CharField(allow_null=True, required=False),
+    },
+)
+
+_CourseResourceItem = inline_serializer(
+    name="CourseResourceItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "content_type": serializers.CharField(),
+        "title": serializers.CharField(),
+        "resource_url": serializers.URLField(allow_blank=True),
+        "description": serializers.CharField(allow_blank=True),
+        "due_date": serializers.DateField(allow_null=True, required=False),
+        "max_marks": serializers.FloatField(allow_null=True, required=False),
+        "quiz_id": serializers.IntegerField(allow_null=True, required=False),
+        "assignment_id": serializers.IntegerField(allow_null=True, required=False),
+        "visible_from": serializers.DateTimeField(allow_null=True, required=False),
+        "uploaded_at": serializers.DateTimeField(),
+        "download_count": serializers.IntegerField(),
+        "sort_order": serializers.IntegerField(),
+        "is_completed": serializers.BooleanField(),
+        "submission": _AssignmentSubmissionItem,
+    },
+)
+
+_CourseLessonItem = inline_serializer(
+    name="CourseLessonItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_blank=True),
+        "sort_order": serializers.IntegerField(),
+        "resources": serializers.ListSerializer(child=_CourseResourceItem),
+    },
+)
+
+_CourseChapterResourceItem = inline_serializer(
+    name="CourseChapterResourceItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "content_type": serializers.CharField(),
+        "title": serializers.CharField(),
+        "resource_url": serializers.URLField(allow_blank=True),
+        "description": serializers.CharField(allow_blank=True),
+        "visible_from": serializers.DateTimeField(allow_null=True, required=False),
+        "uploaded_at": serializers.DateTimeField(),
+        "download_count": serializers.IntegerField(),
+        "sort_order": serializers.IntegerField(),
+        "is_completed": serializers.BooleanField(),
+    },
+)
+
+_CourseChapterItem = inline_serializer(
+    name="CourseChapterItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_blank=True),
+        "sort_order": serializers.IntegerField(),
+        "resources": serializers.ListSerializer(child=_CourseChapterResourceItem),
+        "lessons": serializers.ListSerializer(child=_CourseLessonItem),
+    },
+)
+
+_CourseLegacyContentItem = inline_serializer(
+    name="CourseLegacyContentItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "content_type": serializers.CharField(),
+        "title": serializers.CharField(),
+        "resource_url": serializers.URLField(allow_blank=True),
+        "sort_order": serializers.IntegerField(),
+        "is_completed": serializers.BooleanField(),
+    },
+)
+
+_CourseQuizItem = inline_serializer(
+    name="CourseQuizItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "duration_minutes": serializers.IntegerField(),
+        "passing_score": serializers.FloatField(),
+    },
+)
+
+_CourseItem = inline_serializer(
+    name="CourseItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_blank=True),
+        "subject_name": serializers.CharField(),
+        "chapters": serializers.ListSerializer(child=_CourseChapterItem),
+        "legacy_content": serializers.ListSerializer(child=_CourseLegacyContentItem),
+        "quizzes": serializers.ListSerializer(child=_CourseQuizItem),
+    },
+)
+
+_QuizQuestionItem = inline_serializer(
+    name="QuizQuestionItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "question_text": serializers.CharField(),
+        "options": serializers.ListField(),
+    },
+)
+
+_QuizDetailResponse = inline_serializer(
+    name="QuizDetailResponse",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "duration_minutes": serializers.IntegerField(allow_null=True, required=False),
+        "passing_score": serializers.FloatField(allow_null=True, required=False),
+        "questions": serializers.ListSerializer(child=_QuizQuestionItem),
+    },
+)
+
+_QuizSubmitRequest = inline_serializer(
+    name="QuizSubmitRequest",
+    fields={
+        "answers": serializers.DictField(child=serializers.CharField(), allow_null=True, required=False),
+    },
+)
+
+_QuizSubmitResponse = inline_serializer(
+    name="QuizSubmitResponse",
+    fields={
+        "score": serializers.IntegerField(),
+        "detail": serializers.CharField(),
+    },
+)
+
+_ExamItem = inline_serializer(
+    name="ExamItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "exam_name": serializers.CharField(),
+        "exam_type": serializers.CharField(),
+        "exam_date": serializers.DateField(),
+        "start_time": serializers.TimeField(allow_null=True, required=False),
+        "duration_minutes": serializers.IntegerField(),
+        "max_marks": serializers.FloatField(),
+        "subject_name": serializers.CharField(),
+    },
+)
+
+_HallTicketExamItem = inline_serializer(
+    name="HallTicketExamItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "exam_name": serializers.CharField(),
+        "exam_date": serializers.DateField(allow_null=True, required=False),
+        "subject_name": serializers.CharField(),
+    },
+)
+
+_HallTicketItem = inline_serializer(
+    name="HallTicketItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "ticket_number": serializers.CharField(),
+        "is_verified": serializers.BooleanField(),
+        "exam": _HallTicketExamItem,
+    },
+)
+
+_ResultExamItem = inline_serializer(
+    name="ResultExamItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "exam_name": serializers.CharField(),
+        "max_marks": serializers.FloatField(),
+        "subject_name": serializers.CharField(),
+    },
+)
+
+_ResultItem = inline_serializer(
+    name="ResultItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "marks_obtained": serializers.FloatField(),
+        "rank_position": serializers.IntegerField(allow_null=True, required=False),
+        "grade_letter": serializers.CharField(allow_blank=True),
+        "remarks": serializers.CharField(allow_blank=True),
+        "percentage": serializers.FloatField(),
+        "exam": _ResultExamItem,
+    },
+)
+
+_PaymentFeeStructureItem = inline_serializer(
+    name="PaymentFeeStructureItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "term_name": serializers.CharField(),
+        "total_amount": serializers.FloatField(),
+    },
+)
+
+_PaymentHistoryItem = inline_serializer(
+    name="PaymentHistoryItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "transaction_id": serializers.CharField(),
+        "amount_paid": serializers.FloatField(),
+        "status": serializers.CharField(),
+        "paid_at": serializers.DateTimeField(allow_null=True, required=False),
+        "fee_structure_detail": _PaymentFeeStructureItem,
+    },
+)
+
+_FeesPendingFeeItem = inline_serializer(
+    name="FeesPendingFeeItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "term_name": serializers.CharField(),
+        "tuition_fee": serializers.FloatField(),
+        "transport_fee": serializers.FloatField(),
+        "hostel_fee": serializers.FloatField(),
+        "total_amount": serializers.FloatField(),
+    },
+)
+
+_FeesResponse = inline_serializer(
+    name="FeesResponse",
+    fields={
+        "pending": serializers.ListSerializer(child=_FeesPendingFeeItem),
+        "payment_history": serializers.ListSerializer(child=_PaymentHistoryItem),
+    },
+)
+
+_InitiatePaymentRequest = inline_serializer(
+    name="InitiatePaymentRequest",
+    fields={
+        "fee_structure_id": serializers.IntegerField(help_text="Fee structure id to pay for."),
+        "payment_method": serializers.CharField(
+            required=False, help_text="Online/Offline payment method.", default="Online"
+        ),
+    },
+)
+
+_InitiatePaymentResponse = inline_serializer(
+    name="InitiatePaymentResponse",
+    fields={
+        "detail": serializers.CharField(),
+        "id": serializers.IntegerField(),
+        "transaction_id": serializers.CharField(),
+    },
+)
+
+_BookDetailItem = inline_serializer(
+    name="BookDetailItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "author": serializers.CharField(),
+    },
+)
+
+_LibraryItem = inline_serializer(
+    name="LibraryItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "issue_date": serializers.DateField(allow_null=True, required=False),
+        "due_date": serializers.DateField(allow_null=True, required=False),
+        "return_date": serializers.DateField(allow_null=True, required=False),
+        "fine_amount": serializers.FloatField(),
+        "book_detail": _BookDetailItem,
+    },
+)
+
+_BookItem = inline_serializer(
+    name="BookItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "author": serializers.CharField(),
+        "available_quantity": serializers.IntegerField(),
+    },
+)
+
+_CertificateItem = inline_serializer(
+    name="CertificateItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "certificate_type": serializers.CharField(),
+        "issued_date": serializers.DateField(allow_null=True, required=False),
+        "file_url": serializers.CharField(allow_blank=True),
+    },
+)
+
+_AnnouncementItem = inline_serializer(
+    name="AnnouncementItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "message": serializers.CharField(allow_blank=True),
+        "created_at": serializers.DateTimeField(allow_null=True, required=False),
+        "sender_name": serializers.CharField(),
+    },
+)
+
+_EventItem = inline_serializer(
+    name="EventItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "title": serializers.CharField(),
+        "description": serializers.CharField(allow_blank=True),
+        "event_date": serializers.DateField(allow_null=True, required=False),
+        "venue": serializers.CharField(allow_blank=True),
+    },
+)
+
+_LeaveItem = inline_serializer(
+    name="LeaveItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "leave_type": serializers.CharField(),
+        "start_date": serializers.DateField(allow_null=True, required=False),
+        "end_date": serializers.DateField(allow_null=True, required=False),
+        "reason": serializers.CharField(allow_blank=True),
+        "status": serializers.CharField(),
+    },
+)
 
 
 def table_exists(table_name):
@@ -117,11 +683,25 @@ class StudentOnlyMixin:
 
 
 class ProfileView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentProfile",
+        summary="Get student profile",
+        description="Returns the logged-in student's profile information (contact details, admission, class, and academic year).",
+        tags=["Student"],
+        responses={200: _StudentProfileResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         return Response(student_profile_payload(request.user))
 
 
 class DashboardView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentDashboard",
+        summary="Get student dashboard summary",
+        description="Returns a summary of the student's attendance, upcoming exams, recent results, homework and assignments due, pending fees, and announcements.",
+        tags=["Student"],
+        responses={200: _StudentDashboardResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         uid = request.user.id
         cls = current_class_for_student(uid)
@@ -240,6 +820,14 @@ class DashboardView(StudentOnlyMixin, APIView):
 
 
 class AttendanceListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentAttendanceList",
+        summary="Get attendance records",
+        description="Returns the student's attendance records (optionally filtered by an YYYY-MM month) plus a summary count and percentage.",
+        tags=["Student"],
+        parameters=[MONTH_PARAMETER],
+        responses={200: _AttendanceListResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         month = request.query_params.get("month")
         uid = request.user.id
@@ -264,6 +852,13 @@ class AttendanceListView(StudentOnlyMixin, APIView):
 
 
 class TimetableView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentTimetable",
+        summary="Get class timetable",
+        description="Returns the weekly timetable entries for the student's enrolled class, or an empty list when not enrolled.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_TimetableItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         cls = current_class_for_student(request.user.id)
         if not cls or not table_exists("portal_timetable"):
@@ -284,6 +879,13 @@ class TimetableView(StudentOnlyMixin, APIView):
 
 
 class HomeworkListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentHomeworkList",
+        summary="Get homework list",
+        description="Returns the homework assigned to the student's class, or an empty list when not enrolled.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_HomeworkItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         cls = current_class_for_student(request.user.id)
         if not cls or not table_exists("portal_homework"):
@@ -304,6 +906,13 @@ class HomeworkListView(StudentOnlyMixin, APIView):
 
 
 class AssignmentListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentAssignmentList",
+        summary="Get assignments list",
+        description="Returns the assignments for the student's class including the student's own submission if any. Quiz correct answers are hidden until submitted.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_AssignmentItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         cls = current_class_for_student(request.user.id)
         if not cls or not table_exists("portal_assignment"):
@@ -343,6 +952,28 @@ class AssignmentListView(StudentOnlyMixin, APIView):
 
 
 class AssignmentSubmitView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentAssignmentSubmit",
+        summary="Submit an assignment",
+        description="Records a submission for a given assignment. Quiz assignments are auto-graded; other assignments store the URL.",
+        tags=["Student"],
+        parameters=[
+            OpenApiParameter(
+                name="assignment_id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Assignment id.",
+            ),
+        ],
+        request=_AssignmentSubmitRequest,
+        responses={
+            200: _AssignmentSubmitResponse,
+            400: ValidationErrorSerializer,
+            404: DetailErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request, assignment_id):
         if not table_exists("portal_assignment_submission"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -404,6 +1035,13 @@ class AssignmentSubmitView(StudentOnlyMixin, APIView):
 
 
 class CourseListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentCourseList",
+        summary="Get LMS courses",
+        description="Returns the learning management courses for the student's class including chapters, lessons, resources, quizzes, and progress flags.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_CourseItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         cls = current_class_for_student(request.user.id)
         if not cls or not table_exists("portal_course"):
@@ -480,6 +1118,22 @@ class CourseListView(StudentOnlyMixin, APIView):
 
 
 class QuizDetailView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentQuizDetail",
+        summary="Get quiz detail",
+        description="Returns a quiz and its questions with answer options for the student.",
+        tags=["Student"],
+        parameters=[
+            OpenApiParameter(
+                name="quiz_id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Quiz id.",
+            ),
+        ],
+        responses={200: _QuizDetailResponse, **ERROR_RESPONSES},
+    )
     def get(self, request, quiz_id):
         if not table_exists("portal_quiz"):
             return Response({"id": quiz_id, "title": "Quiz", "questions": []})
@@ -487,11 +1141,66 @@ class QuizDetailView(StudentOnlyMixin, APIView):
         quiz["questions"] = rows("SELECT id, question_text, options FROM portal_quiz_question WHERE quiz_id=%s", [quiz_id]) if table_exists("portal_quiz_question") else []
         return Response(serialise(quiz))
 
+    @extend_schema(
+        operation_id="StudentQuizSubmit",
+        summary="Submit a quiz response",
+        description=(
+            "Accepts the student's answers (a map of question_id to selected option) and "
+            "returns a percentage score computed against the quiz's stored correct answers."
+        ),
+        tags=["Student"],
+        parameters=[
+            OpenApiParameter(
+                name="quiz_id",
+                type=int,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Quiz id.",
+            ),
+        ],
+        request=_QuizSubmitRequest,
+        responses={200: _QuizSubmitResponse, **ERROR_RESPONSES},
+    )
     def post(self, request, quiz_id):
-        return Response({"score": 0, "detail": "Quiz submitted. Scoring workflow can be extended."})
+        answers = request.data.get("answers")
+        if not isinstance(answers, dict):
+            return Response({"detail": "answers (question_id -> selected option) is required."}, status=400)
+
+        if not table_exists("portal_quiz_question"):
+            return Response({"score": 0, "detail": "Quiz submitted, but no questions are available for scoring."})
+
+        questions = rows(
+            "SELECT id, correct_answer FROM portal_quiz_question WHERE quiz_id=%s",
+            [quiz_id],
+        )
+        if not questions:
+            return Response({"score": 0, "detail": "Quiz submitted, but no questions are available for scoring."})
+
+        correct = 0
+        for q in questions:
+            submitted = str(answers.get(str(q["id"]), "")).strip()
+            expected = str(q.get("correct_answer") or "").strip()
+            if submitted and submitted == expected:
+                correct += 1
+
+        total = len(questions)
+        score = int(round(100 * correct / total)) if total else 0
+        return Response(
+            {
+                "score": score,
+                "detail": f"Quiz submitted. {correct} of {total} questions answered correctly.",
+            }
+        )
 
 
 class ExamListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentExamList",
+        summary="Get exam schedule",
+        description="Returns the exam schedule for the student's class, or an empty list when not enrolled.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_ExamItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         cls = current_class_for_student(request.user.id)
         if not cls or not table_exists("portal_exam_schedule"):
@@ -508,6 +1217,13 @@ class ExamListView(StudentOnlyMixin, APIView):
 
 
 class HallTicketListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentHallTicketList",
+        summary="Get hall tickets",
+        description="Returns the student's generated exam hall tickets with exam details.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_HallTicketItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_hall_ticket"):
             return Response([])
@@ -525,6 +1241,13 @@ class HallTicketListView(StudentOnlyMixin, APIView):
 
 
 class ResultListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentResultList",
+        summary="Get exam results",
+        description="Returns the student's exam results with percentage and exam details, or an empty list when no results exist.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_ResultItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_result"):
             return Response([])
@@ -543,6 +1266,13 @@ class ResultListView(StudentOnlyMixin, APIView):
 
 
 class FeesView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentFees",
+        summary="Get fees and payment history",
+        description="Returns pending fee structures for the student's class and the student's payment history.",
+        tags=["Student"],
+        responses={200: _FeesResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         cls = current_class_for_student(request.user.id)
         pending, history = [], []
@@ -569,6 +1299,18 @@ class FeesView(StudentOnlyMixin, APIView):
 
 
 class InitiatePaymentView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentInitiatePayment",
+        summary="Initiate a fee payment",
+        description="Records a successful payment against a fee structure and returns the generated transaction id.",
+        tags=["Student"],
+        request=_InitiatePaymentRequest,
+        responses={
+            200: _InitiatePaymentResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_payment"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -590,6 +1332,13 @@ class InitiatePaymentView(StudentOnlyMixin, APIView):
 
 
 class LibraryView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentLibraryList",
+        summary="Get library transactions",
+        description="Returns the student's library borrowing history with book details.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_LibraryItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_library_transaction"):
             return Response([])
@@ -605,6 +1354,14 @@ class LibraryView(StudentOnlyMixin, APIView):
 
 
 class BookSearchView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentBookSearch",
+        summary="Search library books",
+        description="Searches books by title or author keyword and returns up to 20 matches.",
+        tags=["Student"],
+        parameters=[SEARCH_QUERY_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_BookItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         q = request.query_params.get("q", "").strip()
         if not q or not table_exists("portal_book"):
@@ -618,6 +1375,13 @@ class BookSearchView(StudentOnlyMixin, APIView):
 
 
 class CertificateListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentCertificateList",
+        summary="Get certificates",
+        description="Returns the certificates issued to the student, or an empty list when none exist.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_CertificateItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_certificate"):
             return Response([])
@@ -625,6 +1389,13 @@ class CertificateListView(StudentOnlyMixin, APIView):
 
 
 class AnnouncementListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentAnnouncementList",
+        summary="Get announcements",
+        description="Returns announcements and news targeted at students, or an empty list when none exist.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_AnnouncementItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         cls = current_class_for_student(request.user.id)
         class_id = cls["class_id"] if cls else None
@@ -645,6 +1416,13 @@ class AnnouncementListView(StudentOnlyMixin, APIView):
 
 
 class EventListView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentEventList",
+        summary="Get events",
+        description="Returns school events with dates and venues, or an empty list when none exist.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_EventItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("cms_event"):
             return Response([])
@@ -654,6 +1432,13 @@ class EventListView(StudentOnlyMixin, APIView):
 class StudentLeaveView(StudentOnlyMixin, APIView):
     """Student submits or views their own leave applications."""
 
+    @extend_schema(
+        operation_id="StudentLeaveList",
+        summary="Get leave applications",
+        description="Returns the leave applications submitted by the student.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_LeaveItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_leave"):
             return Response([])
@@ -662,6 +1447,18 @@ class StudentLeaveView(StudentOnlyMixin, APIView):
             [request.user.id],
         )))
 
+    @extend_schema(
+        operation_id="StudentLeaveCreate",
+        summary="Submit a leave application",
+        description="Creates a new leave application for the student and returns the new leave request id.",
+        tags=["Student"],
+        request=LeaveRequestSerializer,
+        responses={
+            200: LeaveSubmitResponseSerializer,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_leave"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -681,53 +1478,107 @@ class StudentLeaveView(StudentOnlyMixin, APIView):
 class FileUploadView(APIView):
     from rest_framework.parsers import MultiPartParser, FormParser
     parser_classes = (MultiPartParser, FormParser)
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "upload"
 
+    @extend_schema(
+        operation_id="FileUpload",
+        summary="Upload a file",
+        description=(
+            "Uploads a file to Supabase storage (or falls back to local storage) and "
+            "returns the public URL. Requires authentication and a file type/size within "
+            "the allowed bounds."
+        ),
+        tags=["System"],
+        request=FileUploadRequestSerializer,
+        responses={
+            200: FileUploadResponseSerializer,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         file_obj = request.FILES.get('file')
         if not file_obj:
             return Response({"detail": "No file uploaded."}, status=400)
-            
-        bucket_name = request.data.get('bucket', 'lms-resources')
-        
+
+        # --- File validation -------------------------------------------------
+        import mimetypes
         from django.conf import settings
+
+        MAX_SIZE = getattr(settings, "MAX_UPLOAD_SIZE_MB", 20) * 1024 * 1024
+        ALLOWED_TYPES = getattr(settings, "ALLOWED_UPLOAD_TYPES", (
+            "image/jpeg", "image/png", "image/webp", "image/gif",
+            "application/pdf", "application/msword",
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            "application/vnd.ms-excel",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            "application/zip", "text/plain", "text/markdown",
+        ))
+
+        name = file_obj.name or ""
+        file_size = file_obj.size
+        guessed, _ = mimetypes.guess_type(name)
+        if file_size > MAX_SIZE:
+            return Response(
+                {"detail": f"File exceeds the {getattr(settings, 'MAX_UPLOAD_SIZE_MB', 20)} MB size limit."},
+                status=400,
+            )
+        ctype = file_obj.content_type or guessed or ""
+        if ctype.split(";")[0].strip().lower() not in ALLOWED_TYPES:
+            return Response(
+                {"detail": "File type not allowed. Use a common document, PDF or image format."},
+                status=400,
+            )
+
+        if getattr(settings, "DEBUG", False):
+            logger.info("Upload user_id=%s name=%s bytes=%s type=%s", request.user.id, name, file_size, ctype)
+
+        bucket_name = request.data.get('bucket', 'lms-resources')
         from supabase import create_client
-        import uuid
+        import uuid as _uuid
 
         url = getattr(settings, "SUPABASE_URL", "")
         key = getattr(settings, "SUPABASE_SERVICE_ROLE_KEY", "")
         if not url or not key:
             from django.core.files.storage import default_storage
-            filename = default_storage.save(f"uploads/{uuid.uuid4()}_{file_obj.name}", file_obj)
+            filename = default_storage.save(f"uploads/{_uuid.uuid4()}_{name}", file_obj)
             file_url = request.build_absolute_uri(default_storage.url(filename))
             return Response({"url": file_url})
 
         try:
             client = create_client(url, key)
-            file_extension = file_obj.name.split('.')[-1]
-            unique_filename = f"{uuid.uuid4()}.{file_extension}"
-            
-            # Read file bytes
+            file_extension = name.split('.')[-1] if '.' in name else "bin"
+            unique_filename = f"{_uuid.uuid4()}.{file_extension}"
+
             file_bytes = file_obj.read()
-            
-            # Upload
             client.storage.from_(bucket_name).upload(
                 path=unique_filename,
                 file=file_bytes,
-                file_options={"content-type": file_obj.content_type}
+                file_options={"content-type": ctype}
             )
-            
+
             file_url = client.storage.from_(bucket_name).get_public_url(unique_filename)
             return Response({"url": file_url})
         except Exception as e:
-            # Fallback to local storage if Supabase upload fails (e.g. connection error)
-            print(f"Supabase upload failed, falling back to local storage. Error: {str(e)}")
+            logger.exception("Supabase upload failed; falling back to local storage")
             from django.core.files.storage import default_storage
-            filename = default_storage.save(f"uploads/{uuid.uuid4()}_{file_obj.name}", file_obj)
+            filename = default_storage.save(f"uploads/{_uuid.uuid4()}_{name}", file_obj)
             file_url = request.build_absolute_uri(default_storage.url(filename))
             return Response({"url": file_url})
 
 
 class StudentAIChatView(StudentOnlyMixin, APIView):
+    @extend_schema(
+        operation_id="StudentAIChat",
+        summary="Chat with the AI study assistant",
+        description="Sends a natural-language message to the AI assistant and receives a helpful reply about assignments, timetable, or grades.",
+        tags=["Student"],
+        request=ChatRequestSerializer,
+        responses={200: ChatResponseSerializer, **ERROR_RESPONSES},
+        examples=[ChatRequestExample],
+    )
     def post(self, request):
         message = request.data.get("message", "").strip()
         if not message:

@@ -9,14 +9,345 @@ and don't bloat admin_views.py further.
 """
 from datetime import date
 
-from django.db import connection
+from django.db import connection, transaction
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import OpenApiExample, OpenApiParameter, extend_schema, inline_serializer
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .admin_views import AdminMixin, SimpleTableView
+from .doc_schemas import (
+    DetailErrorSerializer,
+    ERROR_RESPONSES,
+    IdDetailResponseSerializer,
+    STUDENT_ID_PARAMETER,
+    ValidationErrorSerializer,
+)
 from .parent_views import ParentMixin, _assert_own_child
 from .roles import log_action
 from .views import StudentOnlyMixin, row, rows, serialise, table_exists
+
+# =============================================================================
+# Documentation-only schemas (raw-SQL views have no DRF serializers)
+# =============================================================================
+_HOSTEL_ITEM = inline_serializer(
+    name="HostelItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "name": serializers.CharField(),
+        "type": serializers.CharField(required=False),
+        "warden_id": serializers.IntegerField(required=False),
+    },
+)
+_HOSTEL_CREATE_REQUEST = inline_serializer(
+    name="HostelCreateRequest",
+    fields={
+        "name": serializers.CharField(),
+        "type": serializers.CharField(required=False),
+        "warden_id": serializers.IntegerField(required=False),
+    },
+)
+
+_ROOM_ITEM = inline_serializer(
+    name="RoomItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "hostel_id": serializers.IntegerField(),
+        "room_number": serializers.CharField(),
+        "capacity": serializers.IntegerField(),
+        "occupied_beds": serializers.IntegerField(required=False),
+        "hostel_name": serializers.CharField(),
+    },
+)
+_ROOM_CREATE_REQUEST = inline_serializer(
+    name="RoomCreateRequest",
+    fields={
+        "hostel_id": serializers.IntegerField(),
+        "room_number": serializers.CharField(),
+        "capacity": serializers.IntegerField(required=False),
+    },
+)
+_ROOM_CREATE_EXAMPLE = OpenApiExample(
+    name="RoomCreateExample",
+    value={"hostel_id": 1, "room_number": "A-101", "capacity": 2},
+)
+
+_HOSTEL_ALLOCATION_ITEM = inline_serializer(
+    name="HostelAllocationItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "allocated_date": serializers.DateField(),
+        "vacated_date": serializers.DateField(required=False),
+        "student_name": serializers.CharField(),
+        "room_number": serializers.CharField(),
+        "hostel_name": serializers.CharField(),
+    },
+)
+_HOSTEL_ALLOCATION_CREATE_REQUEST = inline_serializer(
+    name="HostelAllocationCreateRequest",
+    fields={
+        "student_id": serializers.IntegerField(),
+        "room_id": serializers.IntegerField(),
+    },
+)
+_HOSTEL_ALLOCATION_CREATE_EXAMPLE = OpenApiExample(
+    name="HostelAllocationExample",
+    value={"student_id": 12, "room_id": 3},
+)
+
+_STOCK_HOSTEL_ITEM = inline_serializer(
+    name="StudentHostelItem",
+    fields={
+        "room_number": serializers.CharField(),
+        "hostel_name": serializers.CharField(),
+        "type": serializers.CharField(required=False),
+        "allocated_date": serializers.DateField(),
+    },
+)
+_STUDENT_TRANSPORT_ITEM = inline_serializer(
+    name="StudentTransportItem",
+    fields={
+        "pickup_point": serializers.CharField(),
+        "vehicle_id": serializers.IntegerField(),
+        "vehicle_number": serializers.CharField(),
+        "maintenance_status": serializers.CharField(required=False),
+        "route_name": serializers.CharField(),
+        "start_point": serializers.CharField(),
+        "end_point": serializers.CharField(),
+        "driver_name": serializers.CharField(required=False),
+    },
+)
+
+_INVENTORY_ITEM = inline_serializer(
+    name="InventoryItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "item_name": serializers.CharField(),
+        "category": serializers.CharField(),
+        "quantity": serializers.IntegerField(),
+        "department": serializers.CharField(),
+    },
+)
+_INVENTORY_CREATE_REQUEST = inline_serializer(
+    name="InventoryCreateRequest",
+    fields={
+        "item_name": serializers.CharField(),
+        "category": serializers.CharField(required=False),
+        "quantity": serializers.IntegerField(required=False),
+        "department": serializers.CharField(required=False),
+    },
+)
+_INVENTORY_CREATE_EXAMPLE = OpenApiExample(
+    name="InventoryCreateExample",
+    value={
+        "item_name": "A4 paper reams",
+        "category": "Stationery",
+        "quantity": 200,
+        "department": "Administration",
+    },
+)
+_INVENTORY_ADJUST_REQUEST = inline_serializer(
+    name="InventoryAdjustRequest",
+    fields={
+        "id": serializers.IntegerField(),
+        "quantity_delta": serializers.IntegerField(),
+    },
+)
+_INVENTORY_ADJUST_EXAMPLE = OpenApiExample(
+    name="InventoryAdjustExample",
+    value={"id": 7, "quantity_delta": -25},
+)
+_QUANTITY_DETAIL_RESPONSE = inline_serializer(
+    name="QuantityDetailResponse",
+    fields={
+        "quantity": serializers.IntegerField(),
+        "detail": serializers.CharField(),
+    },
+)
+
+_VISITOR_LOG_ITEM = inline_serializer(
+    name="VisitorLogItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "visitor_name": serializers.CharField(),
+        "purpose": serializers.CharField(),
+        "host_user_id": serializers.IntegerField(required=False),
+        "id_proof_type": serializers.CharField(),
+        "check_in_time": serializers.DateTimeField(required=False),
+        "check_out_time": serializers.DateTimeField(required=False),
+        "host_name": serializers.CharField(required=False),
+    },
+)
+_VISITOR_LOG_CREATE_REQUEST = inline_serializer(
+    name="VisitorLogCreateRequest",
+    fields={
+        "visitor_name": serializers.CharField(),
+        "purpose": serializers.CharField(),
+        "host_user_id": serializers.IntegerField(required=False),
+        "id_proof_type": serializers.CharField(required=False),
+    },
+)
+_VISITOR_LOG_CREATE_EXAMPLE = OpenApiExample(
+    name="VisitorCheckInExample",
+    value={
+        "visitor_name": "Ravi Kumar",
+        "purpose": "Parent meeting with class teacher",
+        "host_user_id": 12,
+        "id_proof_type": "Aadhaar",
+    },
+)
+_VISITOR_CHECKIN_RESPONSE = inline_serializer(
+    name="VisitorCheckInResponse",
+    fields={
+        "id": serializers.IntegerField(),
+        "check_in_time": serializers.DateTimeField(),
+        "detail": serializers.CharField(),
+    },
+)
+
+_ALUMNI_ITEM = inline_serializer(
+    name="AlumniItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "student_id": serializers.IntegerField(),
+        "graduation_year": serializers.IntegerField(),
+        "current_occupation": serializers.CharField(required=False),
+        "higher_studies_details": serializers.CharField(required=False),
+        "student_name": serializers.CharField(),
+        "email": serializers.EmailField(required=False),
+    },
+)
+_ALUMNI_UPSERT_REQUEST = inline_serializer(
+    name="AlumniUpsertRequest",
+    fields={
+        "student_id": serializers.IntegerField(),
+        "graduation_year": serializers.IntegerField(),
+        "current_occupation": serializers.CharField(required=False),
+        "higher_studies_details": serializers.CharField(required=False),
+    },
+)
+
+_MEDICAL_LOG_ITEM = inline_serializer(
+    name="MedicalLogItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "student_id": serializers.IntegerField(),
+        "visit_date": serializers.DateField(),
+        "symptoms": serializers.CharField(required=False),
+        "treatment_given": serializers.CharField(required=False),
+        "doctor_notes": serializers.CharField(required=False),
+        "recorded_by": serializers.IntegerField(),
+        "student_name": serializers.CharField(),
+    },
+)
+_MEDICAL_LOG_CREATE_REQUEST = inline_serializer(
+    name="MedicalLogCreateRequest",
+    fields={
+        "student_id": serializers.IntegerField(),
+        "symptoms": serializers.CharField(required=False),
+        "treatment_given": serializers.CharField(required=False),
+        "doctor_notes": serializers.CharField(required=False),
+    },
+)
+_STUDENT_MEDICAL_ITEM = inline_serializer(
+    name="StudentMedicalItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "visit_date": serializers.DateField(),
+        "symptoms": serializers.CharField(required=False),
+        "treatment_given": serializers.CharField(required=False),
+        "doctor_notes": serializers.CharField(required=False),
+    },
+)
+
+_PAYROLL_ITEM = inline_serializer(
+    name="PayrollItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "employee_id": serializers.IntegerField(),
+        "pay_month": serializers.CharField(),
+        "basic_salary": serializers.DecimalField(max_digits=12, decimal_places=2),
+        "allowances": serializers.DecimalField(max_digits=12, decimal_places=2),
+        "deductions": serializers.DecimalField(max_digits=12, decimal_places=2),
+        "net_pay": serializers.DecimalField(max_digits=12, decimal_places=2),
+        "status": serializers.CharField(),
+        "paid_on": serializers.DateTimeField(required=False),
+        "generated_by": serializers.IntegerField(required=False),
+        "employee_name": serializers.CharField(),
+        "designation": serializers.CharField(required=False),
+        "department": serializers.CharField(required=False),
+        "employee_code": serializers.CharField(required=False),
+    },
+)
+_PAYROLL_UPDATE_REQUEST = inline_serializer(
+    name="PayrollUpdateRequest",
+    fields={
+        "id": serializers.IntegerField(),
+        "allowances": serializers.DecimalField(max_digits=12, decimal_places=2, required=False),
+        "deductions": serializers.DecimalField(max_digits=12, decimal_places=2, required=False),
+        "status": serializers.CharField(required=False),
+    },
+)
+_PAYROLL_UPDATE_EXAMPLE = OpenApiExample(
+    name="PayrollUpdateExample",
+    value={"id": 41, "allowances": 5000.0, "deductions": 1200.0, "status": "Paid"},
+)
+
+
+# ---------------------------------------------------------------------------
+# Reusable query path/query parameters for these modules
+# ---------------------------------------------------------------------------
+_HOSTEL_ID_PARAMETER = OpenApiParameter(
+    name="hostel_id",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description="Filter rooms belonging to this hostel.",
+)
+_DEPARTMENT_PARAMETER = OpenApiParameter(
+    name="department",
+    type=OpenApiTypes.STR,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description="Filter inventory items by department.",
+)
+_OPEN_PARAMETER = OpenApiParameter(
+    name="open",
+    type=OpenApiTypes.BOOL,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description="Pass open=true to list only visitors still checked in.",
+)
+_GRADUATION_YEAR_PARAMETER = OpenApiParameter(
+    name="graduation_year",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.QUERY,
+    required=False,
+    description="Filter alumni by graduation year.",
+)
+_CHILD_ID_PARAMETER = OpenApiParameter(
+    name="child_id",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.QUERY,
+    required=True,
+    description="The parent's child (student) to look up.",
+)
+_ALLOCATION_ID_PARAMETER = OpenApiParameter(
+    name="allocation_id",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.PATH,
+    required=True,
+    description="Hostel allocation id to vacate.",
+)
+_VISITOR_ID_PARAMETER = OpenApiParameter(
+    name="visitor_id",
+    type=OpenApiTypes.INT,
+    location=OpenApiParameter.PATH,
+    required=True,
+    description="Visitor log id to check out.",
+)
+
 
 # =============================================================================
 # HOSTEL
@@ -26,10 +357,39 @@ class HostelView(SimpleTableView):
     columns = ("name", "type", "warden_id")
     order_by = "name"
 
+    @extend_schema(
+        operation_id="HostelList",
+        summary="List hostels",
+        description="Return all hostels.",
+        tags=["Hostel"],
+        responses={200: serializers.ListSerializer(child=_HOSTEL_ITEM), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        return super().get(request)
+
+    @extend_schema(
+        operation_id="HostelCreate",
+        summary="Create a hostel",
+        description="Create a new hostel.",
+        tags=["Hostel"],
+        request=_HOSTEL_CREATE_REQUEST,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        return super().post(request)
+
 
 class RoomView(AdminMixin, APIView):
     """GET ?hostel_id= to scope to one hostel; POST to add a room."""
 
+    @extend_schema(
+        operation_id="RoomList",
+        summary="List rooms",
+        description="Return rooms, optionally filtered to one hostel.",
+        tags=["Hostel"],
+        parameters=[_HOSTEL_ID_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_ROOM_ITEM), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_room"):
             return Response([])
@@ -45,6 +405,15 @@ class RoomView(AdminMixin, APIView):
         sql += " ORDER BY h.name, r.room_number"
         return Response(serialise(rows(sql, params)))
 
+    @extend_schema(
+        operation_id="RoomCreate",
+        summary="Add a room",
+        description="Create a new room in a hostel.",
+        tags=["Hostel"],
+        request=_ROOM_CREATE_REQUEST,
+        examples=[_ROOM_CREATE_EXAMPLE],
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
     def post(self, request):
         if not table_exists("portal_room"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -60,6 +429,13 @@ class RoomView(AdminMixin, APIView):
 
 
 class HostelAllocationView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="HostelAllocationList",
+        summary="List current hostel allocations",
+        description="Return all active (non-vacated) hostel allocations.",
+        tags=["Hostel"],
+        responses={200: serializers.ListSerializer(child=_HOSTEL_ALLOCATION_ITEM), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_hostel_allocation"):
             return Response([])
@@ -77,6 +453,15 @@ class HostelAllocationView(AdminMixin, APIView):
             """
         )))
 
+    @extend_schema(
+        operation_id="HostelAllocationCreate",
+        summary="Allocate a student to a room",
+        description="Allocate a student to a room. Rejects if the room is already full.",
+        tags=["Hostel"],
+        request=_HOSTEL_ALLOCATION_CREATE_REQUEST,
+        examples=[_HOSTEL_ALLOCATION_CREATE_EXAMPLE],
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
     def post(self, request):
         """Allocate a student to a room. Rejects if the room is already full."""
         if not table_exists("portal_hostel_allocation"):
@@ -88,18 +473,28 @@ class HostelAllocationView(AdminMixin, APIView):
             return Response({"detail": "Room not found."}, status=404)
         if room["occupied_beds"] >= room["capacity"]:
             return Response({"detail": "Room is already at full capacity."}, status=400)
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "INSERT INTO portal_hostel_allocation (student_id, room_id) VALUES (%s,%s) RETURNING id",
-                [student_id, room_id],
-            )
-            alloc_id = cursor.fetchone()[0]
-            cursor.execute("UPDATE portal_room SET occupied_beds = occupied_beds + 1 WHERE id=%s", [room_id])
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_hostel_allocation (student_id, room_id) VALUES (%s,%s) RETURNING id",
+                    [student_id, room_id],
+                )
+                alloc_id = cursor.fetchone()[0]
+                cursor.execute("UPDATE portal_room SET occupied_beds = occupied_beds + 1 WHERE id=%s", [room_id])
         log_action(request.user, "hostel.allocate", "student", student_id, {"room_id": room_id})
         return Response({"id": alloc_id, "detail": "Student allocated to room."})
 
 
 class HostelVacateView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="HostelVacate",
+        summary="Vacate a hostel allocation",
+        description="Mark a hostel allocation as vacated today and free the room's occupied bed.",
+        tags=["Hostel"],
+        parameters=[_ALLOCATION_ID_PARAMETER],
+        request=None,
+        responses={200: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
     def post(self, request, allocation_id):
         if not table_exists("portal_hostel_allocation"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -108,15 +503,16 @@ class HostelVacateView(AdminMixin, APIView):
             return Response({"detail": "Allocation not found."}, status=404)
         if alloc["vacated_date"]:
             return Response({"detail": "Already vacated."}, status=400)
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "UPDATE portal_hostel_allocation SET vacated_date=%s WHERE id=%s",
-                [date.today(), allocation_id],
-            )
-            cursor.execute(
-                "UPDATE portal_room SET occupied_beds = GREATEST(occupied_beds - 1, 0) WHERE id=%s",
-                [alloc["room_id"]],
-            )
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE portal_hostel_allocation SET vacated_date=%s WHERE id=%s",
+                    [date.today(), allocation_id],
+                )
+                cursor.execute(
+                    "UPDATE portal_room SET occupied_beds = GREATEST(occupied_beds - 1, 0) WHERE id=%s",
+                    [alloc["room_id"]],
+                )
         log_action(request.user, "hostel.vacate", "allocation", allocation_id, {})
         return Response({"detail": "Room vacated."})
 
@@ -124,6 +520,13 @@ class HostelVacateView(AdminMixin, APIView):
 class StudentHostelView(StudentOnlyMixin, APIView):
     """A student's own current room, if any."""
 
+    @extend_schema(
+        operation_id="StudentHostelView",
+        summary="Student's current hostel room",
+        description="Return the current student's hostel room allocation, if any.",
+        tags=["Hostel"],
+        responses={200: _STOCK_HOSTEL_ITEM, **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_hostel_allocation"):
             return Response(None)
@@ -143,6 +546,13 @@ class StudentHostelView(StudentOnlyMixin, APIView):
 class StudentTransportView(StudentOnlyMixin, APIView):
     """A student's own current transport allocation, if any."""
 
+    @extend_schema(
+        operation_id="StudentTransportView",
+        summary="Student's current transport allocation",
+        description="Return the current student's transport allocation, if any.",
+        tags=["Transport"],
+        responses={200: _STUDENT_TRANSPORT_ITEM, **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_transport_allocation"):
             return Response(None)
@@ -165,6 +575,14 @@ class StudentTransportView(StudentOnlyMixin, APIView):
 class ChildHostelView(ParentMixin, APIView):
     """A parent's view of their child's current hostel room."""
 
+    @extend_schema(
+        operation_id="ChildHostelView",
+        summary="Parent's view of a child's hostel room",
+        description="Return a parent's child's current hostel room, if any.",
+        tags=["Hostel"],
+        parameters=[_CHILD_ID_PARAMETER],
+        responses={200: _STOCK_HOSTEL_ITEM, **ERROR_RESPONSES},
+    )
     def get(self, request):
         child_id = request.query_params.get("child_id")
         if not _assert_own_child(request.user.id, child_id):
@@ -191,6 +609,14 @@ class InventoryView(AdminMixin, APIView):
     """GET ?department= to filter; PATCH via item id in the body for quantity
     adjustments (simple stock in/out), POST to add a new item line."""
 
+    @extend_schema(
+        operation_id="InventoryList",
+        summary="List inventory items",
+        description="Return inventory items, optionally filtered by department.",
+        tags=["System"],
+        parameters=[_DEPARTMENT_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_INVENTORY_ITEM), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_inventory"):
             return Response([])
@@ -203,6 +629,15 @@ class InventoryView(AdminMixin, APIView):
         sql += " ORDER BY department, item_name"
         return Response(serialise(rows(sql, params)))
 
+    @extend_schema(
+        operation_id="InventoryCreate",
+        summary="Add an inventory item",
+        description="Create a new inventory line item.",
+        tags=["System"],
+        request=_INVENTORY_CREATE_REQUEST,
+        examples=[_INVENTORY_CREATE_EXAMPLE],
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
     def post(self, request):
         if not table_exists("portal_inventory"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -217,6 +652,15 @@ class InventoryView(AdminMixin, APIView):
         log_action(request.user, "inventory.create", "portal_inventory", new_id, dict(d))
         return Response({"id": new_id, "detail": "Item added."})
 
+    @extend_schema(
+        operation_id="InventoryAdjust",
+        summary="Adjust stock quantity",
+        description="Body: {id, quantity_delta} — adjusts stock up or down (never below zero).",
+        tags=["System"],
+        request=_INVENTORY_ADJUST_REQUEST,
+        examples=[_INVENTORY_ADJUST_EXAMPLE],
+        responses={200: _QUANTITY_DETAIL_RESPONSE, **ERROR_RESPONSES},
+    )
     def patch(self, request):
         """Body: {id, quantity_delta} — adjusts stock up or down."""
         if not table_exists("portal_inventory"):
@@ -240,6 +684,14 @@ class InventoryView(AdminMixin, APIView):
 # VISITOR MANAGEMENT
 # =============================================================================
 class VisitorLogView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="VisitorLogList",
+        summary="List visitor logs",
+        description="Return recent visitor check-in logs, optionally only those still checked in.",
+        tags=["System"],
+        parameters=[_OPEN_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_VISITOR_LOG_ITEM), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_visitor_log"):
             return Response([])
@@ -253,6 +705,15 @@ class VisitorLogView(AdminMixin, APIView):
         sql += " ORDER BY v.check_in_time DESC LIMIT 200"
         return Response(serialise(rows(sql)))
 
+    @extend_schema(
+        operation_id="VisitorLogCheckIn",
+        summary="Check in a visitor",
+        description="Create a visitor log entry with a check-in time.",
+        tags=["System"],
+        request=_VISITOR_LOG_CREATE_REQUEST,
+        examples=[_VISITOR_LOG_CREATE_EXAMPLE],
+        responses={200: _VISITOR_CHECKIN_RESPONSE, **ERROR_RESPONSES},
+    )
     def post(self, request):
         if not table_exists("portal_visitor_log"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -269,6 +730,15 @@ class VisitorLogView(AdminMixin, APIView):
 
 
 class VisitorCheckoutView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="VisitorCheckout",
+        summary="Check out a visitor",
+        description="Stamp a check-out time on an open visitor log.",
+        tags=["System"],
+        parameters=[_VISITOR_ID_PARAMETER],
+        request=None,
+        responses={200: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
     def post(self, request, visitor_id):
         if not table_exists("portal_visitor_log"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -287,6 +757,14 @@ class VisitorCheckoutView(AdminMixin, APIView):
 # ALUMNI REGISTRY
 # =============================================================================
 class AlumniView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AlumniList",
+        summary="List alumni",
+        description="Return alumni records, optionally filtered by graduation year.",
+        tags=["Admin Portal"],
+        parameters=[_GRADUATION_YEAR_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_ALUMNI_ITEM), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_alumni"):
             return Response([])
@@ -302,6 +780,14 @@ class AlumniView(AdminMixin, APIView):
         sql += " ORDER BY a.graduation_year DESC, student_name"
         return Response(serialise(rows(sql, params)))
 
+    @extend_schema(
+        operation_id="AlumniUpsert",
+        summary="Create or update an alumni record",
+        description="Upsert an alumni record keyed by student_id.",
+        tags=["Admin Portal"],
+        request=_ALUMNI_UPSERT_REQUEST,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
     def post(self, request):
         if not table_exists("portal_alumni"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -325,6 +811,14 @@ class AlumniView(AdminMixin, APIView):
 class MedicalLogView(AdminMixin, APIView):
     """Admin/nurse-facing: list (optionally by student) + create."""
 
+    @extend_schema(
+        operation_id="MedicalLogList",
+        summary="List medical logs",
+        description="Return medical visit logs, optionally filtered by student.",
+        tags=["Admin Portal"],
+        parameters=[STUDENT_ID_PARAMETER],
+        responses={200: serializers.ListSerializer(child=_MEDICAL_LOG_ITEM), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_medical_log"):
             return Response([])
@@ -340,6 +834,14 @@ class MedicalLogView(AdminMixin, APIView):
         sql += " ORDER BY m.visit_date DESC LIMIT 200"
         return Response(serialise(rows(sql, params)))
 
+    @extend_schema(
+        operation_id="MedicalLogCreate",
+        summary="Create a medical log",
+        description="Record a medical visit for a student.",
+        tags=["Admin Portal"],
+        request=_MEDICAL_LOG_CREATE_REQUEST,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
     def post(self, request):
         if not table_exists("portal_medical_log"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -358,6 +860,13 @@ class MedicalLogView(AdminMixin, APIView):
 class StudentMedicalView(StudentOnlyMixin, APIView):
     """Read-only — a student can see their own medical visit history."""
 
+    @extend_schema(
+        operation_id="StudentMedicalView",
+        summary="Student's own medical history",
+        description="Return the current student's medical visit history.",
+        tags=["Student"],
+        responses={200: serializers.ListSerializer(child=_STUDENT_MEDICAL_ITEM), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_medical_log"):
             return Response([])
@@ -378,6 +887,25 @@ class PayrollView(AdminMixin, APIView):
     allowances, deductions} lets Admin adjust a single payslip before it's
     marked Paid."""
 
+    @extend_schema(
+        operation_id="PayrollList",
+        summary="List payroll records",
+        description=(
+            "List a pay period's payslips (auto-generates one Pending payslip per active "
+            "employee for the month on first request)."
+        ),
+        tags=["Payroll"],
+        parameters=[
+            OpenApiParameter(
+                name="month",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Pay period as 'YYYY-MM-01'. Defaults to the current month.",
+            )
+        ],
+        responses={200: serializers.ListSerializer(child=_PAYROLL_ITEM), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_payroll_record") or not table_exists("portal_employee"):
             return Response([])
@@ -405,6 +933,18 @@ class PayrollView(AdminMixin, APIView):
             [month],
         )))
 
+    @extend_schema(
+        operation_id="PayrollUpdate",
+        summary="Adjust or pay a payslip",
+        description=(
+            "Body: {id, allowances?, deductions?, status?} — recomputes net_pay and, when "
+            "status is set to Paid, stamps paid_on."
+        ),
+        tags=["Payroll"],
+        request=_PAYROLL_UPDATE_REQUEST,
+        examples=[_PAYROLL_UPDATE_EXAMPLE],
+        responses={200: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
     def patch(self, request):
         """Body: {id, allowances?, deductions?, status?} — recomputes net_pay
         and, when status is set to Paid, stamps paid_on."""
