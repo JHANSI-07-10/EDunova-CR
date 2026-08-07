@@ -7,14 +7,657 @@ from django.core.validators import validate_email
 from django.contrib.auth.models import Group
 from django.db import connection, transaction
 from django.utils.crypto import get_random_string
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import (
+    extend_schema,
+    extend_schema_view,
+    OpenApiParameter,
+    OpenApiExample,
+    inline_serializer,
+)
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.admissions.models import AdmissionEnquiry
+from .doc_schemas import (
+    DetailErrorSerializer,
+    ValidationErrorSerializer,
+    IdDetailResponseSerializer,
+    ERROR_RESPONSES,
+)
 from .roles import IsAdmin, get_role, log_action
 from .views import row, rows, serialise, table_exists
 
 User = get_user_model()
+
+
+# ---------------------------------------------------------------------------
+# Documentation-only schemas (drf-spectacular). None are used for real
+# (de)serialization — the views use raw SQL and hand-shaped dictionaries.
+# ---------------------------------------------------------------------------
+
+_RecentAdmissionItem = inline_serializer(
+    name="AdminRecentAdmissionItem",
+    fields={
+        "registration_number": serializers.CharField(required=False),
+        "applicant_name": serializers.CharField(required=False),
+        "target_class": serializers.CharField(required=False),
+        "status": serializers.CharField(required=False),
+        "submitted_at": serializers.DateTimeField(required=False),
+    },
+)
+
+_AdminDashboardResponse = inline_serializer(
+    name="AdminDashboardResponse",
+    fields={
+        "pending_admissions": serializers.IntegerField(required=False),
+        "total_students": serializers.IntegerField(required=False),
+        "total_teachers": serializers.IntegerField(required=False),
+        "total_parents": serializers.IntegerField(required=False),
+        "total_employees": serializers.IntegerField(required=False),
+        "open_leaves": serializers.IntegerField(required=False),
+        "fee_collected_this_month": serializers.FloatField(required=False),
+        "library_books_out": serializers.IntegerField(required=False),
+        "recent_admissions": serializers.ListSerializer(child=_RecentAdmissionItem, required=False),
+    },
+)
+
+_AdmissionListItem = inline_serializer(
+    name="AdminAdmissionListItem",
+    fields={
+        "registration_number": serializers.CharField(required=False),
+        "applicant_name": serializers.CharField(required=False),
+        "date_of_birth": serializers.DateField(required=False),
+        "gender": serializers.CharField(required=False),
+        "target_class": serializers.CharField(required=False),
+        "parent_name": serializers.CharField(required=False),
+        "parent_phone": serializers.CharField(required=False),
+        "parent_email": serializers.EmailField(required=False),
+        "scholarship_applied": serializers.BooleanField(required=False),
+        "status": serializers.CharField(required=False),
+        "rejection_reason": serializers.CharField(required=False),
+        "submitted_at": serializers.DateTimeField(required=False),
+    },
+)
+
+_AdmissionCreateRequest = inline_serializer(
+    name="AdminAdmissionCreateRequest",
+    fields={
+        "applicant_name": serializers.CharField(help_text="Full name of the applicant."),
+        "date_of_birth": serializers.DateField(required=False),
+        "gender": serializers.ChoiceField(
+            choices=["Male", "Female", "Other"], default="Male", required=False
+        ),
+        "target_class": serializers.CharField(),
+        "parent_name": serializers.CharField(required=False),
+        "parent_phone": serializers.CharField(required=False),
+        "parent_email": serializers.EmailField(required=False),
+        "address": serializers.CharField(required=False, default=""),
+        "scholarship_applied": serializers.BooleanField(required=False, default=False),
+    },
+)
+
+_AdmissionCreateResponse = inline_serializer(
+    name="AdminAdmissionCreateResponse",
+    fields={
+        "detail": serializers.CharField(),
+        "registration_number": serializers.CharField(),
+    },
+)
+
+_CredentialsPayload = inline_serializer(
+    name="AdminCredentialsPayload",
+    fields={
+        "student_username": serializers.CharField(),
+        "student_temp_password": serializers.CharField(),
+        "parent_username": serializers.CharField(),
+        "parent_temp_password": serializers.CharField(required=False),
+        "parent_account_reused": serializers.BooleanField(required=False),
+    },
+)
+
+_AdmissionActionResponse = inline_serializer(
+    name="AdminAdmissionActionResponse",
+    fields={
+        "status": serializers.CharField(),
+        "credentials": _CredentialsPayload,
+    },
+)
+
+_AdmissionActionRequest = inline_serializer(
+    name="AdminAdmissionActionRequest",
+    fields={
+        "action": serializers.ChoiceField(
+            choices=["advance", "reject"],
+            help_text="'advance' moves the application forward; 'reject' refuses it.",
+        ),
+        "reason": serializers.CharField(
+            required=False, help_text="Rejection reason (required when action='reject')."
+        ),
+    },
+)
+
+_ADMISSION_ACTION_BODY_EXAMPLE = OpenApiExample(
+    "AdmissionActionBody",
+    value={"action": "advance", "reason": ""},
+    description="Move an application to its next workflow stage.",
+)
+
+_UserItem = inline_serializer(
+    name="AdminUserItem",
+    fields={
+        "id": serializers.IntegerField(),
+        "username": serializers.CharField(),
+        "email": serializers.EmailField(required=False),
+        "name": serializers.CharField(),
+        "is_active": serializers.BooleanField(),
+        "date_joined": serializers.DateTimeField(),
+        "role": serializers.CharField(),
+    },
+)
+
+_UserCreateRequest = inline_serializer(
+    name="AdminUserCreateRequest",
+    fields={
+        "role": serializers.ChoiceField(
+            choices=["Student", "Teacher", "Parent", "Admin", "Employee"],
+            help_text="Role to assign.",
+        ),
+        "email": serializers.EmailField(required=False),
+        "username": serializers.CharField(required=False),
+        "first_name": serializers.CharField(required=False, default=""),
+        "last_name": serializers.CharField(required=False, default=""),
+        "phone_number": serializers.CharField(required=False, default=""),
+        "parent_name": serializers.CharField(
+            required=False, help_text="Only for creating a Student's parent account."
+        ),
+        "parent_email": serializers.EmailField(
+            required=False, help_text="Only for creating a Student's parent account."
+        ),
+        "parent_phone": serializers.CharField(required=False),
+        "class_id": serializers.IntegerField(required=False),
+        "roll_number": serializers.IntegerField(required=False),
+    },
+)
+
+_UserCreateResponse = inline_serializer(
+    name="AdminUserCreateResponse",
+    fields={
+        "id": serializers.IntegerField(),
+        "username": serializers.CharField(),
+        "temp_password": serializers.CharField(),
+        "role": serializers.CharField(),
+    },
+)
+
+_UserDetailPatchRequest = inline_serializer(
+    name="AdminUserDetailPatchRequest",
+    fields={
+        "is_active": serializers.BooleanField(
+            required=False, help_text="Toggle account active status."
+        ),
+        "role": serializers.ChoiceField(
+            choices=["Student", "Teacher", "Parent", "Admin", "Employee"],
+            required=False,
+            help_text="Reassign the user's role/group.",
+        ),
+    },
+)
+
+_UserResetPasswordResponse = inline_serializer(
+    name="AdminUserResetPasswordResponse",
+    fields={
+        "detail": serializers.CharField(),
+        "temp_password": serializers.CharField(required=False),
+        "email_error": serializers.BooleanField(required=False),
+    },
+)
+
+_RolesResponse = inline_serializer(
+    name="AdminRolesResponse",
+    fields={
+        "Student": serializers.IntegerField(required=False),
+        "Teacher": serializers.IntegerField(required=False),
+        "Parent": serializers.IntegerField(required=False),
+        "Admin": serializers.IntegerField(required=False),
+        "Employee": serializers.IntegerField(required=False),
+    },
+)
+
+_ClassItem = inline_serializer(
+    name="AdminClassItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "name": serializers.CharField(required=False),
+        "section": serializers.CharField(required=False),
+        "curriculum": serializers.CharField(required=False),
+        "room_number": serializers.CharField(required=False),
+    },
+)
+
+_ClassCreateRequest = inline_serializer(
+    name="AdminClassCreateRequest",
+    fields={
+        "name": serializers.CharField(),
+        "section": serializers.CharField(),
+        "curriculum": serializers.CharField(required=False),
+        "room_number": serializers.CharField(required=False),
+    },
+)
+
+_CLASS_CREATE_BODY_EXAMPLE = OpenApiExample(
+    "ClassCreateBody",
+    value={"name": "Class R", "section": "A"},
+    description="Creates a new grade/section under the class module.",
+)
+
+_SubjectItem = inline_serializer(
+    name="AdminSubjectItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "name": serializers.CharField(required=False),
+        "subject_code": serializers.CharField(required=False),
+        "type": serializers.CharField(required=False),
+    },
+)
+
+_SubjectCreateRequest = inline_serializer(
+    name="AdminSubjectCreateRequest",
+    fields={
+        "name": serializers.CharField(),
+        "subject_code": serializers.CharField(required=False),
+        "type": serializers.CharField(required=False),
+    },
+)
+
+_VehicleItem = inline_serializer(
+    name="AdminVehicleItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "vehicle_number": serializers.CharField(required=False),
+        "capacity": serializers.IntegerField(required=False),
+        "driver_id": serializers.IntegerField(required=False),
+        "gps_device_id": serializers.CharField(required=False),
+        "maintenance_status": serializers.CharField(required=False),
+    },
+)
+
+_VehicleCreateRequest = inline_serializer(
+    name="AdminVehicleCreateRequest",
+    fields={
+        "vehicle_number": serializers.CharField(),
+        "capacity": serializers.IntegerField(required=False),
+        "driver_id": serializers.IntegerField(required=False),
+        "gps_device_id": serializers.CharField(required=False),
+        "maintenance_status": serializers.CharField(required=False),
+    },
+)
+
+_RouteItem = inline_serializer(
+    name="AdminRouteItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "route_name": serializers.CharField(required=False),
+        "start_point": serializers.CharField(required=False),
+        "end_point": serializers.CharField(required=False),
+    },
+)
+
+_RouteCreateRequest = inline_serializer(
+    name="AdminRouteCreateRequest",
+    fields={
+        "route_name": serializers.CharField(),
+        "start_point": serializers.CharField(required=False),
+        "end_point": serializers.CharField(required=False),
+    },
+)
+
+_TransportAllocationItem = inline_serializer(
+    name="AdminTransportAllocationItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "student_id": serializers.IntegerField(required=False),
+        "vehicle_id": serializers.IntegerField(required=False),
+        "route_id": serializers.IntegerField(required=False),
+        "pickup_point": serializers.CharField(required=False),
+    },
+)
+
+_TransportAllocationCreateRequest = inline_serializer(
+    name="AdminTransportAllocationCreateRequest",
+    fields={
+        "student_id": serializers.IntegerField(),
+        "vehicle_id": serializers.IntegerField(required=False),
+        "route_id": serializers.IntegerField(required=False),
+        "pickup_point": serializers.CharField(required=False),
+    },
+)
+
+_FeeStructureItem = inline_serializer(
+    name="AdminFeeStructureItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "class_id": serializers.IntegerField(required=False),
+        "term_name": serializers.CharField(required=False),
+        "tuition_fee": serializers.FloatField(required=False),
+        "transport_fee": serializers.FloatField(required=False),
+        "hostel_fee": serializers.FloatField(required=False),
+        "total_amount": serializers.FloatField(required=False),
+    },
+)
+
+_FeeStructureCreateRequest = inline_serializer(
+    name="AdminFeeStructureCreateRequest",
+    fields={
+        "class_id": serializers.IntegerField(),
+        "term_name": serializers.CharField(),
+        "tuition_fee": serializers.FloatField(required=False),
+        "transport_fee": serializers.FloatField(required=False),
+        "hostel_fee": serializers.FloatField(required=False),
+        "total_amount": serializers.FloatField(required=False),
+    },
+)
+
+_PaymentItem = inline_serializer(
+    name="AdminPaymentItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "transaction_id": serializers.CharField(required=False),
+        "amount_paid": serializers.FloatField(required=False),
+        "status": serializers.CharField(required=False),
+        "paid_at": serializers.DateTimeField(required=False),
+        "student_name": serializers.CharField(required=False),
+        "term_name": serializers.CharField(required=False),
+    },
+)
+
+_BookItem = inline_serializer(
+    name="AdminBookItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "title": serializers.CharField(required=False),
+        "author": serializers.CharField(required=False),
+        "isbn": serializers.CharField(required=False),
+        "barcode_id": serializers.CharField(required=False),
+        "quantity": serializers.IntegerField(required=False),
+        "available_quantity": serializers.IntegerField(required=False),
+        "book_type": serializers.CharField(required=False),
+        "digital_file_url": serializers.URLField(required=False),
+    },
+)
+
+_BookCreateRequest = inline_serializer(
+    name="AdminBookCreateRequest",
+    fields={
+        "title": serializers.CharField(),
+        "author": serializers.CharField(required=False),
+        "isbn": serializers.CharField(required=False),
+        "barcode_id": serializers.CharField(required=False),
+        "quantity": serializers.IntegerField(required=False),
+        "available_quantity": serializers.IntegerField(required=False),
+        "book_type": serializers.CharField(required=False),
+        "digital_file_url": serializers.URLField(required=False),
+    },
+)
+
+_LibraryIssueRequest = inline_serializer(
+    name="AdminLibraryIssueRequest",
+    fields={
+        "book_id": serializers.IntegerField(),
+        "borrower_id": serializers.IntegerField(),
+        "loan_days": serializers.IntegerField(required=False, default=14),
+    },
+)
+
+_LIBRARY_ISSUE_EXAMPLE = OpenApiExample(
+    "LibraryIssueBody",
+    value={"book_id": 12, "borrower_id": 8, "loan_days": 14},
+    description="Issues a book to a borrower for a configured number of days.",
+)
+
+_LibraryIssueResponse = inline_serializer(
+    name="AdminLibraryIssueResponse",
+    fields={
+        "id": serializers.IntegerField(),
+        "due_date": serializers.DateField(),
+        "detail": serializers.CharField(),
+    },
+)
+
+_LibraryReturnResponse = inline_serializer(
+    name="AdminLibraryReturnResponse",
+    fields={
+        "detail": serializers.CharField(),
+        "late_days": serializers.IntegerField(),
+        "fine_amount": serializers.IntegerField(),
+    },
+)
+
+_NoticeItem = inline_serializer(
+    name="AdminNoticeItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "sender_id": serializers.IntegerField(required=False),
+        "recipient_type": serializers.CharField(required=False),
+        "target_class_id": serializers.IntegerField(required=False),
+        "title": serializers.CharField(required=False),
+        "message": serializers.CharField(required=False),
+        "created_at": serializers.DateTimeField(required=False),
+    },
+)
+
+_NoticeCreateRequest = inline_serializer(
+    name="AdminNoticeCreateRequest",
+    fields={
+        "recipient_type": serializers.CharField(required=False, default="All"),
+        "target_class_id": serializers.IntegerField(required=False),
+        "title": serializers.CharField(),
+        "message": serializers.CharField(),
+    },
+)
+
+_NOTICE_BROADCAST_EXAMPLE = OpenApiExample(
+    "NoticeBroadcastBody",
+    value={
+        "recipient_type": "All",
+        "target_class_id": None,
+        "title": "Exam Schedule Released",
+        "message": "Final term exams start on Monday.",
+    },
+    description="Broadcasts a notice/notification to the selected audience.",
+)
+
+_NoticeCreateResponse = inline_serializer(
+    name="AdminNoticeCreateResponse",
+    fields={"id": serializers.IntegerField(), "detail": serializers.CharField()},
+)
+
+_LeaveItem = inline_serializer(
+    name="AdminLeaveItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "leave_type": serializers.CharField(required=False),
+        "start_date": serializers.DateField(required=False),
+        "end_date": serializers.DateField(required=False),
+        "reason": serializers.CharField(required=False),
+        "status": serializers.CharField(required=False),
+        "applicant_name": serializers.CharField(required=False),
+    },
+)
+
+_LeaveDecideRequest = inline_serializer(
+    name="AdminLeaveDecideRequest",
+    fields={
+        "decision": serializers.ChoiceField(
+            choices=["Approved", "Rejected"], help_text="Decision to apply to the leave request."
+        ),
+    },
+)
+
+_LEAVE_DECIDE_EXAMPLE = OpenApiExample(
+    "LeaveDecideBody",
+    value={"decision": "Approved"},
+    description="Approves or rejects a pending leave request.",
+)
+
+_LeaveDecideResponse = inline_serializer(
+    name="AdminLeaveDecideResponse",
+    fields={"detail": serializers.CharField()},
+)
+
+_ReportAttendanceByClass = inline_serializer(
+    name="AdminReportAttendanceByClass",
+    fields={
+        "class_name": serializers.CharField(required=False),
+        "attendance_pct": serializers.FloatField(required=False),
+    },
+)
+
+_ReportFeeByMonth = inline_serializer(
+    name="AdminReportFeeByMonth",
+    fields={
+        "month": serializers.CharField(required=False),
+        "total": serializers.FloatField(required=False),
+    },
+)
+
+_ReportAverageMarks = inline_serializer(
+    name="AdminReportAverageMarks",
+    fields={
+        "subject_name": serializers.CharField(required=False),
+        "average_marks": serializers.FloatField(required=False),
+    },
+)
+
+_ReportsResponse = inline_serializer(
+    name="AdminReportsResponse",
+    fields={
+        "attendance_by_class": serializers.ListSerializer(
+            child=_ReportAttendanceByClass, required=False
+        ),
+        "fee_collection_by_month": serializers.ListSerializer(
+            child=_ReportFeeByMonth, required=False
+        ),
+        "average_marks_by_subject": serializers.ListSerializer(
+            child=_ReportAverageMarks, required=False
+        ),
+    },
+)
+
+_AuditLogItem = inline_serializer(
+    name="AdminAuditLogItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "action": serializers.CharField(required=False),
+        "target_type": serializers.CharField(required=False),
+        "target_id": serializers.CharField(required=False),
+        "details": serializers.JSONField(required=False),
+        "created_at": serializers.DateTimeField(required=False),
+        "actor_name": serializers.CharField(required=False),
+    },
+)
+
+_BackupExportResponse = inline_serializer(
+    name="AdminBackupExportResponse",
+    fields={
+        "generated_at": serializers.DateField(required=False),
+        "tables": serializers.DictField(child=serializers.JSONField(), required=False),
+    },
+)
+
+_EnrollmentListItem = inline_serializer(
+    name="AdminEnrollmentListItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "student_id": serializers.IntegerField(required=False),
+        "student_username": serializers.CharField(required=False),
+        "student_name": serializers.CharField(required=False),
+        "class_id": serializers.IntegerField(required=False),
+        "class_name": serializers.CharField(required=False),
+        "academic_year": serializers.CharField(required=False),
+        "roll_number": serializers.IntegerField(required=False),
+    },
+)
+
+_EnrollmentCreateRequest = inline_serializer(
+    name="AdminEnrollmentCreateRequest",
+    fields={
+        "student_id": serializers.IntegerField(),
+        "class_id": serializers.IntegerField(),
+        "roll_number": serializers.IntegerField(required=False),
+        "academic_year": serializers.CharField(required=False, default="2025-26"),
+    },
+)
+
+_EnrollmentCreateResponse = inline_serializer(
+    name="AdminEnrollmentCreateResponse",
+    fields={"id": serializers.IntegerField(), "detail": serializers.CharField()},
+)
+
+_AssignedSubject = inline_serializer(
+    name="AdminAssignedSubject",
+    fields={"id": serializers.IntegerField(required=False), "name": serializers.CharField(required=False)},
+)
+
+_ClassTeacherListItem = inline_serializer(
+    name="AdminClassTeacherListItem",
+    fields={
+        "class_id": serializers.IntegerField(required=False),
+        "class_name": serializers.CharField(required=False),
+        "teacher_id": serializers.IntegerField(required=False),
+        "teacher_name": serializers.CharField(required=False),
+        "assigned_subjects": serializers.ListSerializer(child=_AssignedSubject, required=False),
+    },
+)
+
+_ClassTeacherAssignRequest = inline_serializer(
+    name="AdminClassTeacherAssignRequest",
+    fields={
+        "class_id": serializers.IntegerField(),
+        "teacher_id": serializers.IntegerField(),
+        "subject_id": serializers.IntegerField(required=False),
+    },
+)
+
+_ClassTeacherAssignResponse = inline_serializer(
+    name="AdminClassTeacherAssignResponse",
+    fields={"detail": serializers.CharField()},
+)
+
+_LmsUploadItem = inline_serializer(
+    name="AdminLmsUploadItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "title": serializers.CharField(required=False),
+        "content_type": serializers.CharField(required=False),
+        "uploaded_at": serializers.DateTimeField(required=False),
+        "course_title": serializers.CharField(required=False),
+        "class_name": serializers.CharField(required=False),
+        "subject_name": serializers.CharField(required=False),
+        "teacher_name": serializers.CharField(required=False),
+    },
+)
+
+_LmsAnalyticsResponse = inline_serializer(
+    name="AdminLmsAnalyticsResponse",
+    fields={
+        "uploads": serializers.ListSerializer(child=_LmsUploadItem, required=False),
+        "stats": inline_serializer(
+            name="AdminLmsAnalyticsStats",
+            fields={
+                "total_courses": serializers.IntegerField(required=False),
+                "total_chapters": serializers.IntegerField(required=False),
+                "total_lessons": serializers.IntegerField(required=False),
+                "total_resources": serializers.IntegerField(required=False),
+                "estimated_storage_mb": serializers.FloatField(required=False),
+                "resources_by_type": serializers.DictField(
+                    child=serializers.IntegerField(), required=False
+                ),
+            },
+        ),
+    },
+)
 
 
 class AdminMixin:
@@ -25,6 +668,13 @@ class AdminMixin:
 # Dashboard
 # ---------------------------------------------------------------------------
 class AdminDashboardView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminDashboard",
+        summary="Admin portal dashboard",
+        description="Returns aggregate counts across admissions, students, teachers, parents, employees, leaves, fees and library, plus the most recent admissions.",
+        tags=["Admin Portal"],
+        responses={200: _AdminDashboardResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         def count(table, where=""):
             if not table_exists(table):
@@ -171,6 +821,22 @@ def _generate_credentials(enquiry):
 
 
 class AdmissionListView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminAdmissionList",
+        summary="List admission applications",
+        description="Returns admission applications, optionally filtered by status. Ordered by most recent submission.",
+        tags=["Admissions"],
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by application status (e.g. Registered, Verification, Screening, Fee_Pending, Confirmed, Rejected).",
+            ),
+        ],
+        responses={200: serializers.ListSerializer(child=_AdmissionListItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         qs = AdmissionEnquiry.objects.all().order_by("-submitted_at")
         status_filter = request.query_params.get("status")
@@ -183,6 +849,18 @@ class AdmissionListView(AdminMixin, APIView):
         ))
         return Response(serialise(data))
 
+    @extend_schema(
+        operation_id="AdminAdmissionCreate",
+        summary="Register a manual admission application",
+        description="Creates a new admission application in the 'Registered' status with an auto-generated registration number.",
+        tags=["Admissions"],
+        request=_AdmissionCreateRequest,
+        responses={
+            201: _AdmissionCreateResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         d = request.data
         from django.utils.crypto import get_random_string
@@ -211,6 +889,28 @@ class AdmissionActionView(AdminMixin, APIView):
     application through Verification -> Screening -> Fee_Pending -> Confirmed,
     or reject it at any stage. 'confirm' also generates student+parent logins."""
 
+    @extend_schema(
+        operation_id="AdminAdmissionAction",
+        summary="Advance or reject an admission application",
+        description="Moves an application through the verification workflow ('advance') or rejects it ('reject'). Advancing a Fee_Pending application to Confirmed also generates student and parent login credentials.",
+        tags=["Admissions"],
+        parameters=[
+            OpenApiParameter(
+                name="registration_number",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Admission registration number.",
+            ),
+        ],
+        request=_AdmissionActionRequest,
+        examples=[_ADMISSION_ACTION_BODY_EXAMPLE],
+        responses={
+            200: _AdmissionActionResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request, registration_number):
         try:
             enquiry = AdmissionEnquiry.objects.get(registration_number=registration_number)
@@ -250,6 +950,22 @@ class AdmissionActionView(AdminMixin, APIView):
 # Users / RBAC
 # ---------------------------------------------------------------------------
 class UserListView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminUserList",
+        summary="List portal users",
+        description="Returns all auth users with their resolved role, optionally filtered by role.",
+        tags=["Admin Portal"],
+        parameters=[
+            OpenApiParameter(
+                name="role",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Filter by role (Student, Teacher, Parent, Admin, Employee).",
+            ),
+        ],
+        responses={200: serializers.ListSerializer(child=_UserItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         from django.contrib.auth.models import User
         from .roles import get_role
@@ -272,6 +988,18 @@ class UserListView(AdminMixin, APIView):
             data = [d for d in data if d["role"] == role_filter]
         return Response(serialise(data))
 
+    @extend_schema(
+        operation_id="AdminUserCreate",
+        summary="Create a portal user",
+        description="Creates a user of any role with a temporary password. For Student roles an optional linked parent account can be created, and class enrollment can be added.",
+        tags=["Admin Portal"],
+        request=_UserCreateRequest,
+        responses={
+            201: _UserCreateResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         """Create a user of any role with a temporary password."""
         d = request.data
@@ -380,6 +1108,27 @@ class UserListView(AdminMixin, APIView):
 
 
 class UserDetailView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminUserDetail",
+        summary="Update a user's status or role",
+        description="Toggles the account's active status and/or reassigns its role/group.",
+        tags=["Admin Portal"],
+        parameters=[
+            OpenApiParameter(
+                name="user_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Django auth user id.",
+            ),
+        ],
+        request=_UserDetailPatchRequest,
+        responses={
+            200: DetailErrorSerializer,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def patch(self, request, user_id):
         try:
             target = User.objects.get(id=user_id)
@@ -410,6 +1159,26 @@ class UserDetailView(AdminMixin, APIView):
             log_action(request.user, f"Audit {role} Role Changed", "user", user_id, {"role": new_role})
         return Response({"detail": "Updated."})
 
+    @extend_schema(
+        operation_id="AdminUserResetPassword",
+        summary="Reset a user's password",
+        description="Generates a temporary password for the user, updates it, and emails it via the reset-password service.",
+        tags=["Admin Portal"],
+        parameters=[
+            OpenApiParameter(
+                name="user_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Django auth user id.",
+            ),
+        ],
+        request=None,
+        responses={
+            200: _UserResetPasswordResponse,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request, user_id):
         """Admin-triggered password reset."""
         try:
@@ -450,6 +1219,13 @@ class UserDetailView(AdminMixin, APIView):
 
 
 class RolesView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminRoles",
+        summary="Role member counts",
+        description="Returns the number of users in each supported role (Student, Teacher, Parent, Admin, Employee).",
+        tags=["Admin Portal"],
+        responses={200: _RolesResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         roles = ["Student", "Teacher", "Parent", "Admin", "Employee"]
         counts = {}
@@ -485,36 +1261,139 @@ class SimpleTableView(AdminMixin, APIView):
         return Response({"id": new_id, "detail": "Created."})
 
 
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminClassList",
+        summary="List classes",
+        description="Returns all class (grade/section) records from the portal.",
+        tags=["Academic"],
+        responses={200: serializers.ListSerializer(child=_ClassItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminClassCreate",
+        summary="Create a class",
+        description="Creates a new class/grade record with an optional section, curriculum and room number.",
+        tags=["Academic"],
+        request=_ClassCreateRequest,
+        examples=[_CLASS_CREATE_BODY_EXAMPLE],
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
 class ClassView(SimpleTableView):
     table = "portal_class"
     columns = ("name", "section", "curriculum", "room_number")
     order_by = "name, section"
 
 
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminSubjectList",
+        summary="List subjects",
+        description="Returns all subject records from the portal.",
+        tags=["Academic"],
+        responses={200: serializers.ListSerializer(child=_SubjectItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminSubjectCreate",
+        summary="Create a subject",
+        description="Creates a new subject record.",
+        tags=["Academic"],
+        request=_SubjectCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
 class SubjectView(SimpleTableView):
     table = "portal_subject"
     columns = ("name", "subject_code", "type")
     order_by = "name"
 
 
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminVehicleList",
+        summary="List vehicles",
+        description="Returns all transport vehicle records from the portal.",
+        tags=["Transport"],
+        responses={200: serializers.ListSerializer(child=_VehicleItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminVehicleCreate",
+        summary="Create a vehicle",
+        description="Creates a new transport vehicle record.",
+        tags=["Transport"],
+        request=_VehicleCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
 class VehicleView(SimpleTableView):
     table = "portal_vehicle"
     columns = ("vehicle_number", "capacity", "driver_id", "gps_device_id", "maintenance_status")
     order_by = "vehicle_number"
 
 
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminRouteList",
+        summary="List transport routes",
+        description="Returns all transport route records from the portal.",
+        tags=["Transport"],
+        responses={200: serializers.ListSerializer(child=_RouteItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminRouteCreate",
+        summary="Create a route",
+        description="Creates a new transport route record.",
+        tags=["Transport"],
+        request=_RouteCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
 class RouteView(SimpleTableView):
     table = "portal_route"
     columns = ("route_name", "start_point", "end_point")
     order_by = "route_name"
 
 
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminTransportAllocation",
+        summary="List transport allocations",
+        description="Returns all student-to-vehicle/route allocations from the portal.",
+        tags=["Transport"],
+        responses={200: serializers.ListSerializer(child=_TransportAllocationItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminTransportAllocationCreate",
+        summary="Create a transport allocation",
+        description="Assigns a student to a vehicle and route with an optional pickup point.",
+        tags=["Transport"],
+        request=_TransportAllocationCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
 class TransportAllocationView(SimpleTableView):
     table = "portal_transport_allocation"
     columns = ("student_id", "vehicle_id", "route_id", "pickup_point")
     order_by = "id"
 
 
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminFeeStructure",
+        summary="List fee structures",
+        description="Returns all fee structure records (per class and term) from the portal.",
+        tags=["Finance"],
+        responses={200: serializers.ListSerializer(child=_FeeStructureItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminFeeStructureCreate",
+        summary="Create a fee structure",
+        description="Creates a fee structure for a class and term.",
+        tags=["Finance"],
+        request=_FeeStructureCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
 class FeeStructureView(SimpleTableView):
     table = "portal_fee_structure"
     columns = ("class_id", "term_name", "tuition_fee", "transport_fee", "hostel_fee", "total_amount")
@@ -522,6 +1401,13 @@ class FeeStructureView(SimpleTableView):
 
 
 class PaymentListView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminPaymentList",
+        summary="List payments",
+        description="Returns up to the 200 most recent successful payment records joined with student and fee-term info.",
+        tags=["Finance"],
+        responses={200: serializers.ListSerializer(child=_PaymentItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_payment"):
             return Response([])
@@ -545,11 +1431,40 @@ class PaymentListView(AdminMixin, APIView):
 FINE_PER_DAY = 5  # rupees/day late, beyond due_date
 
 
+@extend_schema_view(
+    post=extend_schema(
+        operation_id="AdminLibraryBookCreate",
+        summary="Create a library book",
+        description="Adds a new book record with title, author, ISBN, barcode and inventory quantities.",
+        tags=["Library"],
+        request=_BookCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
 class LibraryBookView(SimpleTableView):
     table = "portal_book"
     columns = ("title", "author", "isbn", "barcode_id", "quantity", "available_quantity", "book_type", "digital_file_url")
     order_by = "title"
 
+    @extend_schema(
+        operation_id="AdminLibraryBookList",
+        summary="List or look up library books",
+        description="Lists all books, or returns a single book when a barcode/isbn query parameter is supplied. A lookup that finds no match returns null; without the barcode parameter a list is returned.",
+        tags=["Library"],
+        parameters=[
+            OpenApiParameter(
+                name="barcode",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Barcode ID or ISBN to look up a single book.",
+            ),
+        ],
+        responses={
+            200: serializers.ListSerializer(child=_BookItem),
+            **ERROR_RESPONSES,
+        },
+    )
     def get(self, request):
         barcode = request.query_params.get("barcode")
         if barcode:
@@ -561,6 +1476,19 @@ class LibraryBookView(SimpleTableView):
 
 
 class LibraryIssueView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminLibraryIssue",
+        summary="Issue a book",
+        description="Issues an available book to a borrower and decrements its available quantity, computing the due date from the loan period.",
+        tags=["Library"],
+        request=_LibraryIssueRequest,
+        examples=[_LIBRARY_ISSUE_EXAMPLE],
+        responses={
+            201: _LibraryIssueResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_library_transaction"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -576,18 +1504,40 @@ class LibraryIssueView(AdminMixin, APIView):
         if not book or book["available_quantity"] < 1:
             return Response({"detail": "No copies available."}, status=400)
         due = date.today() + timedelta(days=days)
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "INSERT INTO portal_library_transaction (book_id, borrower_id, due_date) VALUES (%s,%s,%s) RETURNING id",
-                [book_id, borrower_id, due],
-            )
-            tid = cursor.fetchone()[0]
-            cursor.execute("UPDATE portal_book SET available_quantity = available_quantity - 1 WHERE id=%s", [book_id])
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_library_transaction (book_id, borrower_id, due_date) VALUES (%s,%s,%s) RETURNING id",
+                    [book_id, borrower_id, due],
+                )
+                tid = cursor.fetchone()[0]
+                cursor.execute("UPDATE portal_book SET available_quantity = available_quantity - 1 WHERE id=%s", [book_id])
         log_action(request.user, "library.issue", "book", book_id, {"borrower_id": borrower_id, "due_date": str(due)})
         return Response({"id": tid, "due_date": due.isoformat(), "detail": "Book issued."})
 
 
 class LibraryReturnView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminLibraryReturn",
+        summary="Return a book",
+        description="Processes the return of an issued book, automatically calculating any late fine and incrementing the book's available quantity.",
+        tags=["Library"],
+        parameters=[
+            OpenApiParameter(
+                name="transaction_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Library transaction id to return.",
+            ),
+        ],
+        request=None,
+        responses={
+            200: _LibraryReturnResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request, transaction_id):
         if not table_exists("portal_library_transaction"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -599,12 +1549,13 @@ class LibraryReturnView(AdminMixin, APIView):
         today = date.today()
         late_days = max(0, (today - txn["due_date"]).days)
         fine = late_days * FINE_PER_DAY
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "UPDATE portal_library_transaction SET return_date=%s, fine_amount=%s WHERE id=%s",
-                [today, fine, transaction_id],
-            )
-            cursor.execute("UPDATE portal_book SET available_quantity = available_quantity + 1 WHERE id=%s", [txn["book_id"]])
+        with transaction.atomic():
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "UPDATE portal_library_transaction SET return_date=%s, fine_amount=%s WHERE id=%s",
+                    [today, fine, transaction_id],
+                )
+                cursor.execute("UPDATE portal_book SET available_quantity = available_quantity + 1 WHERE id=%s", [txn["book_id"]])
         log_action(request.user, "library.return", "transaction", transaction_id, {"fine": fine})
         return Response({"detail": "Book returned.", "late_days": late_days, "fine_amount": fine})
 
@@ -613,11 +1564,34 @@ class LibraryReturnView(AdminMixin, APIView):
 # Notices (broadcast) — reuses portal_notification
 # ---------------------------------------------------------------------------
 class NoticeBroadcastView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminNoticeBroadcast",
+        summary="List or broadcast notices",
+        description="GET returns the 100 most recent portal notifications; POST broadcasts a new notice to a recipient audience.",
+        tags=["CMS"],
+        responses={
+            200: serializers.ListSerializer(child=_NoticeItem),
+            **ERROR_RESPONSES,
+        },
+    )
     def get(self, request):
         if not table_exists("portal_notification"):
             return Response([])
         return Response(serialise(rows("SELECT * FROM portal_notification ORDER BY created_at DESC LIMIT 100")))
 
+    @extend_schema(
+        operation_id="AdminNoticeBroadcastCreate",
+        summary="Broadcast a notice",
+        description="Sends a notification/notice to all users or a specific class audience.",
+        tags=["CMS"],
+        request=_NoticeCreateRequest,
+        examples=[_NOTICE_BROADCAST_EXAMPLE],
+        responses={
+            201: _NoticeCreateResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_notification"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -637,6 +1611,22 @@ class NoticeBroadcastView(AdminMixin, APIView):
 # Leave approvals (all staff/student leave requests, Admin can approve/reject)
 # ---------------------------------------------------------------------------
 class LeaveApprovalListView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminLeaveApprovalList",
+        summary="List leave requests",
+        description="Returns pending (or status-filtered) leave requests from staff and students.",
+        tags=["Admin Portal"],
+        parameters=[
+            OpenApiParameter(
+                name="status",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Leave status filter (default 'Pending').",
+            ),
+        ],
+        responses={200: serializers.ListSerializer(child=_LeaveItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_leave"):
             return Response([])
@@ -652,6 +1642,28 @@ class LeaveApprovalListView(AdminMixin, APIView):
         )
         return Response(serialise(data))
 
+    @extend_schema(
+        operation_id="AdminLeaveDecide",
+        summary="Approve or reject a leave request",
+        description="Applies an Approved/Rejected decision to a specified leave request.",
+        tags=["Admin Portal"],
+        parameters=[
+            OpenApiParameter(
+                name="leave_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Leave request id to decide on.",
+            ),
+        ],
+        request=_LeaveDecideRequest,
+        examples=[_LEAVE_DECIDE_EXAMPLE],
+        responses={
+            200: _LeaveDecideResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request, leave_id):
         if not table_exists("portal_leave"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -671,6 +1683,13 @@ class LeaveApprovalListView(AdminMixin, APIView):
 # Reports / analytics (basic)
 # ---------------------------------------------------------------------------
 class ReportsView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminReports",
+        summary="School performance reports",
+        description="Returns aggregate attendance by class, monthly fee collection and average subject marks.",
+        tags=["Reports"],
+        responses={200: _ReportsResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         report = {}
         if table_exists("portal_attendance"):
@@ -707,6 +1726,13 @@ class ReportsView(AdminMixin, APIView):
 # Audit log (read-only view of every admin write above)
 # ---------------------------------------------------------------------------
 class AuditLogListView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminAuditLogList",
+        summary="List audit log entries",
+        description="Returns the 300 most recent admin audit-log entries with actor names.",
+        tags=["System"],
+        responses={200: serializers.ListSerializer(child=_AuditLogItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_audit_log"):
             return Response([])
@@ -742,6 +1768,13 @@ EXPORT_TABLES = [
 
 
 class BackupExportView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminBackupExport",
+        summary="Export operational backup snapshot",
+        description="Returns a JSON snapshot of all existing portal tables plus the generated-at date.",
+        tags=["System"],
+        responses={200: _BackupExportResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         snapshot = {}
         for t in EXPORT_TABLES:
@@ -752,6 +1785,13 @@ class BackupExportView(AdminMixin, APIView):
 
 
 class ClassEnrollmentView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminClassEnrollment",
+        summary="List student enrollments",
+        description="Returns student-class enrollment records joined with student and class names.",
+        tags=["Academic"],
+        responses={200: serializers.ListSerializer(child=_EnrollmentListItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_student_enrollment"):
             return Response([])
@@ -769,6 +1809,18 @@ class ClassEnrollmentView(AdminMixin, APIView):
         )
         return Response(serialise(data))
 
+    @extend_schema(
+        operation_id="AdminClassEnrollmentCreate",
+        summary="Enroll a student in a class",
+        description="Enrolls a student in a class for an academic year, preventing duplicate enrollments.",
+        tags=["Academic"],
+        request=_EnrollmentCreateRequest,
+        responses={
+            201: _EnrollmentCreateResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         d = request.data
         student_id = d.get("student_id")
@@ -800,6 +1852,13 @@ class ClassEnrollmentView(AdminMixin, APIView):
 
 
 class ClassTeacherAssignView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminClassTeacherAssign",
+        summary="List class-teacher assignments",
+        description="Returns class-to-teacher assignments including each teacher's assigned subjects.",
+        tags=["Academic"],
+        responses={200: serializers.ListSerializer(child=_ClassTeacherListItem), **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_class_teacher"):
             return Response([])
@@ -821,6 +1880,18 @@ class ClassTeacherAssignView(AdminMixin, APIView):
         )
         return Response(serialise(data))
 
+    @extend_schema(
+        operation_id="AdminClassTeacherAssignCreate",
+        summary="Assign a class teacher",
+        description="Assigns a teacher to a class (upserting the class teacher) and optionally allocates a subject to that teacher for the class.",
+        tags=["Academic"],
+        request=_ClassTeacherAssignRequest,
+        responses={
+            200: _ClassTeacherAssignResponse,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         d = request.data
         class_id = d.get("class_id")
@@ -847,6 +1918,13 @@ class ClassTeacherAssignView(AdminMixin, APIView):
 
 
 class AdminLmsAnalyticsView(AdminMixin, APIView):
+    @extend_schema(
+        operation_id="AdminLmsAnalytics",
+        summary="LMS usage analytics",
+        description="Returns recent course-content uploads and aggregate LMS statistics (courses, chapters, lessons, resources and estimated storage).",
+        tags=["LMS"],
+        responses={200: _LmsAnalyticsResponse, **ERROR_RESPONSES},
+    )
     def get(self, request):
         if not table_exists("portal_course_content"):
             return Response({"uploads": [], "stats": {}})
@@ -895,7 +1973,28 @@ class AdminLmsAnalyticsView(AdminMixin, APIView):
                 "resources_by_type": {r["type"]: r["count"] for r in resources_by_type}
             }
         }))
-        
+
+    @extend_schema(
+        operation_id="AdminLmsDeleteResource",
+        summary="Delete an LMS resource",
+        description="Deletes a course content resource by id, cleaning up any referenced quiz or assignment, and logs the action.",
+        tags=["LMS"],
+        parameters=[
+            OpenApiParameter(
+                name="id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=True,
+                description="ID of the course content resource to delete.",
+            ),
+        ],
+        request=None,
+        responses={
+            200: DetailErrorSerializer,
+            400: ValidationErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def delete(self, request):
         resource_id = request.query_params.get("id")
         if not resource_id:

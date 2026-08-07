@@ -13,10 +13,25 @@ course's forum — meaning a student in one grade could see another grade's
 discussion threads with no barrier at all. That's fixed everywhere below.
 """
 from django.db import connection
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, inline_serializer
+from rest_framework import serializers
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .doc_schemas import (
+    DetailErrorSerializer,
+    ValidationErrorSerializer,
+    IdDetailResponseSerializer,
+    COURSE_ID_PARAMETER,
+    STUDENT_ID_PARAMETER,
+    ForumTopicCreateSerializer,
+    ForumPostCreateSerializer,
+    DigitalNoteCreateSerializer,
+    MarkCompleteRequestSerializer,
+    ERROR_RESPONSES,
+)
 from .roles import get_role, log_action
 from .views import row, rows, serialise, table_exists
 
@@ -57,11 +72,82 @@ _FORBIDDEN = Response({"detail": "You don't have access to this course."}, statu
 
 
 # =============================================================================
+# Documentation-only schemas (the portal has no DRF serializers; raw SQL only)
+# =============================================================================
+LmsForumTopicItemSerializer = inline_serializer(
+    name="LmsForumTopicItem",
+    fields={
+        "id": serializers.IntegerField(help_text="Topic id."),
+        "title": serializers.CharField(help_text="Topic title."),
+        "content": serializers.CharField(help_text="Topic body (markdown supported)."),
+        "created_at": serializers.DateTimeField(help_text="When the topic was created."),
+        "creator_name": serializers.CharField(help_text="Display name of the topic creator."),
+        "reply_count": serializers.IntegerField(help_text="Number of replies on the topic."),
+    },
+)
+
+LmsForumPostItemSerializer = inline_serializer(
+    name="LmsForumPostItem",
+    fields={
+        "id": serializers.IntegerField(help_text="Post id."),
+        "post_text": serializers.CharField(help_text="Reply body."),
+        "created_at": serializers.DateTimeField(help_text="When the reply was posted."),
+        "author_name": serializers.CharField(help_text="Display name of the reply author."),
+    },
+)
+
+LmsForumTopicDetailSerializer = inline_serializer(
+    name="LmsForumTopicDetail",
+    fields={
+        "id": serializers.IntegerField(help_text="Topic id."),
+        "title": serializers.CharField(help_text="Topic title."),
+        "content": serializers.CharField(help_text="Topic body (markdown supported)."),
+        "created_at": serializers.DateTimeField(help_text="When the topic was created."),
+        "creator_name": serializers.CharField(help_text="Display name of the topic creator."),
+        "posts": serializers.ListSerializer(
+            child=LmsForumPostItemSerializer, help_text="Replies on this topic."
+        ),
+    },
+)
+
+LmsDigitalNoteItemSerializer = inline_serializer(
+    name="LmsDigitalNoteItem",
+    fields={
+        "id": serializers.IntegerField(help_text="Note id."),
+        "title": serializers.CharField(help_text="Note title."),
+        "body_markdown": serializers.CharField(help_text="Note body in markdown."),
+        "created_at": serializers.DateTimeField(help_text="When the note was created."),
+        "author_name": serializers.CharField(help_text="Display name of the note author."),
+    },
+)
+
+LmsCourseAnalyticsItemSerializer = inline_serializer(
+    name="LmsCourseAnalyticsItem",
+    fields={
+        "student_id": serializers.IntegerField(help_text="Student (auth user) id."),
+        "student_name": serializers.CharField(help_text="Full name of the student."),
+        "completed_count": serializers.IntegerField(help_text="Content items marked complete."),
+        "total_content": serializers.IntegerField(help_text="Total content items in the course."),
+        "completion_percent": serializers.FloatField(help_text="Completion percentage (0-100)."),
+    },
+)
+
+
+# =============================================================================
 # DISCUSSION FORUMS
 # =============================================================================
 class ForumTopicListView(AuthenticatedMixin, APIView):
     """GET ?course_id= — topics for a course. POST — create a topic."""
 
+    @extend_schema(
+        operation_id="LmsForumTopicList",
+        tags=["LMS"],
+        parameters=[COURSE_ID_PARAMETER],
+        responses={
+            200: serializers.ListSerializer(child=LmsForumTopicItemSerializer),
+            **ERROR_RESPONSES,
+        },
+    )
     def get(self, request):
         course_id = request.query_params.get("course_id")
         if not course_id or not table_exists("portal_forum_topic"):
@@ -79,6 +165,15 @@ class ForumTopicListView(AuthenticatedMixin, APIView):
             [course_id],
         )))
 
+    @extend_schema(
+        operation_id="LmsForumTopicCreate",
+        tags=["LMS"],
+        request=ForumTopicCreateSerializer,
+        responses={
+            200: IdDetailResponseSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_forum_topic"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -99,6 +194,23 @@ class ForumTopicListView(AuthenticatedMixin, APIView):
 class ForumTopicDetailView(AuthenticatedMixin, APIView):
     """GET a topic with all its replies."""
 
+    @extend_schema(
+        operation_id="LmsForumTopicDetail",
+        tags=["LMS"],
+        parameters=[
+            OpenApiParameter(
+                name="topic_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Forum topic id.",
+            )
+        ],
+        responses={
+            200: LmsForumTopicDetailSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def get(self, request, topic_id):
         if not table_exists("portal_forum_topic"):
             return Response(None)
@@ -132,6 +244,24 @@ class ForumTopicDetailView(AuthenticatedMixin, APIView):
 class ForumPostView(AuthenticatedMixin, APIView):
     """POST a reply to a topic."""
 
+    @extend_schema(
+        operation_id="LmsForumPostCreate",
+        tags=["LMS"],
+        parameters=[
+            OpenApiParameter(
+                name="topic_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.PATH,
+                required=True,
+                description="Forum topic id to reply to.",
+            )
+        ],
+        request=ForumPostCreateSerializer,
+        responses={
+            200: IdDetailResponseSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request, topic_id):
         if not table_exists("portal_forum_post"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -160,6 +290,15 @@ class DigitalNoteView(AuthenticatedMixin, APIView):
     """GET ?course_id= — notes for a course. POST — add a note (any
     authenticated user, e.g. a teacher sharing notes or a student's own)."""
 
+    @extend_schema(
+        operation_id="LmsDigitalNoteList",
+        tags=["LMS"],
+        parameters=[COURSE_ID_PARAMETER],
+        responses={
+            200: serializers.ListSerializer(child=LmsDigitalNoteItemSerializer),
+            **ERROR_RESPONSES,
+        },
+    )
     def get(self, request):
         course_id = request.query_params.get("course_id")
         if not course_id or not table_exists("portal_digital_note"):
@@ -176,6 +315,15 @@ class DigitalNoteView(AuthenticatedMixin, APIView):
             [course_id],
         )))
 
+    @extend_schema(
+        operation_id="LmsDigitalNoteCreate",
+        tags=["LMS"],
+        request=DigitalNoteCreateSerializer,
+        responses={
+            200: IdDetailResponseSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         if not table_exists("portal_digital_note"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
@@ -199,6 +347,15 @@ class MarkContentCompleteView(AuthenticatedMixin, APIView):
     """POST {content_id} — a student marks one piece of course content (a
     video, PDF, etc.) as done. This is what feeds the analytics below."""
 
+    @extend_schema(
+        operation_id="LmsMarkContentComplete",
+        tags=["LMS"],
+        request=MarkCompleteRequestSerializer,
+        responses={
+            200: DetailErrorSerializer,
+            **ERROR_RESPONSES,
+        },
+    )
     def post(self, request):
         content_id = request.data.get("content_id")
         if not content_id or not table_exists("portal_course_progress"):
@@ -224,6 +381,15 @@ class CourseAnalyticsView(AuthenticatedMixin, APIView):
     classmate — unlike the forum/notes views, there's no "your own record"
     case here to allow a Student role through."""
 
+    @extend_schema(
+        operation_id="LmsCourseAnalytics",
+        tags=["LMS"],
+        parameters=[COURSE_ID_PARAMETER, STUDENT_ID_PARAMETER],
+        responses={
+            200: serializers.ListSerializer(child=LmsCourseAnalyticsItemSerializer),
+            **ERROR_RESPONSES,
+        },
+    )
     def get(self, request):
         course_id = request.query_params.get("course_id")
         student_id = request.query_params.get("student_id")

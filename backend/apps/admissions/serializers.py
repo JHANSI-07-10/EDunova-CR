@@ -81,6 +81,7 @@ class AdmissionEnquirySerializer(serializers.ModelSerializer):
             "scholarship_discount", "student_admission_number",
             "student_roll_number",
         ]
+
         read_only_fields = [
             "id", "registration_number", "status", "reviewed_by",
             "rejection_reason", "submitted_at", "updated_at",
@@ -164,3 +165,4 @@ class AdmissionStatusSerializer(serializers.ModelSerializer):
             "gender", "target_class", "parent_name", "status", "submitted_at",
         ]
         read_only_fields = fields
+

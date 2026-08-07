@@ -6,11 +6,13 @@ from django.db import connection
 
 # Order matters: the second file's FKs (portal_employee, portal_vehicle, ...)
 # reference tables created in the first file (portal_user_profile, auth_user).
+# improvements depends on every other file having created the base tables.
 SQL_FILES = [
     "portal_extension_auth_user.sql",
     "portal_extension_parent_admin.sql",
     "portal_extension_facilities.sql",
     "portal_extension_payroll.sql",
+    "portal_extension_improvements.sql",
 ]
 
 TRACKING_TABLE_SQL = """

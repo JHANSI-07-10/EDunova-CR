@@ -5,49 +5,28 @@ import sys
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
 from django.core.cache import cache
-from rest_framework import serializers, status
+from rest_framework import status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
+from rest_framework.views import APIView
+from drf_spectacular.utils import extend_schema, extend_schema_view
 from rest_framework_simplejwt.tokens import RefreshToken
-from drf_spectacular.utils import OpenApiTypes, extend_schema
+from rest_framework_simplejwt.views import TokenRefreshView
 
-
-# ---------------------------------------------------------------------------
-# OpenAPI documentation schemas for the OTP login flow (docs only — the views
-# keep reading request.data directly; these serializers are never instantiated
-# at runtime). They give the Swagger UI an editable request body and proper
-# response shapes for /api/auth/login/, /api/auth/verify-otp/ and
-# /api/auth/resend-otp/.
-# ---------------------------------------------------------------------------
-class LoginRequestSerializer(serializers.Serializer):
-    email = serializers.CharField(help_text="Registered email address or username.")
-    password = serializers.CharField(write_only=True, help_text="Account password.")
-
-
-class OtpRequestSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField(help_text="user_id returned by POST /api/auth/login/.")
-    otp = serializers.CharField(help_text="6-digit code emailed by login/resend.")
-
-
-class ResendRequestSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField(help_text="user_id returned by POST /api/auth/login/.")
-
-
-class LoginResponseSerializer(serializers.Serializer):
-    user_id = serializers.IntegerField()
-    user_type = serializers.CharField()
-    email_sent = serializers.BooleanField()
-    detail = serializers.CharField(required=False)
-    email_error = serializers.CharField(required=False)
-
-
-class TokenResponseSerializer(serializers.Serializer):
-    refresh = serializers.CharField()
-    access = serializers.CharField()
-    user = serializers.DictField()
-
+from .doc_schemas import (
+    DetailErrorSerializer,
+    LoginStep1RequestSerializer,
+    LoginStep1ResponseSerializer,
+    ResendOtpRequestSerializer,
+    TokenRefreshRequestSerializer,
+    TokenRefreshResponseSerializer,
+    ValidationErrorSerializer,
+    VerifyOtpRequestSerializer,
+    VerifyOtpResponseSerializer,
+)
+from .roles import log_action
 from .services.email_service import send_login_otp_email
 
 
@@ -154,6 +133,13 @@ def user_payload(user) -> dict:
     }
 
 
+def _client_ip(request) -> str:
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR") or request.META.get("REMOTE_HOST") or ""
+
+
 def _find_user_by_email_or_username(identifier: str):
     User = get_user_model()
     if not identifier:
@@ -182,9 +168,21 @@ def _store_otp(user_id: int, otp: str) -> None:
 # ---------------------------------------------------------------------------
 
 @extend_schema(
-    tags=["auth"],
-    request=LoginRequestSerializer,
-    responses={200: LoginResponseSerializer, 400: OpenApiTypes.OBJECT, 500: OpenApiTypes.OBJECT, 503: OpenApiTypes.OBJECT},
+    operation_id="AuthLoginStep1",
+    summary="Login Step 1 - Request OTP",
+    description=(
+        "Authenticate with email/username and password. If valid, a 6-digit one-time "
+        "password (OTP) is sent to the account email and a `user_id` is returned. "
+        "Use that `user_id` with `auth/verify-otp` to complete sign-in and receive "
+        "JWT tokens."
+    ),
+    tags=["Authentication"],
+    request=LoginStep1RequestSerializer,
+    responses={
+        200: LoginStep1ResponseSerializer,
+        400: ValidationErrorSerializer,
+        500: DetailErrorSerializer,
+    },
 )
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -277,9 +275,20 @@ def login_step1(request):
 
 
 @extend_schema(
-    tags=["auth"],
-    request=OtpRequestSerializer,
-    responses={200: TokenResponseSerializer, 400: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT},
+    operation_id="AuthVerifyOtp",
+    summary="Verify OTP and Obtain JWT Tokens",
+    description=(
+        "Verify the one-time password from `auth/login` and return JWT access and "
+        "refresh tokens plus the logged-in user payload. Send the access token via "
+        "the **Authorize** button for all protected endpoints."
+    ),
+    tags=["Authentication"],
+    request=VerifyOtpRequestSerializer,
+    responses={
+        200: VerifyOtpResponseSerializer,
+        400: ValidationErrorSerializer,
+        404: DetailErrorSerializer,
+    },
 )
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -315,6 +324,17 @@ def login_step2_verify_otp(request):
 
     refresh = RefreshToken.for_user(user)
     cache.delete(f"portal_login_otp:{user_id}")
+    try:
+        log_action(
+            actor=user,
+            action="auth.login",
+            target_type="session",
+            target_id=user.id,
+            details={"user_type": get_user_role(user)},
+            ip_address=_client_ip(request),
+        )
+    except Exception:
+        logger.warning("Audit write failed during login for user_id=%s", user.id)
     return Response({
         "refresh": str(refresh),
         "access": str(refresh.access_token),
@@ -323,9 +343,16 @@ def login_step2_verify_otp(request):
 
 
 @extend_schema(
-    tags=["auth"],
-    request=ResendRequestSerializer,
-    responses={200: OpenApiTypes.OBJECT, 404: OpenApiTypes.OBJECT, 503: OpenApiTypes.OBJECT},
+    operation_id="AuthResendOtp",
+    summary="Resend OTP",
+    description="Re-send a fresh one-time password to the account email for the given `user_id`.",
+    tags=["Authentication"],
+    request=ResendOtpRequestSerializer,
+    responses={
+        200: DetailErrorSerializer,
+        404: DetailErrorSerializer,
+        500: DetailErrorSerializer,
+    },
 )
 @api_view(["POST"])
 @permission_classes([AllowAny])
@@ -367,4 +394,55 @@ def resend_otp(request):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    return Response({"detail": "OTP resent successfully.", "email_sent": True})
+    return Response({"detail": "OTP resent successfully."})
+
+
+@extend_schema_view(
+    post=extend_schema(
+        operation_id="AuthTokenRefresh",
+        summary="Refresh JWT Access Token",
+        description="Exchange a valid refresh token for a freshly signed access token.",
+        tags=["Authentication"],
+        request=TokenRefreshRequestSerializer,
+        responses={
+            200: TokenRefreshResponseSerializer,
+            401: DetailErrorSerializer,
+        },
+    )
+)
+class TokenRefreshAPIView(TokenRefreshView):
+    """Wraps SimpleJWT's TokenRefreshView with OpenAPI documentation only."""
+
+
+class LogoutView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        operation_id="AuthLogout",
+        summary="Logout",
+        description=(
+            "Invalidates the caller's session from the perspective of the audit trail. "
+            "The JWT access token simply expires; clients should clear their stored tokens. "
+            "Requires a valid Bearer token so the user identity is recorded."
+        ),
+        tags=["Authentication"],
+        request=None,
+        responses={
+            200: DetailErrorSerializer,
+            401: DetailErrorSerializer,
+        },
+    )
+    def post(self, request):
+        user = request.user
+        try:
+            log_action(
+                actor=user,
+                action="auth.logout",
+                target_type="session",
+                target_id=user.id,
+                details={"user_type": get_user_role(user)},
+                ip_address=_client_ip(request),
+            )
+        except Exception:
+            logger.warning("Audit write failed during logout for user_id=%s", user.id)
+        return Response({"detail": "Logged out successfully."})

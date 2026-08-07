@@ -8,16 +8,100 @@ Kept in its own file for the same reason as facilities_views.py: easy to
 find, doesn't bloat admin_views.py/views.py further.
 """
 from django.db import connection
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema, OpenApiParameter, inline_serializer
+from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .admin_views import AdminMixin
+from .doc_schemas import (
+    DetailErrorSerializer,
+    ValidationErrorSerializer,
+    EXAM_SCHEDULE_ID_PARAMETER,
+    CLASS_ID_PARAMETER,
+    EXAM_NAME_PARAMETER,
+    STUDENT_ID_PARAMETER,
+)
 from .roles import log_action
 from .views import StudentOnlyMixin, current_class_for_student, row, rows, serialise, table_exists
 
 
 def _grade_for_percent(pct):
     return "A" if pct >= 90 else "B" if pct >= 75 else "C" if pct >= 60 else "D" if pct >= 40 else "F"
+
+
+# =============================================================================
+# Documentation-only schemas (the portal has no DRF serializers; raw SQL only)
+# =============================================================================
+ExamRankListItemSerializer = inline_serializer(
+    name="ExamRankListItem",
+    fields={
+        "id": serializers.IntegerField(help_text="Portal result record id."),
+        "student_id": serializers.IntegerField(help_text="Student (auth user) id."),
+        "marks_obtained": serializers.FloatField(help_text="Marks scored in this subject."),
+        "grade_letter": serializers.CharField(
+            required=False, allow_null=True, help_text="Letter grade for the marks."
+        ),
+        "rank_position": serializers.IntegerField(
+            required=False, allow_null=True, help_text="Per-subject rank for this exam."
+        ),
+        "student_name": serializers.CharField(help_text="Full name of the student."),
+        "roll_number": serializers.CharField(
+            required=False, allow_null=True, help_text="Student roll number."
+        ),
+    },
+)
+
+ExamOverallRankItemSerializer = inline_serializer(
+    name="ExamOverallRankItem",
+    fields={
+        "student_id": serializers.IntegerField(help_text="Student (auth user) id."),
+        "student_name": serializers.CharField(help_text="Full name of the student."),
+        "roll_number": serializers.CharField(
+            required=False, allow_null=True, help_text="Student roll number."
+        ),
+        "total_marks": serializers.FloatField(help_text="Summed marks across subjects."),
+        "max_total": serializers.FloatField(help_text="Summed maximum marks across subjects."),
+        "overall_rank": serializers.IntegerField(help_text="Class-wide rank by total marks."),
+    },
+)
+
+ExamSubjectSerializer = inline_serializer(
+    name="ExamReportCardSubject",
+    fields={
+        "subject_name": serializers.CharField(help_text="Subject name."),
+        "max_marks": serializers.FloatField(help_text="Maximum marks for the subject."),
+        "marks_obtained": serializers.FloatField(help_text="Marks scored in the subject."),
+        "grade_letter": serializers.CharField(help_text="Letter grade for the subject."),
+        "rank_position": serializers.IntegerField(
+            required=False, allow_null=True, help_text="Per-subject rank for the exam."
+        ),
+    },
+)
+
+ExamReportCardSerializer = inline_serializer(
+    name="ExamReportCard",
+    fields={
+        "student_name": serializers.CharField(
+            required=False, allow_null=True, help_text="Full name of the student."
+        ),
+        "exam_name": serializers.CharField(help_text="Exam cycle name."),
+        "subjects": serializers.ListSerializer(
+            child=ExamSubjectSerializer, help_text="Per-subject results."
+        ),
+        "total_marks": serializers.FloatField(help_text="Sum of marks obtained."),
+        "max_total": serializers.FloatField(help_text="Sum of maximum marks."),
+        "percentage": serializers.FloatField(help_text="Overall percentage (0-100)."),
+        "overall_grade": serializers.CharField(
+            required=False, allow_null=True, help_text="Overall letter grade."
+        ),
+        "is_complete": serializers.BooleanField(help_text="Whether all subjects are graded."),
+        "expected_subject_count": serializers.IntegerField(
+            required=False, allow_null=True, help_text="Subjects taught in the student's class."
+        ),
+    },
+)
 
 
 # =============================================================================
@@ -28,6 +112,15 @@ class RankListView(AdminMixin, APIView):
     populate portal_result.rank_position). POST recomputes and persists the
     per-subject ranks for that exam_schedule."""
 
+    @extend_schema(
+        operation_id="ExamRankList",
+        tags=["Examination"],
+        parameters=[EXAM_SCHEDULE_ID_PARAMETER],
+        responses={
+            200: serializers.ListSerializer(child=ExamRankListItemSerializer),
+            400: ValidationErrorSerializer,
+        },
+    )
     def get(self, request):
         exam_id = request.query_params.get("exam_schedule_id")
         if not exam_id or not table_exists("portal_result"):
@@ -47,6 +140,19 @@ class RankListView(AdminMixin, APIView):
             [exam_id],
         )))
 
+    @extend_schema(
+        operation_id="ExamRankListGenerate",
+        tags=["Examination"],
+        request=inline_serializer(
+            name="ExamRankGenerateRequest",
+            fields={"exam_schedule_id": serializers.IntegerField()},
+        ),
+        responses={
+            200: DetailErrorSerializer,
+            400: ValidationErrorSerializer,
+            404: DetailErrorSerializer,
+        },
+    )
     def post(self, request):
         """Body: {exam_schedule_id}. Ranks all results for that exam by marks
         (ties share the same rank, standard competition ranking: 1,2,2,4)."""
@@ -81,6 +187,15 @@ class OverallRankListView(AdminMixin, APIView):
     school usually means by "the class rank list" rather than a single
     subject's rank."""
 
+    @extend_schema(
+        operation_id="ExamOverallRankList",
+        tags=["Examination"],
+        parameters=[CLASS_ID_PARAMETER, EXAM_NAME_PARAMETER],
+        responses={
+            200: serializers.ListSerializer(child=ExamOverallRankItemSerializer),
+            400: ValidationErrorSerializer,
+        },
+    )
     def get(self, request):
         class_id = request.query_params.get("class_id")
         exam_name = request.query_params.get("exam_name")
@@ -161,6 +276,16 @@ def _report_card_data(student_id, exam_name):
 class ReportCardView(AdminMixin, APIView):
     """Admin-facing: ?student_id=&exam_name= — generate any student's report card."""
 
+    @extend_schema(
+        operation_id="ExamAdminReportCard",
+        tags=["Examination"],
+        parameters=[STUDENT_ID_PARAMETER, EXAM_NAME_PARAMETER],
+        responses={
+            200: ExamReportCardSerializer,
+            400: ValidationErrorSerializer,
+            404: DetailErrorSerializer,
+        },
+    )
     def get(self, request):
         student_id = request.query_params.get("student_id")
         exam_name = request.query_params.get("exam_name")
@@ -173,6 +298,15 @@ class ReportCardView(AdminMixin, APIView):
 class StudentReportCardView(StudentOnlyMixin, APIView):
     """Student-facing: ?exam_name= — a student's own report card only."""
 
+    @extend_schema(
+        operation_id="ExamStudentReportCard",
+        tags=["Examination"],
+        parameters=[EXAM_NAME_PARAMETER],
+        responses={
+            200: ExamReportCardSerializer,
+            400: ValidationErrorSerializer,
+        },
+    )
     def get(self, request):
         exam_name = request.query_params.get("exam_name")
         if not exam_name:
