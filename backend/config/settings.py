@@ -137,6 +137,10 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = "static/"
+# Where `collectstatic` gathers admin/static assets for production. Required
+# by the container entrypoint (entrypoint.sh runs collectstatic --noinput);
+# without it the deploy crashes with ImproperlyConfigured.
+STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
