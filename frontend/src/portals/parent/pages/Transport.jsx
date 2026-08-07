@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import { useAuth } from "../context/AuthContext";
+import { isNonEmptyString } from "../../../utils/validation";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -160,6 +161,7 @@ export default function Transport() {
   const [complaintType, setComplaintType] = useState("Delay Issue");
   const [complaintDetails, setComplaintDetails] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
   function load() {
     if (!activeChildId) return;
@@ -174,7 +176,15 @@ export default function Transport() {
 
   async function handleRequest(e) {
     e.preventDefault();
-    if (!requestDetails.trim() || !activeChildId) return;
+    if (!isNonEmptyString(requestDetails)) {
+      setFormErrors({ requestDetails: "Please provide the request details." });
+      return;
+    }
+    if (!activeChildId) {
+      setFormErrors({ requestDetails: "Please select a child from the top bar first." });
+      return;
+    }
+    setFormErrors({});
     setSubmitting(true);
     try {
       await api.post("/parent/messages/", {
@@ -192,7 +202,15 @@ export default function Transport() {
 
   async function handleComplaint(e) {
     e.preventDefault();
-    if (!complaintDetails.trim() || !activeChildId) return;
+    if (!isNonEmptyString(complaintDetails)) {
+      setFormErrors({ complaintDetails: "Please describe the complaint or concern." });
+      return;
+    }
+    if (!activeChildId) {
+      setFormErrors({ complaintDetails: "Please select a child from the top bar first." });
+      return;
+    }
+    setFormErrors({});
     setSubmitting(true);
     try {
       await api.post("/parent/messages/", {
@@ -236,7 +254,7 @@ export default function Transport() {
         <Card className="max-w-xl">
           <p className="font-heading font-semibold mb-2">Request Transport Access</p>
           <p className="text-sm text-ink-secondary mb-4">Submit a request to the transport department to assign a school bus route.</p>
-          <form onSubmit={handleRequest} className="space-y-3">
+          <form onSubmit={handleRequest} noValidate className="space-y-3">
             <div className="flex gap-4 flex-wrap">
               {["New Registration", "Route Enquiry"].map((t) => (
                 <label key={t} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
@@ -245,12 +263,15 @@ export default function Transport() {
                 </label>
               ))}
             </div>
-            <textarea
-              required rows={3} value={requestDetails}
-              onChange={(e) => setRequestDetails(e.target.value)}
-              placeholder="Provide pickup address, landmarks, and timings..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-academic-blue resize-none"
-            />
+            <div>
+              <textarea
+                required rows={3} value={requestDetails}
+                onChange={(e) => setRequestDetails(e.target.value)}
+                placeholder="Provide pickup address, landmarks, and timings..."
+                className={`w-full rounded-xl border px-3 py-2 text-sm outline-none focus:border-academic-blue resize-none ${formErrors.requestDetails ? "border-danger" : "border-slate-200"}`}
+              />
+              {formErrors.requestDetails && <p className="text-xs text-danger mt-1">{formErrors.requestDetails}</p>}
+            </div>
             <button disabled={submitting} className="bg-academic-blue text-white rounded-xl px-5 py-2 font-medium text-sm hover:bg-academic-blue/90 disabled:opacity-50">
               {submitting ? "Submitting..." : "Submit Access Request"}
             </button>
@@ -338,7 +359,7 @@ export default function Transport() {
         <Card>
           <p className="font-heading font-semibold mb-1">Route Change Request</p>
           <p className="text-sm text-ink-secondary mb-4">Request to modify pick/drop location or assign a different bus route.</p>
-          <form onSubmit={handleRequest} className="space-y-3">
+          <form onSubmit={handleRequest} noValidate className="space-y-3">
             <div className="flex gap-4 flex-wrap">
               {["Route Change", "Temporary Discontinue"].map((t) => (
                 <label key={t} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
@@ -347,12 +368,15 @@ export default function Transport() {
                 </label>
               ))}
             </div>
-            <textarea
-              required rows={3} value={requestDetails}
-              onChange={(e) => setRequestDetails(e.target.value)}
-              placeholder="Provide exact details of the requested changes..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-academic-blue resize-none"
-            />
+            <div>
+              <textarea
+                required rows={3} value={requestDetails}
+                onChange={(e) => setRequestDetails(e.target.value)}
+                placeholder="Provide exact details of the requested changes..."
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus:border-academic-blue resize-none ${formErrors.requestDetails ? "border-danger" : "border-slate-200"}`}
+              />
+              {formErrors.requestDetails && <p className="text-xs text-danger mt-1">{formErrors.requestDetails}</p>}
+            </div>
             <button disabled={submitting} className="bg-academic-blue text-white rounded-xl px-5 py-2 font-medium text-sm hover:bg-academic-blue/90 disabled:opacity-50">
               {submitting ? "Submitting..." : "Submit Request"}
             </button>
@@ -362,7 +386,7 @@ export default function Transport() {
         <Card>
           <p className="font-heading font-semibold mb-1">Transport Complaint Ticket</p>
           <p className="text-sm text-ink-secondary mb-4">Report delay alerts, vehicle issues, or driver misconduct.</p>
-          <form onSubmit={handleComplaint} className="space-y-3">
+          <form onSubmit={handleComplaint} noValidate className="space-y-3">
             <div className="flex gap-4 flex-wrap">
               {["Delay Issue", "Driver Complaint", "Other Incident"].map((t) => (
                 <label key={t} className="flex items-center gap-2 text-sm font-medium cursor-pointer">
@@ -371,12 +395,15 @@ export default function Transport() {
                 </label>
               ))}
             </div>
-            <textarea
-              required rows={3} value={complaintDetails}
-              onChange={(e) => setComplaintDetails(e.target.value)}
-              placeholder="Describe the complaint or concern..."
-              className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-academic-blue resize-none"
-            />
+            <div>
+              <textarea
+                required rows={3} value={complaintDetails}
+                onChange={(e) => setComplaintDetails(e.target.value)}
+                placeholder="Describe the complaint or concern..."
+                className={`w-full rounded-xl border px-3 py-2.5 text-sm outline-none focus:border-academic-blue resize-none ${formErrors.complaintDetails ? "border-danger" : "border-slate-200"}`}
+              />
+              {formErrors.complaintDetails && <p className="text-xs text-danger mt-1">{formErrors.complaintDetails}</p>}
+            </div>
             <button disabled={submitting} className="bg-rose-600 text-white rounded-xl px-5 py-2 font-medium text-sm hover:bg-rose-700 disabled:opacity-50">
               {submitting ? "Submitting..." : "Submit Incident Report"}
             </button>

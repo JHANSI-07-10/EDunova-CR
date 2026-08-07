@@ -36,7 +36,10 @@ export default function Footer() {
     <footer className="bg-bg-dark text-gray-300 mt-20">
       <div className="max-w-7xl mx-auto px-6 py-14 grid grid-cols-2 md:grid-cols-6 gap-8">
         <div className="col-span-2">
-          <div className="font-heading font-bold text-xl text-white mb-2">EduNova Global Academy</div>
+          <div className="flex items-center gap-2.5 mb-2">
+            <img src="/images/logo-icon.svg" alt="EduNova Global Academy logo" className="h-10 w-10 rounded-xl" />
+            <span className="font-heading font-bold text-xl text-white">EduNova Global Academy</span>
+          </div>
           <p className="font-subheading text-sm text-gray-400 mb-1">Inspiring Minds. Building Futures.</p>
           <p className="text-sm text-gray-500">www.edunovaacademy.edu.in</p>
         </div>

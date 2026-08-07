@@ -17,6 +17,7 @@ import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
 import { publicImages } from '../../../constants/publicImages'
+import { isValidEmail, isValidPhone, isNonEmptyString, isTextOnly } from '../../../utils/validation'
 
 const fetchJobs =
   cmsApi.getJobPostings || cmsApi.getJobs || cmsApi.getCareers || (async () => [])
@@ -77,9 +78,34 @@ export default function Careers() {
   const [resumeFile, setResumeFile] = useState(null)
   const [applying, setApplying] = useState(false)
   const [success, setSuccess] = useState(false)
+  const [formErrors, setFormErrors] = useState({})
 
   const handleApply = async (e) => {
     e.preventDefault()
+    const errs = {}
+    if (!isNonEmptyString(formData.applicant_name) || !isTextOnly(formData.applicant_name)) {
+      errs.applicant_name = 'Please enter a valid name (letters only).'
+    }
+    if (!isValidEmail(formData.email)) {
+      errs.email = 'Please enter a valid email address.'
+    }
+    if (!isValidPhone(formData.phone)) {
+      errs.phone = 'Please enter a valid phone number (7–15 digits, +/space/dash allowed).'
+    }
+    if (!resumeFile) {
+      errs.resume = 'Please attach your resume (PDF or DOC).'
+    } else {
+      const okTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
+      const extOk = /\.(pdf|doc|docx)$/i.test(resumeFile.name)
+      if (!okTypes.includes(resumeFile.type) && !extOk) {
+        errs.resume = 'Resume must be a PDF or Word document (.pdf, .doc, .docx).'
+      }
+    }
+    if (Object.keys(errs).length > 0) {
+      setFormErrors(errs)
+      return
+    }
+    setFormErrors({})
     setApplying(true)
     try {
       const data = new FormData()
@@ -281,7 +307,7 @@ export default function Careers() {
                   </div>
 
                   <button
-                    onClick={() => { setSelectedJob(job); setSuccess(false); }}
+                    onClick={() => { setSelectedJob(job); setSuccess(false); setFormErrors({}); }}
                     className="inline-flex items-center gap-2 font-subheading font-bold text-accent hover:text-primary transition-colors"
                   >
                     Apply Now <Send size={16} />
@@ -329,20 +355,23 @@ export default function Careers() {
                   <button onClick={() => setSelectedJob(null)} className="btn-primary">Close</button>
                 </div>
               ) : (
-                <form onSubmit={handleApply} className="space-y-4">
+                <form onSubmit={handleApply} noValidate className="space-y-4">
                   <div className="grid md:grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold mb-1">Full Name *</label>
-                      <input type="text" required className="w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors" value={formData.applicant_name} onChange={e => setFormData({...formData, applicant_name: e.target.value})} />
+                      <input type="text" required className={`w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors ${formErrors.applicant_name ? 'border-red-400' : ''}`} value={formData.applicant_name} onChange={e => setFormData({...formData, applicant_name: e.target.value})} />
+                      {formErrors.applicant_name && <p className="text-xs text-red-500 mt-1">{formErrors.applicant_name}</p>}
                     </div>
                     <div>
                       <label className="block text-sm font-semibold mb-1">Email Address *</label>
-                      <input type="email" required className="w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                      <input type="email" required className={`w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors ${formErrors.email ? 'border-red-400' : ''}`} value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
+                      {formErrors.email && <p className="text-xs text-red-500 mt-1">{formErrors.email}</p>}
                     </div>
                   </div>
                   <div>
                     <label className="block text-sm font-semibold mb-1">Phone Number *</label>
-                    <input type="tel" required className="w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors" value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                    <input type="tel" required className={`w-full border rounded-xl p-3 focus:border-accent outline-none transition-colors ${formErrors.phone ? 'border-red-400' : ''}`} value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
+                    {formErrors.phone && <p className="text-xs text-red-500 mt-1">{formErrors.phone}</p>}
                   </div>
                   <div>
                     <label className="block text-sm font-semibold mb-1">Cover Letter</label>
@@ -350,7 +379,8 @@ export default function Careers() {
                   </div>
                   <div>
                     <label className="block text-sm font-semibold mb-1">Resume (PDF/Doc) *</label>
-                    <input type="file" required accept=".pdf,.doc,.docx" className="w-full border rounded-xl p-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20 transition-colors" onChange={e => setResumeFile(e.target.files[0])} />
+                    <input type="file" required accept=".pdf,.doc,.docx" className={`w-full border rounded-xl p-3 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent/10 file:text-accent hover:file:bg-accent/20 transition-colors ${formErrors.resume ? 'border-red-400' : ''}`} onChange={e => { setResumeFile(e.target.files[0]); setFormErrors(f => ({ ...f, resume: undefined })); }} />
+                    {formErrors.resume && <p className="text-xs text-red-500 mt-1">{formErrors.resume}</p>}
                   </div>
                   <div className="pt-4 border-t flex justify-end gap-3">
                     <button type="button" onClick={() => setSelectedJob(null)} className="px-6 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">Cancel</button>

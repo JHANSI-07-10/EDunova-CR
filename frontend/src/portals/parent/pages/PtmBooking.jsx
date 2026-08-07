@@ -3,6 +3,7 @@ import api from "../lib/api";
 import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import { useAuth } from "../context/AuthContext";
 import { Lock, Clock, Calendar, Check, AlertTriangle, CalendarDays } from "lucide-react";
+import { isNonEmptyString } from "../../../utils/validation";
 
 const TONE = { Scheduled: "blue", Completed: "green", Cancelled: "red", Waitlisted: "gold" };
 
@@ -15,6 +16,7 @@ export default function PtmBooking() {
 
   const [hasPendingFees, setHasPendingFees] = useState(false);
   const [feesLoading, setFeesLoading] = useState(true);
+  const [formErrors, setFormErrors] = useState({});
 
   // Slot availability verification simulator states
   const [verifyingSlot, setVerifyingSlot] = useState(false);
@@ -40,7 +42,22 @@ export default function PtmBooking() {
 
   function startVerification(e) {
     e.preventDefault();
-    if (!form.teacher_id || !form.meeting_date || !form.time_slot) return;
+    const errs = {};
+    if (!isNonEmptyString(form.teacher_id)) errs.teacher_id = "Please select a teacher.";
+    if (!isNonEmptyString(form.meeting_date)) {
+      errs.meeting_date = "Please choose a meeting date.";
+    } else {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const chosen = new Date(`${form.meeting_date}T00:00:00`);
+      if (chosen < today) errs.meeting_date = "Meeting date cannot be in the past.";
+    }
+    if (!isNonEmptyString(form.time_slot)) errs.time_slot = "Please choose a time slot.";
+    if (Object.keys(errs).length > 0) {
+      setFormErrors(errs);
+      return;
+    }
+    setFormErrors({});
     setVerifyingSlot(true);
     setVerificationResult(null);
     
@@ -105,21 +122,24 @@ export default function PtmBooking() {
     <div className="space-y-6">
       <Card>
         <SectionTitle>Book a parent-teacher meeting</SectionTitle>
-        <form onSubmit={startVerification} className="grid sm:grid-cols-2 gap-4">
+        <form onSubmit={startVerification} noValidate className="grid sm:grid-cols-2 gap-4">
           <div className="space-y-1">
             <label className="text-xs font-semibold text-ink-secondary">Select Teacher (*)</label>
-            <select required value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus-ring outline-none">
+            <select required value={form.teacher_id} onChange={(e) => setForm({ ...form, teacher_id: e.target.value })} className={`w-full rounded-xl border px-3 py-2.5 text-sm focus-ring outline-none ${formErrors.teacher_id ? "border-danger" : "border-slate-200"}`}>
               <option value="">Select teacher</option>
               {teachers.map((t) => <option key={t.id} value={t.id}>{t.name} — {t.subject_name}</option>)}
             </select>
+            {formErrors.teacher_id && <p className="text-xs text-danger mt-1">{formErrors.teacher_id}</p>}
           </div>
           <div className="space-y-1">
             <label className="text-xs font-semibold text-ink-secondary">Time Slot (Even minutes = Available, Odd = Booked) (*)</label>
-            <input required type="time" value={form.time_slot} onChange={(e) => setForm({ ...form, time_slot: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+            <input required type="time" value={form.time_slot} onChange={(e) => setForm({ ...form, time_slot: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${formErrors.time_slot ? "border-danger" : "border-slate-200"}`} />
+            {formErrors.time_slot && <p className="text-xs text-danger mt-1">{formErrors.time_slot}</p>}
           </div>
           <div className="space-y-1 sm:col-span-2">
             <label className="text-xs font-semibold text-ink-secondary">Meeting Date (*)</label>
-            <input required type="date" value={form.meeting_date} onChange={(e) => setForm({ ...form, meeting_date: e.target.value })} className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm focus-ring outline-none" />
+            <input required type="date" value={form.meeting_date} onChange={(e) => setForm({ ...form, meeting_date: e.target.value })} className={`w-full rounded-xl border px-3 py-2 text-sm focus-ring outline-none ${formErrors.meeting_date ? "border-danger" : "border-slate-200"}`} />
+            {formErrors.meeting_date && <p className="text-xs text-danger mt-1">{formErrors.meeting_date}</p>}
           </div>
           <div className="space-y-1 sm:col-span-2">
             <label className="text-xs font-semibold text-ink-secondary">Notes (Optional)</label>

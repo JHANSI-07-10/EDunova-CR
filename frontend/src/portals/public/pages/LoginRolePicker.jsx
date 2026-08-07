@@ -36,6 +36,11 @@ export default function LoginRolePicker() {
   return (
     <section className="max-w-5xl mx-auto px-6 py-16">
       <div className="text-center mb-10">
+        <img
+          src="/images/logo-icon.svg"
+          alt="EduNova Global Academy logo"
+          className="w-16 h-16 rounded-2xl shadow-raised mx-auto mb-4"
+        />
         <h1 className="font-heading text-3xl font-bold text-text-primary mb-2">Portal Login</h1>
         <p className="text-text-secondary font-body">Choose your role to sign in to your EduNova portal.</p>
       </div>

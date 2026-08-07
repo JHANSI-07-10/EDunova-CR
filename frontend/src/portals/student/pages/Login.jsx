@@ -89,9 +89,7 @@ export default function Login() {
     <div className="min-h-screen grid lg:grid-cols-2 bg-surface-light">
       <div className="hidden lg:flex flex-col justify-between bg-academic-blue text-white p-12">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-academic-gold flex items-center justify-center font-heading font-bold text-academic-blue">
-            E
-          </div>
+          <img src="/images/logo-icon.svg" alt="EduNova logo" className="w-10 h-10 rounded-xl bg-white shadow-sm" />
           <span className="font-heading font-semibold text-lg">EduNova Global Academy</span>
         </div>
         <div>

@@ -37,9 +37,7 @@ export default function Sidebar({ open, onClose }) {
       >
         <div className="flex items-center justify-between px-6 py-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-academic-gold flex items-center justify-center font-heading font-bold text-academic-blue">
-              E
-            </div>
+            <img src="/images/logo-icon.svg" alt="EduNova logo" className="w-10 h-10 rounded-xl bg-white shadow-sm" />
             <div>
               <p className="font-heading font-semibold leading-tight">EduNova</p>
               <p className="text-xs text-white/60 font-sub">Parent Portal</p>

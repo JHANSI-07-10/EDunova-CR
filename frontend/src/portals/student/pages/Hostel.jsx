@@ -5,6 +5,7 @@ import {
 import { useEffect, useState } from "react";
 import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
 import api from "../lib/api";
+import { isNonEmptyString, isValidDateRange } from "../../../utils/validation";
 
 function Btn({ variant = "primary", size = "md", className = "", children, ...props }) {
   const base = "inline-flex items-center justify-center gap-2 font-medium rounded-xl transition-all disabled:opacity-50";
@@ -47,6 +48,8 @@ export default function Hostel() {
   const [complaintForm, setComplaintForm] = useState({ category: "Maintenance", title: "", description: "" });
   const [complaintLoading, setComplaintLoading] = useState(false);
 
+  const [formErrors, setFormErrors] = useState({});
+
   const [applications, setApplications] = useState([]);
 
   function load() {
@@ -69,7 +72,10 @@ export default function Hostel() {
 
   async function submitApplication(e) {
     e.preventDefault();
-    if (!appForm.hostel_id) return;
+    const errs = {};
+    if (!appForm.hostel_id) errs.hostel_id = "Please select a hostel building.";
+    if (Object.keys(errs).length > 0) { setFormErrors(errs); return; }
+    setFormErrors({});
     setAppLoading(true);
     try {
       await api.post("/hostels/applications/", appForm);
@@ -82,7 +88,15 @@ export default function Hostel() {
 
   async function submitLeave(e) {
     e.preventDefault();
-    if (!leaveForm.start_date || !leaveForm.end_date || !leaveForm.reason.trim()) return;
+    const errs = {};
+    if (!isNonEmptyString(leaveForm.start_date)) errs.leave_start = "Start date is required.";
+    if (!isNonEmptyString(leaveForm.end_date)) errs.leave_end = "End date is required.";
+    if (leaveForm.start_date && leaveForm.end_date && !isValidDateRange(leaveForm.start_date, leaveForm.end_date)) {
+      errs.leave_end = "End date must be on or after the start date.";
+    }
+    if (!isNonEmptyString(leaveForm.reason)) errs.leave_reason = "Reason is required.";
+    if (Object.keys(errs).length > 0) { setFormErrors(errs); return; }
+    setFormErrors({});
     setLeaveLoading(true);
     try {
       await api.post("/hostels/leaves/", leaveForm);
@@ -95,7 +109,11 @@ export default function Hostel() {
 
   async function submitComplaint(e) {
     e.preventDefault();
-    if (!complaintForm.title.trim() || !complaintForm.description.trim()) return;
+    const errs = {};
+    if (!isNonEmptyString(complaintForm.title)) errs.title = "Issue title is required.";
+    if (!isNonEmptyString(complaintForm.description)) errs.description = "Description is required.";
+    if (Object.keys(errs).length > 0) { setFormErrors(errs); return; }
+    setFormErrors({});
     setComplaintLoading(true);
     try {
       await api.post("/hostels/complaints/", complaintForm);
@@ -123,6 +141,7 @@ export default function Hostel() {
             <button
               onClick={() => {
                 setAppForm({ hostel_id: hostels[0]?.id || "", preferred_room_type: "2-Sharing", reason: "" });
+                setFormErrors({});
                 setAppModal(true);
               }}
               className="bg-academic-blue text-white rounded-xl px-5 py-2.5 font-medium text-sm hover:bg-academic-blue/90"
@@ -163,18 +182,19 @@ export default function Hostel() {
                 <h3 className="font-heading font-semibold text-ink-primary">Hostel Application</h3>
                 <button onClick={() => setAppModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
               </div>
-              <form onSubmit={submitApplication} className="space-y-4">
+              <form onSubmit={submitApplication} noValidate className="space-y-4">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-ink-secondary uppercase">Preferred Hostel Building * (*)</label>
                   <select
                     required
                     value={appForm.hostel_id}
                     onChange={e => setAppForm({ ...appForm, hostel_id: e.target.value })}
-                    className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white"
+                    className={`rounded-xl border px-3 py-2 text-sm bg-white ${formErrors.hostel_id ? "border-danger" : "border-slate-200"}`}
                   >
                     <option value="">Select building</option>
                     {hostels.map(h => <option key={h.id} value={h.id}>{h.name} ({h.type})</option>)}
                   </select>
+                  {formErrors.hostel_id && <p className="text-xs text-danger mt-1">{formErrors.hostel_id}</p>}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-ink-secondary uppercase">Preferred Sharing *</label>
@@ -338,7 +358,7 @@ export default function Hostel() {
         <Card>
           <div className="flex justify-between items-center mb-3">
             <p className="font-heading font-semibold">Leaves & Night-Out Pass</p>
-            <Btn variant="outline" size="sm" onClick={() => { setLeaveForm({ start_date: "", end_date: "", reason: "" }); setLeaveModal(true); }}>Request Pass</Btn>
+            <Btn variant="outline" size="sm" onClick={() => { setLeaveForm({ start_date: "", end_date: "", reason: "" }); setFormErrors({}); setLeaveModal(true); }}>Request Pass</Btn>
           </div>
           {data.leaves.length === 0 ? (
             <p className="text-xs text-ink-secondary">No leave requests found.</p>
@@ -362,7 +382,7 @@ export default function Hostel() {
         <Card>
           <div className="flex justify-between items-center mb-3">
             <p className="font-heading font-semibold">Complaints & Maintenance Desk</p>
-            <Btn variant="outline" size="sm" onClick={() => { setComplaintForm({ category: "Maintenance", title: "", description: "" }); setComplaintModal(true); }}>File Complaint</Btn>
+            <Btn variant="outline" size="sm" onClick={() => { setComplaintForm({ category: "Maintenance", title: "", description: "" }); setFormErrors({}); setComplaintModal(true); }}>File Complaint</Btn>
           </div>
           {data.complaints.length === 0 ? (
             <p className="text-xs text-ink-secondary">No complaints registered.</p>
@@ -391,20 +411,23 @@ export default function Hostel() {
               <h3 className="font-heading font-semibold text-ink-primary">Request Leave Pass</h3>
               <button onClick={() => setLeaveModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
-            <form onSubmit={submitLeave} className="space-y-4">
+            <form onSubmit={submitLeave} noValidate className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-ink-secondary">Start Date * (*)</label>
-                  <input required type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white" />
+                  <input required type="date" value={leaveForm.start_date} onChange={e => setLeaveForm({ ...leaveForm, start_date: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm bg-white ${formErrors.leave_start ? "border-danger" : "border-slate-200"}`} />
+                  {formErrors.leave_start && <p className="text-xs text-danger">{formErrors.leave_start}</p>}
                 </div>
                 <div className="flex flex-col gap-1">
                   <label className="text-xs font-medium text-ink-secondary">End Date * (*)</label>
-                  <input required type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white" />
+                  <input required type="date" value={leaveForm.end_date} onChange={e => setLeaveForm({ ...leaveForm, end_date: e.target.value })} className={`rounded-xl border px-3 py-2 text-sm bg-white ${formErrors.leave_end ? "border-danger" : "border-slate-200"}`} />
+                  {formErrors.leave_end && <p className="text-xs text-danger">{formErrors.leave_end}</p>}
                 </div>
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-ink-secondary uppercase">Reason for Leave * (*)</label>
-                <textarea required rows={3} value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="e.g. Traveling home for weekend..." className="rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none" />
+                <textarea required rows={3} value={leaveForm.reason} onChange={e => setLeaveForm({ ...leaveForm, reason: e.target.value })} placeholder="e.g. Traveling home for weekend..." className={`rounded-xl border px-3 py-2 text-sm resize-none ${formErrors.leave_reason ? "border-danger" : "border-slate-200"}`} />
+                {formErrors.leave_reason && <p className="text-xs text-danger mt-1">{formErrors.leave_reason}</p>}
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setLeaveModal(false)} className="flex-1 border border-slate-200 text-ink-primary rounded-xl py-2 font-medium">Cancel</button>
@@ -425,7 +448,7 @@ export default function Hostel() {
               <h3 className="font-heading font-semibold text-ink-primary">File Complaint / Issue</h3>
               <button onClick={() => setComplaintModal(false)} className="text-slate-400 hover:text-slate-600"><X size={18} /></button>
             </div>
-            <form onSubmit={submitComplaint} className="space-y-4">
+            <form onSubmit={submitComplaint} noValidate className="space-y-4">
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-ink-secondary">Category *</label>
                 <select value={complaintForm.category} onChange={e => setComplaintForm({ ...complaintForm, category: e.target.value })} className="rounded-xl border border-slate-200 px-3 py-2 text-sm bg-white">
@@ -434,11 +457,13 @@ export default function Hostel() {
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-ink-secondary">Issue Title * (*)</label>
-                <input required type="text" value={complaintForm.title} onChange={e => setComplaintForm({ ...complaintForm, title: e.target.value })} placeholder="e.g. Geyser not working" className="rounded-xl border border-slate-200 px-3 py-2 text-sm" />
+                <input required type="text" value={complaintForm.title} onChange={e => setComplaintForm({ ...complaintForm, title: e.target.value })} placeholder="e.g. Geyser not working" className={`rounded-xl border px-3 py-2 text-sm ${formErrors.title ? "border-danger" : "border-slate-200"}`} />
+                {formErrors.title && <p className="text-xs text-danger mt-1">{formErrors.title}</p>}
               </div>
               <div className="flex flex-col gap-1">
                 <label className="text-xs font-medium text-ink-secondary uppercase">Detailed Description * (*)</label>
-                <textarea required rows={3} value={complaintForm.description} onChange={e => setComplaintForm({ ...complaintForm, description: e.target.value })} placeholder="Describe the issue in detail..." className="rounded-xl border border-slate-200 px-3 py-2 text-sm resize-none" />
+                <textarea required rows={3} value={complaintForm.description} onChange={e => setComplaintForm({ ...complaintForm, description: e.target.value })} placeholder="Describe the issue in detail..." className={`rounded-xl border px-3 py-2 text-sm resize-none ${formErrors.description ? "border-danger" : "border-slate-200"}`} />
+                {formErrors.description && <p className="text-xs text-danger mt-1">{formErrors.description}</p>}
               </div>
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setComplaintModal(false)} className="flex-1 border border-slate-200 text-ink-primary rounded-xl py-2 font-medium">Cancel</button>

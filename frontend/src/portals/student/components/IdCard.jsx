@@ -27,9 +27,7 @@ export default function IdCard({ profile }) {
               <p className="text-[10px] tracking-widest text-white/60 font-sub">EDUNOVA GLOBAL ACADEMY</p>
               <p className="font-heading font-semibold text-lg leading-tight mt-0.5">{profile.name}</p>
             </div>
-            <div className="w-9 h-9 rounded-lg bg-academic-gold text-academic-blue flex items-center justify-center font-heading font-bold text-sm">
-              E
-            </div>
+            <img src="/images/logo-icon.svg" alt="EduNova logo" className="w-9 h-9 rounded-lg bg-white shadow-sm" />
           </div>
           <div className="flex justify-between items-end">
             <div>
