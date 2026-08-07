@@ -77,26 +77,6 @@ def _log_unexpected(exc, request):
 
 def edunova_exception_handler(exc, context):
     """DRF EXCEPTION_HANDLER: consistent envelope + safe 500s + structured logs."""
-    # Data-level bugs from the API surface (e.g. int("abc"), duplicate rows)
-    # are client errors, not server faults — map them to a clean 400 with a
-    # stable code instead of falling through to the generic 500.
-    if isinstance(exc, IntegrityError):
-        return Response(
-            {
-                "detail": "This record conflicts with existing data (duplicate or integrity error).",
-                "code": "integrity_error",
-            },
-            status=400,
-        )
-    if isinstance(exc, ValueError):
-        return Response(
-            {
-                "detail": "One of the supplied values is invalid.",
-                "code": "invalid_value",
-            },
-            status=400,
-        )
-
     response = exception_handler(exc, context)
 
     if response is None:
