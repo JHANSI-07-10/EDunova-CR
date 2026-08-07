@@ -1414,7 +1414,7 @@ paths:
                 $ref: '#/components/schemas/DetailErrorResponse'
           description: ''
     post:
-      operationId: AdminLeaveDecide
+      operationId: AdminLeaveDecideCreate
       description: Applies an Approved/Rejected decision to a specified leave request.
       summary: Approve or reject a leave request
       parameters:
@@ -1489,7 +1489,7 @@ paths:
           description: ''
   /api/admin-portal/leaves/{leave_id}/decide/:
     get:
-      operationId: AdminLeaveApprovalList_2
+      operationId: AdminLeaveDecideRoute
       description: Returns pending (or status-filtered) leave requests from staff
         and students.
       summary: List leave requests
@@ -1548,7 +1548,7 @@ paths:
                 $ref: '#/components/schemas/DetailErrorResponse'
           description: ''
     post:
-      operationId: AdminLeaveDecide_2
+      operationId: AdminLeaveDecide
       description: Applies an Approved/Rejected decision to a specified leave request.
       summary: Approve or reject a leave request
       parameters:
@@ -2375,10 +2375,9 @@ paths:
   /api/admin-portal/rank-list/:
     get:
       operationId: ExamRankList
-      description: |-
-        GET ?exam_schedule_id= for a single subject's rank list (also used to
-        populate portal_result.rank_position). POST recomputes and persists the
-        per-subject ranks for that exam_schedule.
+      description: Returns the per-subject rank list for an exam schedule, including
+        each student's marks and rank position.
+      summary: List a subject's rank list
       parameters:
       - in: query
         name: exam_schedule_id
@@ -2407,9 +2406,9 @@ paths:
           description: ''
     post:
       operationId: ExamRankListGenerate
-      description: |-
-        Body: {exam_schedule_id}. Ranks all results for that exam by marks
-        (ties share the same rank, standard competition ranking: 1,2,2,4).
+      description: Computes and saves per-subject ranks for an exam schedule (standard
+        competition ranking).
+      summary: Generate and persist a subject rank list
       tags:
       - Examination
       requestBody:
@@ -2448,11 +2447,9 @@ paths:
   /api/admin-portal/rank-list/overall/:
     get:
       operationId: ExamOverallRankList
-      description: |-
-        Aggregate rank across every subject for one class + exam cycle name
-        (e.g. all "Mid-Term" exam_schedules for class 8-A), which is what a
-        school usually means by "the class rank list" rather than a single
-        subject's rank.
+      description: Aggregates ranks across every subject for a class and exam round
+        to produce the overall class ranking.
+      summary: List the overall class rank list
       parameters:
       - in: query
         name: class_id
@@ -2487,8 +2484,9 @@ paths:
   /api/admin-portal/report-card/:
     get:
       operationId: ExamAdminReportCard
-      description: 'Admin-facing: ?student_id=&exam_name= — generate any student''s
-        report card.'
+      description: Generates a report card for any student for a given exam round
+        (admin-facing).
+      summary: Generate an admin report card
       parameters:
       - in: query
         name: exam_name
@@ -3173,7 +3171,7 @@ paths:
           description: ''
   /api/admin-portal/users/{user_id}/:
     post:
-      operationId: AdminUserResetPassword
+      operationId: AdminUserDetailAction
       description: Generates a temporary password for the user, updates it, and emails
         it via the reset-password service.
       summary: Reset a user's password
@@ -3290,7 +3288,7 @@ paths:
           description: ''
   /api/admin-portal/users/{user_id}/reset-password/:
     post:
-      operationId: AdminUserResetPassword_2
+      operationId: AdminUserResetPassword
       description: Generates a temporary password for the user, updates it, and emails
         it via the reset-password service.
       summary: Reset a user's password
@@ -3343,7 +3341,7 @@ paths:
                 $ref: '#/components/schemas/DetailErrorResponse'
           description: ''
     patch:
-      operationId: AdminUserDetail_2
+      operationId: AdminUserDetailViaResetPassword
       description: Toggles the account's active status and/or reassigns its role/group.
       summary: Update a user's status or role
       parameters:
@@ -3820,6 +3818,30 @@ paths:
                 $ref: '#/components/schemas/ValidationErrorResponse'
           description: ''
         '500':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailErrorResponse'
+          description: ''
+  /api/auth/logout/:
+    post:
+      operationId: AuthLogout
+      description: Invalidates the caller's session from the perspective of the audit
+        trail. The JWT access token simply expires; clients should clear their stored
+        tokens. Requires a valid Bearer token so the user identity is recorded.
+      summary: Logout
+      tags:
+      - Authentication
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DetailErrorResponse'
+          description: ''
+        '401':
           content:
             application/json:
               schema:
@@ -4890,12 +4912,9 @@ paths:
   /api/lms/analytics/:
     get:
       operationId: LmsCourseAnalytics
-      description: |-
-        GET ?course_id= — completion % per student for a course. Deliberately
-        Admin/Teacher only: this shows every enrolled student's individual
-        progress, which a classmate has no business seeing about another
-        classmate — unlike the forum/notes views, there's no "your own record"
-        case here to allow a Student role through.
+      description: Returns each enrolled student's completion percentage for a course
+        (Admin/Teacher only).
+      summary: Get course completion analytics
       parameters:
       - in: query
         name: course_id
@@ -4954,7 +4973,9 @@ paths:
   /api/lms/forum-topics/:
     get:
       operationId: LmsForumTopicList
-      description: GET ?course_id= — topics for a course. POST — create a topic.
+      description: Returns the forum topics for the given course, each with its reply
+        count.
+      summary: List forum topics for a course
       parameters:
       - in: query
         name: course_id
@@ -5007,7 +5028,8 @@ paths:
           description: ''
     post:
       operationId: LmsForumTopicCreate
-      description: GET ?course_id= — topics for a course. POST — create a topic.
+      description: Posts a new discussion topic to the given course.
+      summary: Create a forum topic
       tags:
       - LMS
       requestBody:
@@ -5064,7 +5086,8 @@ paths:
   /api/lms/forum-topics/{topic_id}/:
     get:
       operationId: LmsForumTopicDetail
-      description: GET a topic with all its replies.
+      description: Returns a single forum topic along with all of its replies.
+      summary: Get a forum topic with its replies
       parameters:
       - in: path
         name: topic_id
@@ -5116,7 +5139,8 @@ paths:
   /api/lms/forum-topics/{topic_id}/reply/:
     post:
       operationId: LmsForumPostCreate
-      description: POST a reply to a topic.
+      description: Posts a reply to the given forum topic.
+      summary: Reply to a forum topic
       parameters:
       - in: path
         name: topic_id
@@ -5180,9 +5204,9 @@ paths:
   /api/lms/mark-complete/:
     post:
       operationId: LmsMarkContentComplete
-      description: |-
-        POST {content_id} — a student marks one piece of course content (a
-        video, PDF, etc.) as done. This is what feeds the analytics below.
+      description: Marks a piece of course content as done for the authenticated student,
+        feeding learning analytics.
+      summary: Mark course content as complete
       tags:
       - LMS
       requestBody:
@@ -5239,9 +5263,9 @@ paths:
   /api/lms/notes/:
     get:
       operationId: LmsDigitalNoteList
-      description: |-
-        GET ?course_id= — notes for a course. POST — add a note (any
-        authenticated user, e.g. a teacher sharing notes or a student's own).
+      description: Returns the shared digital notes for the given course (e.g. teacher-shared
+        study material).
+      summary: List digital notes for a course
       parameters:
       - in: query
         name: course_id
@@ -5294,9 +5318,8 @@ paths:
           description: ''
     post:
       operationId: LmsDigitalNoteCreate
-      description: |-
-        GET ?course_id= — notes for a course. POST — add a note (any
-        authenticated user, e.g. a teacher sharing notes or a student's own).
+      description: Adds a new digital note to the given course.
+      summary: Create a digital note
       tags:
       - LMS
       requestBody:
@@ -5349,6 +5372,49 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/DetailErrorResponse'
+          description: ''
+  /api/notifications/preferences/:
+    get:
+      operationId: NotificationPreferencesGet
+      description: Returns the caller's Email/SMS/Push/In-app notification preferences.
+      summary: Get my notification preferences
+      tags:
+      - Notifications
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponse'
+          description: ''
+    put:
+      operationId: NotificationPreferencesUpdate
+      description: Enable or disable any subset of the email, SMS, push and in-app
+        channels.
+      summary: Update my notification preferences
+      tags:
+      - Notifications
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesUpdateRequestRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesUpdateRequestRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/NotificationPreferencesUpdateRequestRequest'
+      security:
+      - jwtAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationPreferencesResponse'
           description: ''
   /api/parent/attendance/:
     get:
@@ -7679,8 +7745,9 @@ paths:
           description: ''
     post:
       operationId: StudentQuizSubmit
-      description: Accepts a submitted quiz and returns a placeholder score. Scoring
-        workflow can be extended.
+      description: Accepts the student's answers (a map of question_id to selected
+        option) and returns a percentage score computed against the quiz's stored
+        correct answers.
       summary: Submit a quiz response
       parameters:
       - in: path
@@ -7744,7 +7811,9 @@ paths:
   /api/student/report-card/:
     get:
       operationId: ExamStudentReportCard
-      description: 'Student-facing: ?exam_name= — a student''s own report card only.'
+      description: Returns the authenticated student's own report card for a given
+        exam round.
+      summary: Get the student's own report card
       parameters:
       - in: query
         name: exam_name
@@ -8268,7 +8337,7 @@ paths:
           description: ''
   /api/teacher/assignments/{assignment_id}/submissions/:
     get:
-      operationId: teacher_assignments_submissions_list
+      operationId: TeacherAssignmentSubmissions
       description: Returns all submissions for an assignment (optionally addressed
         via the submission detail route).
       summary: List assignment submissions
@@ -8322,7 +8391,7 @@ paths:
                   $ref: '#/components/schemas/TeacherSubmissionItem'
           description: ''
     patch:
-      operationId: teacher_assignments_submissions_partial_update
+      operationId: TeacherAssignmentSubmissionBulk
       description: Records marks and feedback for a single student submission and
         derives a letter grade.
       summary: Grade a submission
@@ -8386,7 +8455,7 @@ paths:
           description: ''
   /api/teacher/assignments/{assignment_id}/submissions/{submission_id}/:
     get:
-      operationId: teacher_assignments_submissions_list_2
+      operationId: TeacherAssignmentSubmissionView
       description: Returns all submissions for an assignment (optionally addressed
         via the submission detail route).
       summary: List assignment submissions
@@ -8445,7 +8514,7 @@ paths:
                   $ref: '#/components/schemas/TeacherSubmissionItem'
           description: ''
     patch:
-      operationId: teacher_assignments_submissions_partial_update_2
+      operationId: TeacherAssignmentSubmissionDetail
       description: Records marks and feedback for a single student submission and
         derives a letter grade.
       summary: Grade a submission
@@ -10470,7 +10539,7 @@ paths:
           description: ''
   /api/teacher/question-bank/:
     get:
-      operationId: teacher_question_bank_list
+      operationId: TeacherQuestionBankList
       description: Returns every question the teacher authored, or a single question
         via the detail route.
       summary: List question bank
@@ -10518,7 +10587,7 @@ paths:
                   $ref: '#/components/schemas/TeacherQuestionBankItem'
           description: ''
     post:
-      operationId: teacher_question_bank_create
+      operationId: TeacherQuestionBankCreate
       description: Inserts a new question into the question bank.
       summary: Add a question
       tags:
@@ -10601,7 +10670,7 @@ paths:
                       correct: Paris
           description: ''
     delete:
-      operationId: teacher_question_bank_destroy
+      operationId: TeacherQuestionBankRemoveAll
       description: Deletes a question the teacher authored by id.
       summary: Remove a question
       tags:
@@ -10647,7 +10716,7 @@ paths:
           description: ''
   /api/teacher/question-bank/{question_id}/:
     get:
-      operationId: teacher_question_bank_list_2
+      operationId: TeacherQuestionBankDetail
       description: Returns every question the teacher authored, or a single question
         via the detail route.
       summary: List question bank
@@ -10701,7 +10770,7 @@ paths:
                   $ref: '#/components/schemas/TeacherQuestionBankItem'
           description: ''
     post:
-      operationId: teacher_question_bank_create_2
+      operationId: TeacherQuestionBankDetailCreate
       description: Inserts a new question into the question bank.
       summary: Add a question
       parameters:
@@ -10790,7 +10859,7 @@ paths:
                       correct: Paris
           description: ''
     delete:
-      operationId: teacher_question_bank_destroy_2
+      operationId: TeacherQuestionBankDelete
       description: Deletes a question the teacher authored by id.
       summary: Remove a question
       parameters:
@@ -10892,7 +10961,8 @@ paths:
     post:
       operationId: FileUpload
       description: Uploads a file to Supabase storage (or falls back to local storage)
-        and returns the public URL.
+        and returns the public URL. Requires authentication and a file type/size within
+        the allowed bounds.
       summary: Upload a file
       tags:
       - System
@@ -10907,7 +10977,6 @@ paths:
         required: true
       security:
       - jwtAuth: []
-      - {}
       responses:
         '200':
           content:
@@ -13805,6 +13874,33 @@ components:
       - published_date
       - slug
       - title
+    NotificationPreferencesResponse:
+      type: object
+      properties:
+        email_enabled:
+          type: boolean
+        sms_enabled:
+          type: boolean
+        push_enabled:
+          type: boolean
+        in_app_enabled:
+          type: boolean
+      required:
+      - email_enabled
+      - in_app_enabled
+      - push_enabled
+      - sms_enabled
+    NotificationPreferencesUpdateRequestRequest:
+      type: object
+      properties:
+        email_enabled:
+          type: boolean
+        sms_enabled:
+          type: boolean
+        push_enabled:
+          type: boolean
+        in_app_enabled:
+          type: boolean
     PaginatedAcademicProgramList:
       type: object
       required:

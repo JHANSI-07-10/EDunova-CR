@@ -11,6 +11,8 @@ they exist purely so drf-spectacular can render request/response shapes,
 examples and query/path parameters in Swagger UI / ReDoc.
 """
 
+from drf_spectacular.openapi import AutoSchema
+from drf_spectacular.settings import spectacular_settings
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     OpenApiExample,
@@ -18,6 +20,38 @@ from drf_spectacular.utils import (
     inline_serializer,
 )
 from rest_framework import serializers
+
+
+class MultiRouteAutoSchema(AutoSchema):
+    """AutoSchema whose operation_id is derived from the concrete URL route.
+
+    Used only for views that are mounted on two paths (e.g. a collection path
+    and a detail/action path). drf-spectacular auto-generates the same
+    operationId for both because both share the same handler methods, so we
+    hand out unique ids here.
+
+    Subclasses must fill ``OPERATION_IDS`` keyed by ``(HTTP method, url_segments)``
+    where ``url_segments`` is the tuple of path segments (path params kept in
+    place, e.g. ``'{user_id}'``). Unmapped combinations fall back to the
+    default drf-spectacular id.
+    """
+
+    OPERATION_IDS = {}
+
+    def get_operation_id(self):
+        key = (self.method, self._route_key())
+        operation_id = self.OPERATION_IDS.get(key)
+        if operation_id:
+            return operation_id
+        return super().get_operation_id()
+
+    def _route_key(self):
+        path = self.path.lstrip("/")
+        prefix = (spectacular_settings.SCHEMA_PATH_PREFIX or "").lstrip("/")
+        if prefix:
+            path = path[len(prefix):].lstrip("/") if path.startswith(prefix) else path
+        segments = [seg for seg in path.split("/") if seg]
+        return tuple(segments)
 
 
 # ---------------------------------------------------------------------------

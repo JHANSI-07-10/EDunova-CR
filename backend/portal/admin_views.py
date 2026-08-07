@@ -24,6 +24,7 @@ from .doc_schemas import (
     DetailErrorSerializer,
     ValidationErrorSerializer,
     IdDetailResponseSerializer,
+    MultiRouteAutoSchema,
     ERROR_RESPONSES,
 )
 from .roles import IsAdmin, get_role, log_action
@@ -1107,9 +1108,21 @@ class UserListView(AdminMixin, APIView):
         return Response({"id": user.id, "username": user.username, "temp_password": temp_password, "role": role})
 
 
+class _UserDetailRouteSchema(MultiRouteAutoSchema):
+    OPERATION_IDS = {
+        ("PATCH", ("admin-portal", "users", "{user_id}")): "AdminUserDetail",
+        ("POST", ("admin-portal", "users", "{user_id}")): "AdminUserDetailAction",
+        ("PATCH", ("admin-portal", "users", "{user_id}", "reset-password")): "AdminUserDetailViaResetPassword",
+        ("POST", ("admin-portal", "users", "{user_id}", "reset-password")): "AdminUserResetPassword",
+    }
+
+
 class UserDetailView(AdminMixin, APIView):
+    # Mounted on BOTH /users/{user_id}/ and /users/{user_id}/reset-password/,
+    # so operation ids must be route-aware to stay unique (see OPERATION_IDS).
+    schema = _UserDetailRouteSchema()
+
     @extend_schema(
-        operation_id="AdminUserDetail",
         summary="Update a user's status or role",
         description="Toggles the account's active status and/or reassigns its role/group.",
         tags=["Admin Portal"],
@@ -1160,7 +1173,6 @@ class UserDetailView(AdminMixin, APIView):
         return Response({"detail": "Updated."})
 
     @extend_schema(
-        operation_id="AdminUserResetPassword",
         summary="Reset a user's password",
         description="Generates a temporary password for the user, updates it, and emails it via the reset-password service.",
         tags=["Admin Portal"],
@@ -1610,9 +1622,21 @@ class NoticeBroadcastView(AdminMixin, APIView):
 # ---------------------------------------------------------------------------
 # Leave approvals (all staff/student leave requests, Admin can approve/reject)
 # ---------------------------------------------------------------------------
+class _LeaveApprovalRouteSchema(MultiRouteAutoSchema):
+    OPERATION_IDS = {
+        ("GET", ("admin-portal", "leaves")): "AdminLeaveApprovalList",
+        ("POST", ("admin-portal", "leaves")): "AdminLeaveDecideCreate",
+        ("GET", ("admin-portal", "leaves", "{leave_id}", "decide")): "AdminLeaveDecideRoute",
+        ("POST", ("admin-portal", "leaves", "{leave_id}", "decide")): "AdminLeaveDecide",
+    }
+
+
 class LeaveApprovalListView(AdminMixin, APIView):
+    # Mounted on BOTH /leaves/ and /leaves/{leave_id}/decide/, so operation ids
+    # must be route-aware to stay unique (see OPERATION_IDS).
+    schema = _LeaveApprovalRouteSchema()
+
     @extend_schema(
-        operation_id="AdminLeaveApprovalList",
         summary="List leave requests",
         description="Returns pending (or status-filtered) leave requests from staff and students.",
         tags=["Admin Portal"],
@@ -1643,7 +1667,6 @@ class LeaveApprovalListView(AdminMixin, APIView):
         return Response(serialise(data))
 
     @extend_schema(
-        operation_id="AdminLeaveDecide",
         summary="Approve or reject a leave request",
         description="Applies an Approved/Rejected decision to a specified leave request.",
         tags=["Admin Portal"],
