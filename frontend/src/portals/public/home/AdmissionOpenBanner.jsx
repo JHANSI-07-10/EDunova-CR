@@ -3,7 +3,7 @@ import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 
 export default function AdmissionOpenBanner() {
-  const { data: settings } = useFetch(cmsApi.getSettings, null)
+  const { data: settings } = useFetch(cmsApi.getSettings, [])
 
   const open = settings?.admissions_open ?? true
   const academicYear = settings?.admissions_academic_year || 'upcoming'
