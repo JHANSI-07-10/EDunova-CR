@@ -73,6 +73,57 @@ class SchoolSettingsViewSet(PublicReadViewSet):
 class CampusViewSet(PublicReadViewSet):
     queryset = Campus.objects.all()
     serializer_class = ser.CampusSerializer
+    # The Contact page consumes a plain array (no pagination wrapper) — only
+    # a handful of campuses exist, so disable pagination for this endpoint.
+    pagination_class = None
+
+    @extend_schema(
+        operation_id="WebsiteCampusNearest",
+        summary="Find nearest campus",
+        description=(
+            "Return the campus closest to the supplied latitude/longitude "
+            "(haversine over campus coordinates). Falls back to the head "
+            "office (or first campus) when coordinates are missing."
+        ),
+        tags=WEBSITE_TAG,
+    )
+    @action(detail=False, methods=["get"], url_path="nearest")
+    def nearest(self, request):
+        import math
+
+        def _haversine(c, lat, lng):
+            if c.latitude is None or c.longitude is None:
+                return None
+            r = 6371.0
+            d_lat = math.radians(lat - c.latitude)
+            d_lng = math.radians(lng - c.longitude)
+            a = (
+                math.sin(d_lat / 2) ** 2
+                + math.cos(math.radians(lat))
+                * math.cos(math.radians(c.latitude))
+                * math.sin(d_lng / 2) ** 2
+            )
+            return 2 * r * math.asin(math.sqrt(a))
+
+        try:
+            lat = float(request.query_params.get("lat"))
+            lng = float(request.query_params.get("lng"))
+        except (TypeError, ValueError):
+            lat = lng = None
+
+        campuses = list(Campus.objects.all())
+        chosen = None
+        if lat is not None and lng is not None:
+            scored = [(c, d) for c in campuses if (d := _haversine(c, lat, lng)) is not None]
+            if scored:
+                chosen = min(scored, key=lambda pair: pair[1])[0]
+        if chosen is None:
+            chosen = next((c for c in campuses if c.is_headquarters), None)
+        if chosen is None and campuses:
+            chosen = campuses[0]
+        if chosen is None:
+            return Response({"detail": "No campuses registered."}, status=404)
+        return Response({"campus_id": chosen.id, "name": chosen.name})
 
 
 @extend_schema_view(

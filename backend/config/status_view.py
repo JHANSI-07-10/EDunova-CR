@@ -156,3 +156,33 @@ def status_dashboard(request):
 # internal route structure + DB errors. Fine for local dev. Before
 # production deploy, either remove the "" route in urls.py or wrap this
 # view with `@staff_member_required` so only logged-in admins can see it.
+
+
+def backend_live_view(request):
+    """Public branded landing page for the API root (https://host/).
+    Shows a live badge, a real DB connectivity check, and links to the
+    Swagger docs (/api/docs/), ReDoc, the OpenAPI schema and the admin.
+    """
+    from django.db import connection
+    from django.template.loader import render_to_string
+    from django.utils.timezone import now
+    from django.conf import settings
+
+    db_ok = False
+    try:
+        with connection.cursor() as cur:
+            cur.execute("SELECT 1")
+            db_ok = cur.fetchone()[0] == 1
+    except Exception:
+        db_ok = False
+
+    html = render_to_string(
+        "backend_live.html",
+        {
+            "db_ok": db_ok,
+            "environment": "Production" if not settings.DEBUG else "Development",
+            "checked_at": now().strftime("%Y-%m-%d %H:%M:%S %Z"),
+        },
+        request=request,
+    )
+    return HttpResponse(html)

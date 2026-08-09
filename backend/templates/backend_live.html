@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EduNova Global Academy — Backend Status</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      min-height: 100vh;
+      font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+      color: #E2E8F0;
+      background: radial-gradient(1200px 600px at 20% -10%, #1E3A8A 0%, transparent 60%),
+                  radial-gradient(1000px 500px at 110% 110%, #7C3AED 0%, transparent 55%),
+                  linear-gradient(160deg, #0B1B3A 0%, #0F2557 55%, #0C1427 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 40px 20px;
+    }
+    .card {
+      width: 100%;
+      max-width: 560px;
+      background: rgba(15, 37, 87, 0.72);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 24px;
+      padding: 44px 40px 36px;
+      box-shadow: 0 30px 80px rgba(2, 8, 32, 0.6);
+      backdrop-filter: blur(8px);
+      text-align: center;
+    }
+    .logo {
+      width: 96px;
+      height: 96px;
+      margin: 0 auto 20px;
+      display: block;
+      border-radius: 24px;
+      box-shadow: 0 12px 32px rgba(2, 8, 32, 0.5);
+    }
+    .brand { font-size: 24px; font-weight: 700; letter-spacing: 0.3px; }
+    .brand span { color: #FBBF24; }
+    .subtitle { color: #94A3B8; font-size: 14px; margin-top: 4px; }
+    .live-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin: 24px 0 20px;
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.45);
+      color: #34D399;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 1.5px;
+      padding: 8px 18px;
+      border-radius: 999px;
+      text-transform: uppercase;
+    }
+    .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: #34D399;
+      box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.6);
+      animation: pulse 1.8s infinite;
+    }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+      70%  { box-shadow: 0 0 0 12px rgba(52, 211, 153, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin-bottom: 10px;
+      font-size: 14px;
+      text-align: left;
+    }
+    .status-row .label { color: #CBD5E1; }
+    .status-row .value { font-weight: 600; }
+    .ok   { color: #34D399; }
+    .bad  { color: #F87171; }
+    .links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 22px;
+    }
+    .links a {
+      display: block;
+      padding: 13px 12px;
+      border-radius: 12px;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      background: linear-gradient(135deg, #F59E0B, #F97316);
+      box-shadow: 0 8px 20px rgba(249, 115, 22, 0.28);
+      transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    .links a.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: none;
+    }
+    .links a:hover { transform: translateY(-2px); }
+    .links a.primary:hover { box-shadow: 0 12px 28px rgba(249, 115, 22, 0.4); }
+    .footer { margin-top: 26px; font-size: 12px; color: #64748B; }
+    .footer code { color: #94A3B8; background: rgba(255,255,255,0.06); padding: 1px 6px; border-radius: 6px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <svg class="logo" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="EduNova logo">
+      <defs>
+        <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stop-color="#1E3A8A"/>
+          <stop offset="1" stop-color="#0F2557"/>
+        </linearGradient>
+        <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#FBBF24"/>
+          <stop offset="1" stop-color="#F97316"/>
+        </linearGradient>
+      </defs>
+      <rect x="40" y="40" width="432" height="432" rx="96" fill="url(#bg)"/>
+      <path d="M 400 84 Q 400 108 376 108 Q 400 108 400 132 Q 400 108 424 108 Q 400 108 400 84 Z" fill="#FBBF24"/>
+      <path d="M 256 104 L 396 168 L 256 232 L 116 168 Z" fill="url(#gold)"/>
+      <ellipse cx="256" cy="168" rx="15" ry="11" fill="#0F2557"/>
+      <path d="M 396 168 C 404 202 400 236 390 264" fill="none" stroke="#F97316" stroke-width="9" stroke-linecap="round"/>
+      <circle cx="389" cy="276" r="11" fill="#FBBF24"/>
+      <path d="M 256 280 C 218 264 176 262 136 276 L 136 362 C 178 350 220 352 256 370 C 292 352 334 350 376 362 L 376 276 C 336 262 294 264 256 280 Z" fill="#FFFFFF"/>
+      <path d="M 256 280 C 256 280 256 330 256 370" stroke="#1E3A8A" stroke-width="7" fill="none" stroke-linecap="round"/>
+      <path d="M 168 300 C 196 292 224 294 244 302" stroke="#CBD5E1" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M 268 302 C 288 294 316 292 344 300" stroke="#CBD5E1" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M 170 322 C 198 314 224 316 243 323" stroke="#CBD5E1" stroke-width="5" fill="none" stroke-linecap="round"/>
+      <path d="M 269 323 C 288 316 314 314 342 322" stroke="#CBD5E1" stroke-width="5" fill="none" stroke-linecap="round"/>
+    </svg>
+    <div class="brand">EduNova <span>Global Academy</span></div>
+    <div class="subtitle">Inspiring Minds. Building Futures.</div>
+
+    <div class="live-badge"><span class="dot"></span> Backend is Live</div>
+
+    <div class="status-row">
+      <span class="label">API Server</span>
+      <span class="value ok">Running</span>
+    </div>
+    <div class="status-row">
+      <span class="label">Database</span>
+      {% if db_ok %}
+        <span class="value ok">Connected</span>
+      {% else %}
+        <span class="value bad">Unreachable</span>
+      {% endif %}
+    </div>
+    <div class="status-row">
+      <span class="label">Environment</span>
+      <span class="value">{{ environment }}</span>
+    </div>
+    <div class="status-row">
+      <span class="label">Checked at</span>
+      <span class="value">{{ checked_at }}</span>
+    </div>
+
+    <div class="links">
+      <a class="primary" href="/api/docs/">Swagger API Docs</a>
+      <a class="secondary" href="/api/redoc/">ReDoc</a>
+      <a class="secondary" href="/api/schema/">OpenAPI Schema</a>
+      <a class="secondary" href="/admin/">Django Admin</a>
+    </div>
+
+    <div class="footer">
+      EduNova Global Academy Pvt. Ltd. — API base URL: <code>{{ request.scheme }}://{{ request.get_host }}</code>
+    </div>
+  </div>
+</body>
+</html>

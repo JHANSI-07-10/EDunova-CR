@@ -21,8 +21,21 @@ class Command(BaseCommand):
                 website_domain="www.edunovaacademy.edu.in",
                 company_type="Private Limited Educational Institution",
                 established_year=2015,
+                admissions_open=True,
+                admissions_academic_year="2026-2027",
             ),
         )
+
+        campuses = [
+            dict(name="Head Office (Dwarka)", address="EduNova Education Campus, Sector 21, Dwarka", city="New Delhi", state="Delhi", country="India", postal_code="110075", latitude=28.5921, longitude=77.0460, phone="+91-11-4567890", email="info@edunovaacademy.edu.in", website="www.edunovaacademy.edu.in", office_hours="9:00 AM - 5:00 PM", is_headquarters=True),
+            dict(name="Noida Campus", address="Plot No. 12, Sector 62", city="Noida", state="Uttar Pradesh", country="India", postal_code="201301", latitude=28.5355, longitude=77.3910, phone="+91-120-6543210", email="noida@edunovaacademy.edu.in", website="www.edunovaacademy.edu.in/noida", office_hours="8:00 AM - 4:00 PM"),
+            dict(name="Gurugram Campus", address="Sector 45, Near Huda City Centre", city="Gurugram", state="Haryana", country="India", postal_code="122003", latitude=28.4595, longitude=77.0266, phone="+91-124-7890123", email="gurugram@edunovaacademy.edu.in", website="www.edunovaacademy.edu.in/gurugram", office_hours="8:00 AM - 4:00 PM"),
+            dict(name="Faridabad Campus", address="Mathura Road, Sector 31", city="Faridabad", state="Haryana", country="India", postal_code="121003", latitude=28.4089, longitude=77.3178, phone="+91-129-4561230", email="faridabad@edunovaacademy.edu.in", website="www.edunovaacademy.edu.in/faridabad", office_hours="8:00 AM - 4:00 PM"),
+            dict(name="Jaipur Campus", address="Mansarovar, Shipra Path", city="Jaipur", state="Rajasthan", country="India", postal_code="302020", latitude=26.9124, longitude=75.7873, phone="+91-141-8904561", email="jaipur@edunovaacademy.edu.in", website="www.edunovaacademy.edu.in/jaipur", office_hours="8:00 AM - 4:00 PM"),
+            dict(name="Lucknow Campus", address="Gomti Nagar, Bypass Road", city="Lucknow", state="Uttar Pradesh", country="India", postal_code="226010", latitude=26.8467, longitude=80.9462, phone="+91-522-7890124", email="lucknow@edunovaacademy.edu.in", website="www.edunovaacademy.edu.in/lucknow", office_hours="8:00 AM - 4:00 PM"),
+        ]
+        for c in campuses:
+            Campus.objects.update_or_create(name=c.pop("name"), defaults=c)
 
         programs = [
             "Pre Primary", "Middle School", "High School", "Senior Secondary",

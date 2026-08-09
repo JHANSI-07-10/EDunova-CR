@@ -96,6 +96,30 @@ NEW_FIELDS = [
 ]
 
 
+def _add_missing_columns(apps, schema_editor):
+    """Add only the columns missing from the table.
+
+    Introspection instead of ``ADD COLUMN IF NOT EXISTS`` keeps the migration
+    portable — Postgres supports the IF NOT EXISTS clause, SQLite does not
+    (which broke the isolated-SQLite unit test database). The raw type strings
+    (varchar/numeric/timestamptz/...) are accepted by both backends.
+    """
+    from django.db import connection
+
+    with connection.cursor() as cur:
+        existing = {
+            col.name
+            for col in connection.introspection.get_table_description(
+                cur, "admissions_admissionenquiry"
+            )
+        }
+        for name, _field, sql_type in NEW_FIELDS:
+            if name not in existing:
+                cur.execute(
+                    f"ALTER TABLE admissions_admissionenquiry ADD COLUMN {name} {sql_type}"
+                )
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -113,13 +137,9 @@ class Migration(migrations.Migration):
                 for name, field, _sql in NEW_FIELDS
             ],
             database_operations=[
-                migrations.RunSQL(
-                    sql="\n".join(
-                        "ALTER TABLE admissions_admissionenquiry ADD COLUMN IF NOT EXISTS "
-                        f"{name} {sql_type};"
-                        for name, _field, sql_type in NEW_FIELDS
-                    ),
-                    reverse_sql=migrations.RunSQL.noop,
+                migrations.RunPython(
+                    _add_missing_columns,
+                    reverse_code=migrations.RunPython.noop,
                 ),
             ],
         ),

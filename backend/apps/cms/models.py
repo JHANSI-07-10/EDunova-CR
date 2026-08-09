@@ -11,6 +11,11 @@ class SchoolSettings(models.Model):
     company_type = models.CharField(max_length=255, default="Private Limited Educational Institution")
     established_year = models.PositiveIntegerField(default=2015)
     headquarters_address = models.TextField(blank=True)
+    # Admissions banner control (home page AdmissionOpenBanner reads these).
+    admissions_open = models.BooleanField(default=True)
+    admissions_academic_year = models.CharField(max_length=50, default="2026-27")
+    admissions_start_date = models.DateField(null=True, blank=True)
+    admissions_close_date = models.DateField(null=True, blank=True)
 
     def save(self, *args, **kwargs):
         self.pk = 1  # enforce singleton
@@ -21,9 +26,22 @@ class SchoolSettings(models.Model):
 
 
 class Campus(models.Model):
-    """Branch Campuses list."""
+    """Branch Campuses list — powers the Contact page campus selector and the
+    /api/campuses/nearest/ geolocation lookup. Coordinates let the frontend
+    compute real driving distances."""
     name = models.CharField(max_length=255)
     address = models.TextField(blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    country = models.CharField(max_length=100, blank=True)
+    postal_code = models.CharField(max_length=20, blank=True)
+    latitude = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    website = models.CharField(max_length=200, blank=True)
+    office_hours = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=50, blank=True, default="Active")
     is_headquarters = models.BooleanField(default=False)
 
     class Meta:

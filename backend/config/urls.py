@@ -21,7 +21,7 @@ from apps.cms.views import (
     WebsiteSubjectDetailView,
     WebsiteSubjectListView,
 )
-from .status_view import status_dashboard
+from .status_view import backend_live_view, status_dashboard
 
 # Public website namespace — the frontend fetches the faculty directory from
 # /api/website/faculty/ (and headline stats from the dedicated path above).
@@ -43,7 +43,11 @@ _status_view = (
 )
 
 urlpatterns = [
-    path("", _status_view, name="status-dashboard"),
+    # Public branded landing page — shows the backend is live, a real DB
+    # health check and links to the API docs. The internal diagnostics
+    # dashboard moves to /status/ (staff-only in production).
+    path("", backend_live_view, name="backend-live"),
+    path("status/", _status_view, name="status-dashboard"),
     path("admin/", admin.site.urls),
     path("api/cms/", include("apps.cms.urls")),
     # The public website frontend calls the /api/website/* namespace (faculty
