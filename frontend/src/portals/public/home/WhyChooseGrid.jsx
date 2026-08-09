@@ -24,6 +24,19 @@ const ICON_MAP = {
   '24x7 Parent Support': HeadphonesIcon,
 }
 
+// Normalizes a title for dedupe/icon matching. Folds the mojibake variants
+// (× U+00D7, non-breaking spaces, fullwidth digits) into their ASCII forms so
+// a corrupted duplicate row like "24×7 Parent Support" collapses onto the
+// canonical "24x7 Parent Support" card instead of rendering twice.
+const normalizeTitle = (title) =>
+  (title || '')
+    .replace(/\u00a0/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\u00d7/g, 'x')
+    .replace(/[\uff10-\uff19]/g, (d) => String.fromCharCode(d.charCodeAt(0) - 0xfee0))
+    .trim()
+    .toLowerCase()
+
 export default function WhyChooseGrid() {
   const { data: items, loading } = useFetch(cmsApi.getWhyChoose, [])
 
@@ -41,13 +54,10 @@ export default function WhyChooseGrid() {
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
             {/* Dedupe by normalized title so a corrupted/duplicate row (e.g. a
-                mojibake "24x7" copy) never renders as two cards. */}
+                mojibake "24×7 Parent Support" copy) never renders as two cards. */}
             {Array.from(
               new Map(
-                (items || []).map((item) => [
-                  (item.title || '').replace(/\s+/g, ' ').trim().toLowerCase(),
-                  item,
-                ])
+                (items || []).map((item) => [normalizeTitle(item.title), item])
               ).values()
             ).map((item, i) => {
               const Icon = ICON_MAP[item.title] || Building2

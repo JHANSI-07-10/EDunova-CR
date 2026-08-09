@@ -1,3 +1,4 @@
+import re
 import shutil
 from pathlib import Path
 
@@ -7,6 +8,17 @@ from apps.cms.models import (
     SchoolSettings, AcademicProgram, Department, SchoolStat, WhyChooseItem,
     TechnologyPartner, CMSPage, FAQ, ScholarshipInfo, FacultyMember,
 )
+
+
+def _normalize_ascii(value):
+    """Fold mojibake/lookalike characters into ASCII so lookups match:
+    × (U+00D7) -> x, non-breaking space -> space, fullwidth digits -> ASCII."""
+    return (
+        re.sub(r"\s+", " ", value.replace("\u00a0", " "))
+        .replace("\u00d7", "x")
+        .translate(str.maketrans({ord(d): chr(i) for i, d in enumerate("０１２３４５６７８９")}))
+        .strip()
+    )
 
 
 class Command(BaseCommand):
@@ -70,7 +82,19 @@ class Command(BaseCommand):
             "STEM Education", "Career Counseling", "24x7 Parent Support",
         ]
         for i, title in enumerate(why_choose):
-            WhyChooseItem.objects.update_or_create(title=title, defaults={"sort_order": i})
+            WhyChooseItem.objects.update_or_create(
+                title=_normalize_ascii(title), defaults={"sort_order": i},
+            )
+        # Self-heal stale/duplicate rows (e.g. an old mojibake "24×7 Parent
+        # Support" copy left behind by an earlier seed) — keep the first
+        # occurrence by sort_order, drop the rest.
+        seen = set()
+        for item in WhyChooseItem.objects.order_by("sort_order", "id"):
+            key = _normalize_ascii(item.title).lower()
+            if key in seen:
+                item.delete()
+            else:
+                seen.add(key)
 
         partners = [
             "Google Workspace", "Microsoft Education", "AWS Educate",

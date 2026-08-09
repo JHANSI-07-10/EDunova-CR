@@ -72,7 +72,11 @@ export default function Login() {
       await verifyOtp(userId, otp);
       navigate("/admin");
     } catch (err) {
-      setError("Incorrect OTP. Please check the code and retry");
+      if (err?.response?.status === 429) {
+        setError("Too many attempts. Please wait a minute and try again, or resend a new code.");
+      } else {
+        setError("Incorrect OTP. Please check the code and retry");
+      }
     } finally {
       setLoading(false);
     }

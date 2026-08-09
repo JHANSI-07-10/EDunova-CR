@@ -315,6 +315,10 @@ EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
+# Fail the SMTP attempt after this many seconds instead of letting the OS
+# hang for the default (often 2+ minutes). Prevents a dead Brevo connection
+# from pinning a gunicorn worker until the platform kills it (HTML 500).
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=15, cast=int)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="EduNova Academy <mandugulajhansilakshmi@gmail.com>")
 
 BREVO_API_KEY = config("BREVO_API_KEY", default=EMAIL_HOST_PASSWORD)
