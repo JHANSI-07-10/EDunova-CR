@@ -321,7 +321,16 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
 EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=15, cast=int)
 DEFAULT_FROM_EMAIL = config("DEFAULT_FROM_EMAIL", default="EduNova Academy <mandugulajhansilakshmi@gmail.com>")
 
-BREVO_API_KEY = config("BREVO_API_KEY", default=EMAIL_HOST_PASSWORD)
+# Brevo HTTPS API (api.brevo.com:443) delivery. Preferred over SMTP in
+# production: many PaaS providers (Render) cannot reach smtp-relay.brevo.com
+# on port 587 (blocked/times out), while the HTTPS API works from anywhere.
+# The API key is the "xkeysib-..." API key from Brevo > SMTP & API > API Keys
+# (NOT the SMTP relay password). When unset, email_service falls back to the
+# configured EMAIL_BACKEND (SMTP/console) for local development.
+BREVO_API_KEY = config("BREVO_API_KEY", default="")
+# Hard cap for the Brevo HTTPS API call so a dead network can never pin a
+# gunicorn worker the way a hung SMTP connection can.
+BREVO_API_TIMEOUT = config("BREVO_API_TIMEOUT", default=15, cast=int)
 
 OTP_EXPIRY_SECONDS = 300
 OTP_LENGTH = 6
@@ -355,6 +364,19 @@ if "console" in str(EMAIL_BACKEND).lower() and not DEBUG:
         "emailed, so users cannot complete login. Set EMAIL_BACKEND="
         "django.core.mail.backends.smtp.EmailBackend plus EMAIL_HOST/"
         "EMAIL_HOST_USER/EMAIL_HOST_PASSWORD (Brevo or Gmail app password)."
+    )
+
+if (
+    not DEBUG
+    and "smtp" in str(EMAIL_BACKEND).lower()
+    and not BREVO_API_KEY
+):
+    _startup_warn(
+        "EMAIL_BACKEND is SMTP but BREVO_API_KEY is empty. From many PaaS "
+        "hosts (e.g. Render) the SMTP connection to smtp-relay.brevo.com:587 "
+        "times out and OTP emails never arrive. Set BREVO_API_KEY to your "
+        "Brevo API key (Settings > SMTP & API > API Keys, starts with "
+        "'xkeysib-') to send OTP emails via the Brevo HTTPS API instead."
     )
 
 _local_hosts = {"localhost", "127.0.0.1", "::1"}
