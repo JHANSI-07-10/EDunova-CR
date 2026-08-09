@@ -10,7 +10,17 @@ from drf_spectacular.views import (
     SpectacularRedocView,
 )
 from rest_framework.routers import DefaultRouter
-from apps.cms.views import CampusViewSet, CampusVisitView, FacultyMemberViewSet, WebsiteStatsView
+from apps.cms.views import (
+    CampusViewSet,
+    CampusVisitView,
+    FacultyMemberViewSet,
+    WebsiteClassDetailView,
+    WebsiteClassListView,
+    WebsiteLevelListView,
+    WebsiteStatsView,
+    WebsiteSubjectDetailView,
+    WebsiteSubjectListView,
+)
 from .status_view import status_dashboard
 
 # Public website namespace — the frontend fetches the faculty directory from
@@ -40,6 +50,11 @@ urlpatterns = [
     # directory, headline stats). The faculty router is mounted here too so
     # no frontend change is needed; stats is the aggregate counters object.
     path("api/website/stats/", WebsiteStatsView.as_view(), name="website-stats"),
+    path("api/website/levels/", WebsiteLevelListView.as_view(), name="website-levels"),
+    path("api/website/classes/", WebsiteClassListView.as_view(), name="website-classes"),
+    path("api/website/classes/<int:pk>/", WebsiteClassDetailView.as_view(), name="website-class-detail"),
+    path("api/website/subjects/", WebsiteSubjectListView.as_view(), name="website-subjects"),
+    path("api/website/subjects/<int:pk>/", WebsiteSubjectDetailView.as_view(), name="website-subject-detail"),
     path("api/website/", include(website_router.urls)),
     # Keep the Contact page's /api/campuses/* calls working (list + visit booking).
     path("api/campuses/visit/", CampusVisitView.as_view(), name="campus-visit"),

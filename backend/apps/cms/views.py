@@ -450,16 +450,18 @@ class JobPostingViewSet(PublicReadViewSet):
         )
 
 
-@extend_schema(
-    operation_id="WebsiteCampusVisitCreate",
-    summary="Schedule a campus visit",
-    description=(
-        "Public endpoint: the Contact page's 'Schedule Campus Visit' modal "
-        "posts a booking request here."
+@extend_schema_view(
+    post=extend_schema(
+        operation_id="WebsiteCampusVisitCreate",
+        summary="Schedule a campus visit",
+        description=(
+            "Public endpoint: the Contact page's 'Schedule Campus Visit' modal "
+            "posts a booking request here."
+        ),
+        tags=WEBSITE_TAG,
+        request=ser.CampusVisitBookingSerializer,
+        responses={201: None},
     ),
-    tags=WEBSITE_TAG,
-    request=ser.CampusVisitBookingSerializer,
-    responses={201: None},
 )
 class CampusVisitView(APIView):
     """Public: write-only campus visit booking."""
@@ -529,6 +531,226 @@ class ContactSubmissionViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet)
 class FacultyMemberViewSet(PublicReadViewSet):
     queryset = FacultyMember.objects.filter(is_active=True)
     serializer_class = ser.FacultyMemberSerializer
+
+
+def _table_exists(name):
+    """True when the given (unmanaged, portal-*) table exists in the DB.
+    Portal tables may be absent on fresh databases, so every website
+    endpoint degrades gracefully instead of 500ing the public site."""
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM information_schema.tables WHERE table_name=%s",
+                [name],
+            )
+            return cur.fetchone() is not None
+    except Exception:
+        return False
+
+
+class WebsiteLevelListView(APIView):
+    """Public academic levels for the Classes filter dropdown
+    (/api/website/levels/). Backed by the unmanaged portal_academic_level
+    table; degrades to an empty list if the table is missing."""
+    permission_classes = [AllowAny]
+
+    @method_decorator(cache_page(60))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    @extend_schema(
+        operation_id="WebsiteLevelsList",
+        summary="List academic levels",
+        description="Academic levels (Pre-Primary, Primary, Middle, Secondary, Senior Secondary) for the Classes filter.",
+        tags=WEBSITE_TAG,
+    )
+    def get(self, request):
+        rows = []
+        if _table_exists("portal_academic_level"):
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT id, name, description FROM portal_academic_level "
+                    "WHERE is_published IS NOT FALSE ORDER BY sort_order, id"
+                )
+                rows = [
+                    {"id": r[0], "name": r[1], "description": r[2] or ""}
+                    for r in cur.fetchall()
+                ]
+        return Response(rows)
+
+
+class WebsiteClassListView(APIView):
+    """Public class list for the Classes/Academics pages
+    (/api/website/classes/). Reads the unmanaged portal_class table and
+    joins the per-class subject count from portal_academic_allocation."""
+    permission_classes = [AllowAny]
+
+    @method_decorator(cache_page(60))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    @extend_schema(
+        operation_id="WebsiteClassesList",
+        summary="List classes",
+        description="Classes offered by the school, with section, curriculum and subject count.",
+        tags=WEBSITE_TAG,
+    )
+    def get(self, request):
+        rows = []
+        if _table_exists("portal_class"):
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT c.id, c.name, c.section, c.curriculum, c.room_number, "
+                    "COUNT(a.subject_id)::int "
+                    "FROM portal_class c "
+                    "LEFT JOIN portal_academic_allocation a ON a.class_id = c.id "
+                    "GROUP BY c.id ORDER BY c.id"
+                )
+                rows = [
+                    {
+                        "id": r[0],
+                        "name": r[1],
+                        "section": r[2] or "",
+                        "curriculum": r[3] or "",
+                        "room_number": r[4] or "",
+                        "academic_level": None,
+                        "cover_image_url": None,
+                        "description": "",
+                        "subjects": [],
+                        "subject_count": r[5],
+                    }
+                    for r in cur.fetchall()
+                ]
+        return Response(rows)
+
+
+class WebsiteClassDetailView(APIView):
+    """Single class with its mapped subjects (/api/website/classes/<id>/)."""
+    permission_classes = [AllowAny]
+
+    @method_decorator(cache_page(60))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    @extend_schema(
+        operation_id="WebsiteClassRetrieve",
+        summary="Get class details",
+        description="One class including its mapped subjects.",
+        tags=WEBSITE_TAG,
+    )
+    def get(self, request, pk):
+        if not _table_exists("portal_class"):
+            return Response({"detail": "Not found."}, status=404)
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT id, name, section, curriculum, room_number "
+                "FROM portal_class WHERE id=%s",
+                [pk],
+            )
+            row = cur.fetchone()
+            if not row:
+                return Response({"detail": "Not found."}, status=404)
+            subjects = []
+            if _table_exists("portal_subject"):
+                cur.execute(
+                    "SELECT s.id, s.name, s.subject_code, s.type "
+                    "FROM portal_subject s "
+                    "JOIN portal_academic_allocation a ON a.subject_id = s.id "
+                    "WHERE a.class_id=%s ORDER BY s.name",
+                    [pk],
+                )
+                subjects = [
+                    {"id": r[0], "name": r[1], "subject_code": r[2] or "", "type": r[3] or ""}
+                    for r in cur.fetchall()
+                ]
+        return Response({
+            "id": row[0],
+            "name": row[1],
+            "section": row[2] or "",
+            "curriculum": row[3] or "",
+            "room_number": row[4] or "",
+            "academic_level": None,
+            "cover_image_url": None,
+            "description": "",
+            "subjects": subjects,
+            "subject_count": len(subjects),
+        })
+
+
+class WebsiteSubjectListView(APIView):
+    """Public subject list (/api/website/subjects/)."""
+    permission_classes = [AllowAny]
+
+    @method_decorator(cache_page(60))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    @extend_schema(
+        operation_id="WebsiteSubjectsList",
+        summary="List subjects",
+        description="Subjects taught at the school with their type (Theory/Practical/Language/Elective).",
+        tags=WEBSITE_TAG,
+    )
+    def get(self, request):
+        rows = []
+        if _table_exists("portal_subject"):
+            with connection.cursor() as cur:
+                cur.execute(
+                    "SELECT id, name, subject_code, type FROM portal_subject ORDER BY name"
+                )
+                rows = [
+                    {"id": r[0], "name": r[1], "subject_code": r[2] or "", "type": r[3] or "", "description": ""}
+                    for r in cur.fetchall()
+                ]
+        return Response(rows)
+
+
+class WebsiteSubjectDetailView(APIView):
+    """Single subject with the classes that teach it (/api/website/subjects/<id>/)."""
+    permission_classes = [AllowAny]
+
+    @method_decorator(cache_page(60))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    @extend_schema(
+        operation_id="WebsiteSubjectRetrieve",
+        summary="Get subject details",
+        description="One subject including the classes it is taught in.",
+        tags=WEBSITE_TAG,
+    )
+    def get(self, request, pk):
+        if not _table_exists("portal_subject"):
+            return Response({"detail": "Not found."}, status=404)
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT id, name, subject_code, type FROM portal_subject WHERE id=%s",
+                [pk],
+            )
+            row = cur.fetchone()
+            if not row:
+                return Response({"detail": "Not found."}, status=404)
+            classes = []
+            if _table_exists("portal_class"):
+                cur.execute(
+                    "SELECT c.id, c.name, c.section, c.curriculum "
+                    "FROM portal_class c "
+                    "JOIN portal_academic_allocation a ON a.class_id = c.id "
+                    "WHERE a.subject_id=%s ORDER BY c.name",
+                    [pk],
+                )
+                classes = [
+                    {"id": r[0], "name": r[1], "section": r[2] or "", "curriculum": r[3] or ""}
+                    for r in cur.fetchall()
+                ]
+        return Response({
+            "id": row[0],
+            "name": row[1],
+            "subject_code": row[2] or "",
+            "type": row[3] or "",
+            "description": "",
+            "classes": classes,
+        })
 
 
 class WebsiteStatsView(APIView):
