@@ -34,6 +34,25 @@ def load_env():
     return env
 
 
+def ensure_bucket(url, key):
+    """Create the bucket if it does not exist (idempotent)."""
+    req = urllib.request.Request(
+        f"{url}/storage/v1/bucket",
+        data=json.dumps({"id": BUCKET, "name": BUCKET, "public": True}).encode(),
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as r:
+            print(f"Bucket '{BUCKET}' created (public).")
+    except urllib.error.HTTPError as e:
+        body = e.read().decode()[:200]
+        if e.code == 400 and "already exists" in body.lower():
+            print(f"Bucket '{BUCKET}' already exists.")
+        else:
+            raise
+
+
 def list_objects(url, key):
     req = urllib.request.Request(
         f"{url}/storage/v1/object/list/{BUCKET}",
@@ -67,6 +86,13 @@ def main():
     key = env.get("SUPABASE_SERVICE_ROLE_KEY", "")
     if not url or not key:
         print("SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY missing from .env")
+        return 1
+
+    print("Ensuring bucket", BUCKET, "exists...")
+    try:
+        ensure_bucket(url, key)
+    except urllib.error.HTTPError as e:
+        print(f"BUCKET SETUP FAILED ({e.code}): {e.read().decode()[:200]}")
         return 1
 
     print("Listing existing objects in bucket", BUCKET, "...")

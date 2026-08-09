@@ -19,17 +19,17 @@ class Command(BaseCommand):
         parent, _ = User.objects.get_or_create(
             username="parent.demo",
             defaults={
-                "email": "parent@edunova.edu",
-                "first_name": "Ravi",
-                "last_name": "Khan",
+                "email": "veereshgollapu@gmail.com",
+                "first_name": "Veeresh",
+                "last_name": "Gollapu",
                 "is_active": True,
             },
         )
 
-        parent.email = "parent@edunova.edu"
-        parent.first_name = "Ravi"
-        parent.last_name = "Khan"
-        parent.set_password("EduNova@123")
+        parent.email = "veereshgollapu@gmail.com"
+        parent.first_name = "Veeresh"
+        parent.last_name = "Gollapu"
+        parent.set_password("Edunova@123")
         parent.save()
         parent.groups.add(parent_group)
 
@@ -53,7 +53,7 @@ class Command(BaseCommand):
         admin.last_name = "Lakshmi"
         admin.is_staff = True
         admin.is_superuser = True
-        admin.set_password("EduNova@123")
+        admin.set_password("Edunova@123")
         admin.save()
         admin.groups.add(admin_group)
 
@@ -122,10 +122,10 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write("======================================")
         self.stdout.write("Parent Login")
-        self.stdout.write("Email    : parent@edunova.edu")
-        self.stdout.write("Password : EduNova@123")
+        self.stdout.write("Email    : veereshgollapu@gmail.com")
+        self.stdout.write("Password : Edunova@123")
         self.stdout.write("")
         self.stdout.write("Admin Login")
         self.stdout.write("Email    : jhansilakshmi1004@gmail.com")
-        self.stdout.write("Password : EduNova@123")
+        self.stdout.write("Password : Edunova@123")
         self.stdout.write("======================================")
