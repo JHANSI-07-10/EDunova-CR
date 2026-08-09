@@ -40,7 +40,16 @@ export default function WhyChooseGrid() {
           <p className="text-center text-text-secondary">Loading…</p>
         ) : (
           <div className="grid sm:grid-cols-2 md:grid-cols-4 gap-4">
-            {(items || []).map((item, i) => {
+            {/* Dedupe by normalized title so a corrupted/duplicate row (e.g. a
+                mojibake "24x7" copy) never renders as two cards. */}
+            {Array.from(
+              new Map(
+                (items || []).map((item) => [
+                  (item.title || '').replace(/\s+/g, ' ').trim().toLowerCase(),
+                  item,
+                ])
+              ).values()
+            ).map((item, i) => {
               const Icon = ICON_MAP[item.title] || Building2
               return (
                 <FadeIn key={item.id} delay={i * 60} className="h-full">

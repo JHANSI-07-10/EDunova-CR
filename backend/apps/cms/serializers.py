@@ -3,7 +3,8 @@ from .models import (
     SchoolSettings, Campus, AcademicProgram, Department, LeadershipMember,
     SchoolStat, WhyChooseItem, TechnologyPartner, CMSPage, NewsPost, Event,
     GalleryAlbum, GalleryImage, Achievement, Testimonial, FAQ, Document,
-    JobPosting, ContactSubmission, ScholarshipInfo,
+    JobPosting, JobApplication, CampusVisitBooking, ContactSubmission,
+    ScholarshipInfo, FacultyMember,
 )
 
 
@@ -35,6 +36,33 @@ class LeadershipMemberSerializer(serializers.ModelSerializer):
     class Meta:
         model = LeadershipMember
         fields = "__all__"
+
+
+class FacultyMemberSerializer(serializers.ModelSerializer):
+    """Public faculty directory entry. `photo_url` is an absolute URL so the
+    website can render the photo regardless of storage backend (local media
+    in dev, Supabase Storage CDN in production)."""
+    photo_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FacultyMember
+        fields = [
+            "id", "first_name", "last_name", "designation", "photo_url",
+            "email", "qualification_detail", "experience_years",
+            "specializations", "achievements", "bio",
+        ]
+
+    def get_photo_url(self, obj):
+        if not obj.photo:
+            return None
+        try:
+            url = obj.photo.url
+        except Exception:
+            return None
+        request = self.context.get("request")
+        if request is not None:
+            return request.build_absolute_uri(url)
+        return url
 
 
 class SchoolStatSerializer(serializers.ModelSerializer):
@@ -117,6 +145,29 @@ class JobPostingSerializer(serializers.ModelSerializer):
     class Meta:
         model = JobPosting
         fields = "__all__"
+
+
+class JobApplicationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = JobApplication
+        fields = ["job_posting", "applicant_name", "email", "phone", "cover_letter", "resume_file"]
+        extra_kwargs = {"resume_file": {"required": False}}
+
+    def validate_resume_file(self, value):
+        allowed = ("application/pdf", "application/msword",
+                   "application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+        if value and value.content_type not in allowed:
+            raise serializers.ValidationError("Resume must be a PDF or Word document (.pdf, .doc, .docx).")
+        if value and value.size > 5 * 1024 * 1024:
+            raise serializers.ValidationError("Resume file size exceeds 5MB.")
+        return value
+
+
+class CampusVisitBookingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CampusVisitBooking
+        fields = ["campus_id", "visitor_name", "visitor_email", "visitor_phone",
+                  "visit_date", "visit_time", "purpose"]
 
 
 class ContactSubmissionSerializer(serializers.ModelSerializer):

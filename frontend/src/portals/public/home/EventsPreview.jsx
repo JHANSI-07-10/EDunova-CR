@@ -6,7 +6,16 @@ import { getMediaUrl } from '../../../utils/media'
 
 export default function EventsPreview() {
   const { data: events, loading } = useFetch(cmsApi.getEvents, [])
-  const upcoming = (events || []).slice(0, 3)
+  // Only future events belong in an "Upcoming Events" strip — past ones drop
+  // out automatically and the list stays sorted by proximity to today.
+  const today = new Date()
+  const upcoming = (events || [])
+    .filter((e) => {
+      const d = new Date(e.event_date || e.date)
+      return !isNaN(d) && d >= new Date(today.getFullYear(), today.getMonth(), today.getDate())
+    })
+    .sort((a, b) => new Date(a.event_date || a.date) - new Date(b.event_date || b.date))
+    .slice(0, 3)
 
   return (
     <section className="section">

@@ -125,7 +125,7 @@ export default function LibraryPublic() {
         <FadeIn delay={100}>
           <div className="relative rounded-3xl overflow-hidden shadow-2xl">
             <img
-              src="/images/student.jpeg"
+              src="/images/library-2.jpeg"
               alt="Students using library resources"
               className="w-full h-[430px] object-cover"
             />

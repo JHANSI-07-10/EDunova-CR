@@ -77,6 +77,36 @@ class LeadershipMember(models.Model):
         return f"{self.name} — {self.designation}"
 
 
+class FacultyMember(models.Model):
+    """Public website faculty directory — served at /api/website/faculty/ and
+    /api/cms/faculty/. Admin manages members (photo upload included) via the
+    Django admin; the public Faculty page renders the grid + detail modal."""
+    first_name = models.CharField(max_length=100)
+    last_name = models.CharField(max_length=100, blank=True)
+    designation = models.CharField(max_length=150)
+    photo = models.ImageField(upload_to="faculty/", blank=True, null=True)
+    email = models.EmailField(blank=True)
+    qualification_detail = models.CharField(max_length=300, blank=True)
+    experience_years = models.PositiveIntegerField(blank=True, null=True)
+    specializations = models.CharField(
+        max_length=500, blank=True, help_text="Comma-separated list, e.g. Physics, Robotics, AI"
+    )
+    achievements = models.TextField(blank=True)
+    bio = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "first_name"]
+
+    def __str__(self):
+        return f"{self.first_name} {self.last_name}".strip() or f"Faculty #{self.pk}"
+
+    @property
+    def display_name(self):
+        return f"{self.first_name} {self.last_name}".strip()
+
+
 class SchoolStat(models.Model):
     """Business Statistics / 'Why Choose EduNova' stat cards:
     6500+ Students, 620+ Employees, 350+ Teachers, 45+ Smart Classrooms,
@@ -270,6 +300,46 @@ class JobPosting(models.Model):
 
     def __str__(self):
         return self.title
+
+
+class JobApplication(models.Model):
+    """Candidate applications submitted from the public Careers page.
+    Stored for HR review (Django admin / admin portal)."""
+    job_posting = models.ForeignKey(
+        JobPosting, on_delete=models.CASCADE, related_name="applications",
+        db_column="job_posting_id",
+    )
+    applicant_name = models.CharField(max_length=150)
+    email = models.EmailField()
+    phone = models.CharField(max_length=20)
+    cover_letter = models.TextField(blank=True)
+    resume_file = models.FileField(upload_to="careers/resumes/", blank=True, null=True)
+    status = models.CharField(max_length=20, default="pending")
+    applied_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-applied_at"]
+
+    def __str__(self):
+        return f"{self.applicant_name} → {self.job_posting.title}"
+
+
+class CampusVisitBooking(models.Model):
+    """Public 'Schedule Campus Visit' bookings from the Contact page."""
+    campus_id = models.CharField(max_length=50, blank=True)
+    visitor_name = models.CharField(max_length=150)
+    visitor_email = models.EmailField()
+    visitor_phone = models.CharField(max_length=20)
+    visit_date = models.DateField(blank=True, null=True)
+    visit_time = models.CharField(max_length=30, blank=True)
+    purpose = models.TextField(blank=True)
+    booked_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-booked_at"]
+
+    def __str__(self):
+        return f"{self.visitor_name} — {self.visit_date or 'no date'}"
 
 
 class ContactSubmission(models.Model):

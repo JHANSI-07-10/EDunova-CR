@@ -27,6 +27,7 @@ export default function PrincipalMessage() {
                 <img
                   src={photo}
                   alt={`${name} — ${designation}`}
+                  onError={(e) => { e.target.src = '/images/meera.jpeg' }}
                   className="w-full h-[390px] object-cover"
                 />
 

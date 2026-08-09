@@ -1,15 +1,21 @@
+from django.db import connection
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import viewsets, mixins
+from rest_framework.decorators import action
+from rest_framework.permissions import AllowAny
+from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
+from rest_framework.views import APIView
 from .models import (
     SchoolSettings, Campus, AcademicProgram, Department, LeadershipMember,
     SchoolStat, WhyChooseItem, TechnologyPartner, CMSPage, NewsPost, Event,
     GalleryAlbum, GalleryImage, Achievement, Testimonial, FAQ, Document,
-    JobPosting, ContactSubmission, ScholarshipInfo,
+    JobPosting, JobApplication, CampusVisitBooking, ContactSubmission,
+    ScholarshipInfo, FacultyMember,
 )
 from . import serializers as ser
 
@@ -389,6 +395,87 @@ class JobPostingViewSet(PublicReadViewSet):
     queryset = JobPosting.objects.select_related("department").filter(is_open=True)
     serializer_class = ser.JobPostingSerializer
 
+    @extend_schema(
+        operation_id="WebsiteJobApply",
+        summary="Apply to a job posting",
+        description=(
+            "Public endpoint: submit a job application (name, email, phone, "
+            "cover letter, resume file) for a specific open job posting."
+        ),
+        tags=WEBSITE_TAG,
+        request=ser.JobApplicationSerializer,
+        responses={201: None},
+    )
+    @action(detail=True, methods=["post"])
+    def apply(self, request, pk=None):
+        job = self.get_object()
+        serializer = ser.JobApplicationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(job_posting=job)
+        return Response(
+            {"success": True, "message": "Application received. Our HR team will review it."},
+            status=201,
+        )
+
+    # Collection-level apply: the frontend posts to /jobs/apply/ with
+    # job_posting (id) in the multipart body — accept that shape too.
+    @extend_schema(
+        operation_id="WebsiteJobApplyByPosting",
+        summary="Apply to a job posting (by id in body)",
+        description="Submit a job application where the job_posting id is sent in the request body.",
+        tags=WEBSITE_TAG,
+        request=ser.JobApplicationSerializer,
+        responses={201: None},
+    )
+    @action(detail=False, methods=["post"], url_path="apply")
+    def apply_collection(self, request):
+        job_id = request.data.get("job_posting")
+        if not job_id:
+            return Response(
+                {"job_posting": ["This field is required."]},
+                status=400,
+            )
+        job = self.get_queryset().filter(pk=job_id).first()
+        if job is None:
+            return Response(
+                {"job_posting": ["Invalid job posting id."]},
+                status=400,
+            )
+        serializer = ser.JobApplicationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(job_posting=job)
+        return Response(
+            {"success": True, "message": "Application received. Our HR team will review it."},
+            status=201,
+        )
+
+
+@extend_schema(
+    operation_id="WebsiteCampusVisitCreate",
+    summary="Schedule a campus visit",
+    description=(
+        "Public endpoint: the Contact page's 'Schedule Campus Visit' modal "
+        "posts a booking request here."
+    ),
+    tags=WEBSITE_TAG,
+    request=ser.CampusVisitBookingSerializer,
+    responses={201: None},
+)
+class CampusVisitView(APIView):
+    """Public: write-only campus visit booking."""
+    permission_classes = [AllowAny]
+    throttle_classes = [ScopedRateThrottle]
+    throttle_scope = "contact"
+
+    def post(self, request):
+        serializer = ser.CampusVisitBookingSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(
+            {"success": True, "message": "Visit request received. Our team will confirm by email."},
+            status=201,
+        )
+
 
 @extend_schema_view(
     list=extend_schema(
@@ -423,3 +510,62 @@ class ContactSubmissionViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet)
     serializer_class = ser.ContactSubmissionSerializer
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = "contact"
+
+
+@extend_schema_view(
+    list=extend_schema(
+        operation_id="WebsiteFacultyList",
+        summary="List faculty members",
+        description="Public list of active faculty members for the website faculty directory.",
+        tags=WEBSITE_TAG,
+    ),
+    retrieve=extend_schema(
+        operation_id="WebsiteFacultyRetrieve",
+        summary="Get a faculty member",
+        description="Retrieve a single faculty member by id.",
+        tags=WEBSITE_TAG,
+    ),
+)
+class FacultyMemberViewSet(PublicReadViewSet):
+    queryset = FacultyMember.objects.filter(is_active=True)
+    serializer_class = ser.FacultyMemberSerializer
+
+
+class WebsiteStatsView(APIView):
+    """Aggregate headline numbers for the public website (Faculty page stats
+    strip, Academics counters): faculty, classes, subjects and students.
+    Portal tables may not exist yet (fresh DB), so each count degrades to 0
+    rather than 500ing the public site. Cached 60s like the other website
+    endpoints."""
+    permission_classes = [AllowAny]
+
+    @method_decorator(cache_page(60))
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    @extend_schema(
+        operation_id="WebsiteStatsGet",
+        summary="Get website headline stats",
+        description=(
+            "Aggregate counts used by the public website: active faculty, "
+            "classes, subjects and students."
+        ),
+        tags=WEBSITE_TAG,
+    )
+    def get(self, request):
+        def _count(sql, default=0):
+            try:
+                with connection.cursor() as cur:
+                    cur.execute(sql)
+                    return cur.fetchone()[0] or 0
+            except Exception:
+                return default
+
+        return Response({
+            "faculty": FacultyMember.objects.filter(is_active=True).count(),
+            "classes": _count("SELECT COUNT(*)::int FROM portal_class"),
+            "subjects": _count(
+                "SELECT COUNT(DISTINCT subject_id)::int FROM portal_academic_allocation"
+            ),
+            "students": _count("SELECT COUNT(*)::int FROM portal_student_profile"),
+        })

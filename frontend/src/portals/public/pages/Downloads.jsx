@@ -11,39 +11,74 @@ import {
 import FadeIn from '../../../components/FadeIn'
 import { publicImages } from '../../../constants/publicImages'
 
+// Builds a small but valid single-page PDF entirely in the browser so the
+// resource cards can offer proper PDF downloads (not .txt files).
+function buildPdfDoc(lines) {
+  const esc = (s) =>
+    String(s)
+      .replace(/\\/g, '\\\\')
+      .replace(/\(/g, '\\(')
+      .replace(/\)/g, '\\)')
+      .replace(/[^\x20-\x7E]/g, '?')
+  const textOps = lines
+    .map((l) => `(${esc(l)}) Tj T*`)
+    .join('\n')
+  const stream = `BT /F1 11 Tf 50 750 Td 16 TL\n${textOps}\nET`
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ]
+  let pdf = '%PDF-1.4\n'
+  const offsets = []
+  objects.forEach((obj, i) => {
+    offsets.push(pdf.length)
+    pdf += `${i + 1} 0 obj\n${obj}\nendobj\n`
+  })
+  const xrefStart = pdf.length
+  pdf += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`
+  offsets.forEach((off) => {
+    pdf += `${String(off).padStart(10, '0')} 00000 n \n`
+  })
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF`
+  return new Blob([pdf], { type: 'application/pdf' })
+}
+
 const DOWNLOADS = [
   {
     title: 'Admission Prospectus',
-    filename: 'edunova-admission-prospectus.txt',
+    filename: 'edunova-admission-prospectus.pdf',
     desc: 'Complete information about EduNova programs, admission process, academic structure, and campus facilities.',
-    type: 'TXT',
+    type: 'PDF',
     icon: FileText,
     content:
       'EduNova Global Academy Admission Prospectus\n\nPrograms: Pre Primary, Middle School, High School, Senior Secondary, CBSE, Cambridge Curriculum, International Programs, STEM Education, Skill Development.\n\nAdmission Process: Online registration, application review, confirmation, document verification, and onboarding.',
   },
   {
     title: 'Fee Structure',
-    filename: 'edunova-fee-structure.txt',
+    filename: 'edunova-fee-structure.pdf',
     desc: 'Class-wise fee details, payment schedule, transport fee, hostel fee, and scholarship information.',
-    type: 'TXT',
+    type: 'PDF',
     icon: ClipboardList,
     content:
       'EduNova Global Academy Fee Structure\n\nThis document includes tuition fee, transport fee, hostel fee, scholarship information, and payment schedule. Final fee values should be updated by the administration team.',
   },
   {
     title: 'Academic Calendar',
-    filename: 'edunova-academic-calendar.txt',
+    filename: 'edunova-academic-calendar.pdf',
     desc: 'Important dates, exam schedule, events, holidays, activities, and academic planning information.',
-    type: 'TXT',
+    type: 'PDF',
     icon: BookOpen,
     content:
       'EduNova Global Academy Academic Calendar\n\nIncludes academic sessions, examination windows, holidays, events, sports day, parent meetings, result dates, and student activities.',
   },
   {
     title: 'Parent Handbook',
-    filename: 'edunova-parent-handbook.txt',
+    filename: 'edunova-parent-handbook.pdf',
     desc: 'Guidelines for parents about communication, attendance, homework, assessments, and student support.',
-    type: 'TXT',
+    type: 'PDF',
     icon: ShieldCheck,
     content:
       'EduNova Global Academy Parent Handbook\n\nGuidelines for attendance, homework, assignments, fee payments, teacher communication, PTM booking, transport, student support, and school policies.',
@@ -52,7 +87,7 @@ const DOWNLOADS = [
 
 export default function Downloads() {
   const downloadFile = (item) => {
-    const blob = new Blob([item.content], { type: 'text/plain;charset=utf-8' })
+    const blob = buildPdfDoc(item.content.split('\n'))
     const url = URL.createObjectURL(blob)
 
     const link = document.createElement('a')
@@ -195,7 +230,7 @@ export default function Downloads() {
                   <button
                     type="button"
                     onClick={() => downloadFile({ title, desc, type, icon: Icon, ...item })}
-                    className="inline-flex items-center justify-center gap-2 btn-primary w-full mt-auto"
+                    className="btn-download gap-2 btn-primary w-full mt-auto"
                   >
                     Download <Download size={16} />
                   </button>

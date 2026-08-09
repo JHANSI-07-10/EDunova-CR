@@ -3,6 +3,7 @@ import { Camera, Image as ImageIcon, ArrowRight, Sparkles } from 'lucide-react'
 import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
+import { getMediaUrl } from '../../../utils/media'
 
 const fallbackImages = [
   { id: '1', image: '/images/Campus.jpeg', caption: 'EduNova Campus' },
@@ -12,7 +13,7 @@ const fallbackImages = [
   { id: '5', image: '/images/library-1.jpeg', caption: 'Digital Library' },
   { id: '6', image: '/images/physics-1.jpeg', caption: 'Innovation Symposium' },
   { id: '7', image: '/images/trophy-1.jpeg', caption: 'Student Achievements' },
-  { id: '8', image: '/images/EduNova.jpeg', caption: 'EduNova Global Academy' },
+  { id: '8', image: '/images/classroom.jpeg', caption: 'Smart Classrooms' },
 ]
 
 export default function Gallery() {
@@ -91,8 +92,9 @@ export default function Gallery() {
                   }`}
                 >
                   <img
-                    src={img.image}
+                    src={getMediaUrl(img.image)}
                     alt={img.caption || 'EduNova Gallery'}
+                    onError={(e) => { e.target.src = '/images/Campus.jpeg' }}
                     className={`w-full object-cover group-hover:scale-110 transition-transform duration-500 ${
                       index === 0
                         ? 'h-[260px] md:h-[430px]'

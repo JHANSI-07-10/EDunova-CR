@@ -340,9 +340,14 @@ export default function Admissions() {
               and allow our admissions team to review your application.
             </p>
             <div className="flex flex-wrap gap-4">
-              <a href="#admission-steps" className="inline-flex items-center gap-2 btn-primary">
+              <button
+                onClick={() => {
+                  document.getElementById('admission-steps')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                }}
+                className="inline-flex items-center gap-2 btn-primary"
+              >
                 Apply Now <ArrowRight size={18} />
-              </a>
+              </button>
               <Link to="/contact" className="border-2 border-white text-white font-subheading font-semibold px-6 py-3 rounded-lg hover:bg-white hover:text-primary transition-colors">
                 Contact Admissions
               </Link>
@@ -378,7 +383,7 @@ export default function Admissions() {
                 {step === 1 && (
                   <div className="space-y-6">
                     <div>
-                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 1 of 6</p>
+                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 1 of 7</p>
                       <h2 className="font-heading text-2xl font-bold text-text-primary mb-3">Check Eligibility</h2>
                     </div>
                     <div className="bg-slate-50 border border-slate-200 rounded-2xl p-5 space-y-4">
@@ -427,7 +432,7 @@ export default function Admissions() {
                 {step === 2 && (
                   <div className="space-y-6">
                     <div>
-                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 2 of 6</p>
+                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 2 of 7</p>
                       <h2 className="font-heading text-2xl font-bold text-text-primary mb-3">Student Details</h2>
                     </div>
                     <div className="grid sm:grid-cols-2 gap-4">
@@ -473,7 +478,7 @@ export default function Admissions() {
                 {step === 3 && (
                   <div className="space-y-6">
                     <div>
-                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 3 of 6</p>
+                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 3 of 7</p>
                       <h2 className="font-heading text-2xl font-bold text-text-primary mb-3">Parent / Guardian Details</h2>
                     </div>
                     <div className="space-y-4">
@@ -524,7 +529,7 @@ export default function Admissions() {
                 {step === 4 && (
                   <div className="space-y-6">
                     <div>
-                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 4 of 6</p>
+                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 4 of 7</p>
                       <h2 className="font-heading text-2xl font-bold text-text-primary mb-3">Address, Academics & Medical</h2>
                     </div>
 
@@ -606,7 +611,7 @@ export default function Admissions() {
                 {step === 5 && (
                   <div className="space-y-6">
                     <div>
-                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 5 of 6</p>
+                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 5 of 7</p>
                       <h2 className="font-heading text-2xl font-bold text-text-primary mb-3">Upload Documents</h2>
                       <p className="text-sm text-text-secondary">Upload digital copies of required documents (PDF/JPG/PNG, max 5MB each).</p>
                     </div>
@@ -654,7 +659,7 @@ export default function Admissions() {
                 {step === 6 && (
                   <div className="space-y-6">
                     <div>
-                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 6 of 6</p>
+                      <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-1">Step 6 of 7</p>
                       <h2 className="font-heading text-2xl font-bold text-text-primary mb-3">Review Your Application</h2>
                     </div>
                     <div className="border border-slate-100 rounded-2xl p-5 space-y-4">
@@ -727,7 +732,15 @@ export default function Admissions() {
                 <p className="font-body text-sm text-text-secondary leading-relaxed mb-4">
                   Need help? Contact our admissions team for guidance.
                 </p>
-                <Link to="/contact" className="font-subheading font-bold text-accent">Contact Admissions →</Link>
+                <div className="space-y-2">
+                  <a href="tel:+91114567890" className="flex items-center gap-2 font-subheading font-bold text-accent text-sm">
+                    <Phone size={15} /> +91-11-4567890
+                  </a>
+                  <a href="mailto:admissions@edunovaacademy.edu.in" className="flex items-center gap-2 font-subheading font-semibold text-text-secondary text-sm hover:text-accent transition-colors">
+                    <Mail size={15} /> admissions@edunovaacademy.edu.in
+                  </a>
+                  <p className="font-body text-xs text-text-secondary pt-1">Mon–Sat, 9:00 AM – 5:00 PM</p>
+                </div>
               </div>
               <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
                 <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center mb-4">

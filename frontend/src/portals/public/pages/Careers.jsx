@@ -1,4 +1,3 @@
-import { Link } from 'react-router-dom'
 import {
   Briefcase,
   GraduationCap,
@@ -80,6 +79,25 @@ export default function Careers() {
   const [success, setSuccess] = useState(false)
   const [formErrors, setFormErrors] = useState({})
 
+  // Opening a job or closing the modal always resets the draft so previously
+  // typed values never leak into the next application.
+  const resetModal = () => {
+    setFormData({ applicant_name: '', email: '', phone: '', cover_letter: '' })
+    setResumeFile(null)
+    setSuccess(false)
+    setFormErrors({})
+  }
+
+  const openApplyModal = (job) => {
+    resetModal()
+    setSelectedJob(job)
+  }
+
+  const closeApplyModal = () => {
+    resetModal()
+    setSelectedJob(null)
+  }
+
   const handleApply = async (e) => {
     e.preventDefault()
     const errs = {}
@@ -100,6 +118,9 @@ export default function Careers() {
       if (!okTypes.includes(resumeFile.type) && !extOk) {
         errs.resume = 'Resume must be a PDF or Word document (.pdf, .doc, .docx).'
       }
+      if (resumeFile.size > 5 * 1024 * 1024) {
+        errs.resume = 'Resume file size must be under 5MB.'
+      }
     }
     if (Object.keys(errs).length > 0) {
       setFormErrors(errs)
@@ -112,12 +133,27 @@ export default function Careers() {
       data.append('job_posting', selectedJob.id)
       Object.keys(formData).forEach(k => data.append(k, formData[k]))
       if (resumeFile) data.append('resume_file', resumeFile)
-      
+
       await cmsApi.submitJobApplication(data)
       setSuccess(true)
     } catch (err) {
       console.error(err)
-      alert('Failed to submit application. Please try again.')
+      // Surface the real reason from the API (validation errors, file type/size,
+      // connectivity) instead of a generic message.
+      const apiErrors = err?.response?.data
+      if (apiErrors && typeof apiErrors === 'object') {
+        const first = Object.entries(apiErrors)[0]
+        if (first) {
+          const [field, value] = first
+          setFormErrors({ [field]: Array.isArray(value) ? value.join(', ') : String(value) })
+        } else {
+          alert('Failed to submit application. Please try again.')
+        }
+      } else if (err?.message && /network|timeout|ERR_/i.test(err.message)) {
+        alert('Network error — please check your connection and try again.')
+      } else {
+        alert('Failed to submit application. Please try again.')
+      }
     }
     setApplying(false)
   }
@@ -307,7 +343,7 @@ export default function Careers() {
                   </div>
 
                   <button
-                    onClick={() => { setSelectedJob(job); setSuccess(false); setFormErrors({}); }}
+                    onClick={() => openApplyModal(job)}
                     className="inline-flex items-center gap-2 font-subheading font-bold text-accent hover:text-primary transition-colors"
                   >
                     Apply Now <Send size={16} />
@@ -331,9 +367,12 @@ export default function Careers() {
               current openings in teaching, academic support, administration,
               and campus operations.
             </p>
-            <Link to="/contact" className="btn-primary">
-              Contact HR Team
-            </Link>
+            <button
+              onClick={() => document.getElementById('open-positions')?.scrollIntoView({ behavior: 'smooth' })}
+              className="btn-primary"
+            >
+              View Open Positions
+            </button>
           </FadeIn>
         </div>
       </section>
@@ -344,7 +383,7 @@ export default function Careers() {
           <div className="bg-white rounded-3xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="sticky top-0 bg-white p-6 border-b flex justify-between items-center z-10 rounded-t-3xl">
               <h3 className="text-2xl font-bold font-heading">Apply for {selectedJob.title}</h3>
-              <button onClick={() => setSelectedJob(null)} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={24} /></button>
+              <button onClick={closeApplyModal} className="p-2 hover:bg-gray-100 rounded-full transition-colors"><X size={24} /></button>
             </div>
             <div className="p-6">
               {success ? (
@@ -352,7 +391,7 @@ export default function Careers() {
                   <CheckCircle2 size={64} className="mx-auto text-green-500 mb-4" />
                   <h4 className="text-2xl font-bold mb-2">Application Submitted!</h4>
                   <p className="text-text-secondary mb-6">Thank you for your interest in joining EduNova. Our HR team will review your application and get back to you soon.</p>
-                  <button onClick={() => setSelectedJob(null)} className="btn-primary">Close</button>
+                  <button onClick={closeApplyModal} className="btn-primary">Close</button>
                 </div>
               ) : (
                 <form onSubmit={handleApply} noValidate className="space-y-4">
@@ -383,7 +422,7 @@ export default function Careers() {
                     {formErrors.resume && <p className="text-xs text-red-500 mt-1">{formErrors.resume}</p>}
                   </div>
                   <div className="pt-4 border-t flex justify-end gap-3">
-                    <button type="button" onClick={() => setSelectedJob(null)} className="px-6 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">Cancel</button>
+                    <button type="button" onClick={closeApplyModal} className="px-6 py-3 rounded-xl font-bold hover:bg-gray-100 transition-colors">Cancel</button>
                     <button type="submit" disabled={applying} className="btn-primary disabled:opacity-50 disabled:cursor-not-allowed">
                       {applying ? 'Submitting...' : 'Submit Application'}
                     </button>

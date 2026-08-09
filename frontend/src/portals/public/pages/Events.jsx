@@ -1,11 +1,30 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { CalendarDays, MapPin, Clock, Users, ArrowRight, Sparkles } from 'lucide-react'
+import { CalendarDays, MapPin, Clock, Users, ArrowRight, Sparkles, X, CheckCircle2 } from 'lucide-react'
 import { cmsApi } from '../../../api/cmsApi'
 import { useFetch } from '../../../components/useFetch'
 import FadeIn from '../../../components/FadeIn'
 import { getMediaUrl } from '../../../utils/media'
 
 const fetchEvents = cmsApi.getEvents
+
+function eventStatus(dateStr) {
+  if (!dateStr) return { label: 'Upcoming', tone: 'bg-secondary/10 text-secondary' }
+  const d = new Date(dateStr)
+  if (isNaN(d)) return { label: 'Upcoming', tone: 'bg-secondary/10 text-secondary' }
+  const today = new Date()
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate())
+  if (d.getTime() === startOfToday.getTime()) return { label: 'Today', tone: 'bg-accent/15 text-accent' }
+  if (d < startOfToday) return { label: 'Completed', tone: 'bg-slate-100 text-slate-500' }
+  return { label: 'Upcoming', tone: 'bg-secondary/10 text-secondary' }
+}
+
+function formatDate(dateStr) {
+  if (!dateStr) return 'Upcoming'
+  const d = new Date(dateStr)
+  if (isNaN(d)) return dateStr
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+}
 
 const fallbackEvents = [
   {
@@ -37,6 +56,7 @@ const fallbackEvents = [
 export default function Events() {
   const { data, loading } = useFetch(fetchEvents, [])
   const events = data && data.length > 0 ? data : fallbackEvents
+  const [selectedEvent, setSelectedEvent] = useState(null)
 
   return (
     <main className="bg-white">
@@ -93,51 +113,100 @@ export default function Events() {
         {loading ? (
           <p className="text-center text-text-secondary">Loading events…</p>
         ) : (
-          <div className="grid md:grid-cols-3 gap-6">
-            {events.map((event, index) => (
-              <FadeIn key={event.id || event.title} delay={index * 60}>
-                <article className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full">
-                  <div className="relative h-64 overflow-hidden">
-                    <img
-                      src={getMediaUrl(event.cover_image || event.image) || '/images/Campus.jpeg'}
-                      alt={event.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/10 to-transparent" />
+          <>
+            {/* Upcoming events first, past ones below with a Completed tag */}
+            {(() => {
+              const sorted = [...(events || [])].sort(
+                (a, b) => new Date(a.event_date || a.date) - new Date(b.event_date || b.date)
+              )
+              const upcoming = sorted.filter(
+                (e) => eventStatus(e.event_date || e.date).label !== 'Completed'
+              )
+              const past = sorted.filter(
+                (e) => eventStatus(e.event_date || e.date).label === 'Completed'
+              )
+              const renderCards = (list) => (
+                <div className="grid md:grid-cols-3 gap-6">
+                  {list.map((event, index) => {
+                    const status = eventStatus(event.event_date || event.date)
+                    return (
+                      <FadeIn key={event.id || event.title} delay={index * 60}>
+                        <button
+                          onClick={() => setSelectedEvent(event)}
+                          className="group bg-white rounded-3xl overflow-hidden border border-gray-100 shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 h-full w-full text-left cursor-pointer"
+                        >
+                          <div className="relative h-64 overflow-hidden">
+                            <img
+                              src={getMediaUrl(event.cover_image || event.image) || '/images/Campus.jpeg'}
+                              alt={event.title}
+                              onError={(e) => { e.target.src = '/images/Campus.jpeg' }}
+                              className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/10 to-transparent" />
 
-                    <div className="absolute bottom-4 left-4 right-4">
-                      <p className="font-heading font-bold text-white text-xl drop-shadow">
-                        {event.title}
-                      </p>
+                            <span className={`absolute top-4 right-4 px-3 py-1 rounded-full text-xs font-bold backdrop-blur ${status.tone}`}>
+                              {status.label}
+                            </span>
+
+                            <div className="absolute bottom-4 left-4 right-4">
+                              <p className="font-heading font-bold text-white text-xl drop-shadow">
+                                {event.title}
+                              </p>
+                            </div>
+                          </div>
+
+                          <div className="p-6">
+                            <div className="space-y-2 mb-4">
+                              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                <CalendarDays size={16} className="text-accent" />
+                                {formatDate(event.event_date || event.date)}
+                              </div>
+
+                              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                <MapPin size={16} className="text-accent" />
+                                {event.venue || 'EduNova Campus'}
+                              </div>
+
+                              <div className="flex items-center gap-2 text-sm text-text-secondary">
+                                <Clock size={16} className="text-accent" />
+                                School Event
+                              </div>
+                            </div>
+
+                            <p className="font-body text-sm text-text-secondary leading-relaxed line-clamp-3">
+                              {event.description}
+                            </p>
+
+                            <span className="inline-flex items-center gap-1.5 mt-4 font-subheading font-bold text-accent text-sm group-hover:gap-2.5 transition-all">
+                              {status.label === 'Completed' ? 'View Recap' : 'View Details'} <ArrowRight size={16} />
+                            </span>
+                          </div>
+                        </button>
+                      </FadeIn>
+                    )
+                  })}
+                </div>
+              )
+              return (
+                <>
+                  {upcoming.length > 0 && (
+                    <>
+                      {upcoming.length > 3 && (
+                        <p className="font-subheading font-semibold text-secondary uppercase text-sm mb-4">Upcoming</p>
+                      )}
+                      {renderCards(upcoming)}
+                    </>
+                  )}
+                  {past.length > 0 && (
+                    <div className="mt-12">
+                      <p className="font-subheading font-semibold text-slate-500 uppercase text-sm mb-4">Past Events</p>
+                      {renderCards(past)}
                     </div>
-                  </div>
-
-                  <div className="p-6">
-                    <div className="space-y-2 mb-4">
-                      <div className="flex items-center gap-2 text-sm text-text-secondary">
-                        <CalendarDays size={16} className="text-accent" />
-                        {event.event_date || event.date || 'Upcoming'}
-                      </div>
-
-                      <div className="flex items-center gap-2 text-sm text-text-secondary">
-                        <MapPin size={16} className="text-accent" />
-                        {event.venue || 'EduNova Campus'}
-                      </div>
-
-                      <div className="flex items-center gap-2 text-sm text-text-secondary">
-                        <Clock size={16} className="text-accent" />
-                        School Event
-                      </div>
-                    </div>
-
-                    <p className="font-body text-sm text-text-secondary leading-relaxed">
-                      {event.description}
-                    </p>
-                  </div>
-                </article>
-              </FadeIn>
-            ))}
-          </div>
+                  )}
+                </>
+              )
+            })()}
+          </>
         )}
       </section>
 
@@ -146,8 +215,9 @@ export default function Events() {
           <FadeIn>
             <div className="relative rounded-3xl overflow-hidden shadow-2xl">
               <img
-                src="/images/student.jpeg"
+                src="/images/classroom.jpeg"
                 alt="EduNova student events"
+                onError={(e) => { e.target.src = '/images/Campus.jpeg' }}
                 className="w-full h-[420px] object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-primary/75 via-transparent to-transparent" />
@@ -186,6 +256,76 @@ export default function Events() {
           </FadeIn>
         </div>
       </section>
+
+      {/* Event Details Modal */}
+      {selectedEvent && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.6)' }}
+          onClick={() => setSelectedEvent(null)}
+        >
+          <div
+            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="relative">
+              <img
+                src={getMediaUrl(selectedEvent.cover_image || selectedEvent.image) || '/images/Campus.jpeg'}
+                alt={selectedEvent.title}
+                onError={(e) => { e.target.src = '/images/Campus.jpeg' }}
+                className="w-full h-64 object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+              <button
+                onClick={() => setSelectedEvent(null)}
+                className="absolute top-4 right-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur flex items-center justify-center text-white hover:bg-white/40 transition-colors"
+              >
+                <X size={20} />
+              </button>
+              <div className="absolute bottom-4 left-6 right-6">
+                <h2 className="font-heading text-2xl font-bold text-white">{selectedEvent.title}</h2>
+                <p className="font-body text-white/85">{formatDate(selectedEvent.event_date || selectedEvent.date)} · {selectedEvent.venue || 'EduNova Campus'}</p>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-5">
+              <div className="flex flex-wrap gap-2">
+                <span className={`px-3 py-1 rounded-full text-xs font-bold ${eventStatus(selectedEvent.event_date || selectedEvent.date).tone}`}>
+                  {eventStatus(selectedEvent.event_date || selectedEvent.date).label}
+                </span>
+                {selectedEvent.venue && (
+                  <span className="bg-primary/10 text-primary text-xs font-semibold px-3 py-1 rounded-full">
+                    <MapPin size={12} className="inline mr-1" />{selectedEvent.venue}
+                  </span>
+                )}
+              </div>
+
+              <p className="font-body text-text-secondary leading-relaxed">
+                {selectedEvent.description}
+              </p>
+
+              {(() => {
+                const d = (selectedEvent.event_date || selectedEvent.date || '').replace(/-/g, '')
+                return (
+                  <div className="pt-4 border-t border-slate-100 flex flex-wrap gap-3">
+                    <a
+                      href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(selectedEvent.title)}&dates=${d}/${d}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 btn-primary"
+                    >
+                      <CalendarDays size={16} /> Add to Calendar
+                    </a>
+                    <Link to="/contact" className="inline-flex items-center gap-2 btn-outline">
+                      <CheckCircle2 size={16} /> Register Interest
+                    </Link>
+                  </div>
+                )
+              })()}
+              </div>
+            </div>
+          </div>
+      )}
     </main>
   )
 }

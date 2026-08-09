@@ -140,7 +140,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
 
             {/* Campus Selection */}
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Target Campus (*)</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Target Campus <span className="text-red-500">*</span></label>
               <select
                 required
                 value={form.campus_id}
@@ -162,7 +162,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
             {/* Visitor Details */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="relative">
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Your Name</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Your Name <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">
                     <User size={16} />
@@ -170,7 +170,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                   <input
                     required
                     type="text"
-                    placeholder="John Doe (*)"
+                    placeholder="John Doe"
                     value={form.visitor_name}
                     onChange={(e) => setForm({ ...form, visitor_name: e.target.value })}
                     className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
@@ -184,7 +184,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Phone Number</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Phone Number <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">
                     <Phone size={16} />
@@ -192,7 +192,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                   <input
                     required
                     type="tel"
-                    placeholder="+91 98765 43210 (*)"
+                    placeholder="+91 98765 43210"
                     value={form.visitor_phone}
                     onChange={(e) => setForm({ ...form, visitor_phone: e.target.value })}
                     className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
@@ -207,7 +207,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Email Address</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Email Address <span className="text-red-500">*</span></label>
               <div className="relative">
                 <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">
                   <Mail size={16} />
@@ -215,7 +215,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
                 <input
                   required
                   type="email"
-                  placeholder="name@example.com (*)"
+                  placeholder="name@example.com"
                   value={form.visitor_email}
                   onChange={(e) => setForm({ ...form, visitor_email: e.target.value })}
                   className={`w-full bg-gray-50 border rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/20 focus:border-academic-blue transition-all ${
@@ -231,7 +231,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
             {/* Visit Schedule */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Preferred Date</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Preferred Date <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">
                     <Calendar size={16} />
@@ -253,7 +253,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Preferred Time</label>
+                <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Preferred Time <span className="text-red-500">*</span></label>
                 <div className="relative">
                   <span className="absolute inset-y-0 left-0 pl-3.5 flex items-center text-gray-400">
                     <Clock size={16} />
@@ -281,7 +281,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Purpose of Visit</label>
+              <label className="block text-xs font-semibold text-gray-700 mb-1.5 font-sub uppercase tracking-wider">Purpose of Visit <span className="text-red-500">*</span></label>
               <div className="relative">
                 <span className="absolute top-3 left-0 pl-3.5 text-gray-400">
                   <FileText size={16} />

@@ -1,7 +1,11 @@
+import shutil
+from pathlib import Path
+
+from django.conf import settings
 from django.core.management.base import BaseCommand
 from apps.cms.models import (
     SchoolSettings, AcademicProgram, Department, SchoolStat, WhyChooseItem,
-    TechnologyPartner, CMSPage, FAQ, ScholarshipInfo,
+    TechnologyPartner, CMSPage, FAQ, ScholarshipInfo, FacultyMember,
 )
 
 
@@ -103,6 +107,21 @@ class Command(BaseCommand):
             },
         )
 
+        # Open positions for the Careers page (submit via /api/cms/jobs/<id>/apply/)
+        from apps.cms.models import JobPosting
+
+        open_jobs = [
+            ("English Teacher", "Academic Affairs", "Responsible for classroom teaching, lesson planning, assessments, and student mentoring."),
+            ("STEM Faculty", "Innovation Lab", "Guide students in STEM projects, robotics, practical learning, and innovation activities."),
+            ("Admissions Counsellor", "Admissions", "Support admission enquiries, parent communication, documentation, and application follow-up."),
+        ]
+        for title, dept_name, desc in open_jobs:
+            dept = Department.objects.filter(name__iexact=dept_name).first()
+            JobPosting.objects.update_or_create(
+                title=title,
+                defaults={"department": dept, "description": desc, "is_open": True},
+            )
+
         # --- Sample content below is placeholder — replace via /admin/ once
         # real testimonials/news/events/achievements are available. It
         # exists only so the homepage doesn't render empty during dev. ---
@@ -141,5 +160,93 @@ class Command(BaseCommand):
         ]
         for title, desc, adate in sample_achievements:
             Achievement.objects.update_or_create(title=title, defaults={"description": desc, "achievement_date": adate})
+
+        # --- Faculty directory (with photos) --------------------------------- #
+        # Copies the person photos bundled in the frontend's public/images into
+        # MEDIA_ROOT/faculty under clean names, then creates/updates the member
+        # records. Skips gracefully if the images folder isn't present (CI).
+        frontend_images = Path(settings.BASE_DIR).parent / "frontend" / "public" / "images"
+        media_faculty = Path(settings.MEDIA_ROOT) / "faculty"
+        media_faculty.mkdir(parents=True, exist_ok=True)
+
+        # source glob -> clean destination filename in media/faculty/
+        photo_map = [
+            ("Man_in_Academic_Office_2K_202607130959.jpeg", "dr_ramesh_kumar.jpeg"),
+            ("Woman_Principal_in_Office_202607130959.jpeg", "meera_nandakumar.jpeg"),
+            ("*Nandita*", "nandita_iyer.jpeg"),
+            ("Man_in_modern_office_202607130959.jpeg", "arjun_mehta.jpeg"),
+            ("meera.jpeg", "kavya_reddy.jpeg"),
+        ]
+        copied = {}
+        for pattern, dest in photo_map:
+            matches = list(frontend_images.glob(pattern)) if frontend_images.is_dir() else []
+            if matches:
+                try:
+                    shutil.copyfile(matches[0], media_faculty / dest)
+                    copied[dest] = f"faculty/{dest}"
+                except OSError:
+                    pass
+
+        faculty_seed = [
+            {
+                "first_name": "Dr. Ramesh", "last_name": "Kumar",
+                "designation": "Principal", "photo": copied.get("dr_ramesh_kumar.jpeg", ""),
+                "email": "ramesh.kumar@edunova.edu.in",
+                "qualification_detail": "Ph.D. Educational Leadership, M.Ed.",
+                "experience_years": 22,
+                "specializations": "Leadership, Curriculum Design, Educational Technology",
+                "achievements": "Awarded National Best Principal 2023 by the Indian Education Council.",
+                "bio": "Dr. Kumar has led EduNova since 2015, championing digital classrooms and personalised learning at scale.",
+            },
+            {
+                "first_name": "Meera", "last_name": "Nandakumar",
+                "designation": "Vice Principal", "photo": copied.get("meera_nandakumar.jpeg", ""),
+                "email": "meera.nandakumar@edunova.edu.in",
+                "qualification_detail": "M.A. English, B.Ed.",
+                "experience_years": 18,
+                "specializations": "Academics, Teacher Mentoring, Student Counselling",
+                "achievements": "Spearheaded EduNova's teacher-mentoring programme, improving board results by 12%.",
+                "bio": "An educator at heart, Ms. Nandakumar oversees academics and mentors every new faculty member.",
+            },
+            {
+                "first_name": "Nandita", "last_name": "Iyer",
+                "designation": "Cambridge Coordinator", "photo": copied.get("nandita_iyer.jpeg", ""),
+                "email": "nandita.iyer@edunova.edu.in",
+                "qualification_detail": "M.Sc. Chemistry, PGCE (Cambridge)",
+                "experience_years": 12,
+                "specializations": "Cambridge Curriculum, International Programmes, STEM",
+                "achievements": "Led the school's Cambridge accreditation process.",
+                "bio": "Nandita coordinates the Cambridge and international streams, bringing global best practices to the classroom.",
+            },
+            {
+                "first_name": "Arjun", "last_name": "Mehta",
+                "designation": "Head of STEM & Robotics", "photo": copied.get("arjun_mehta.jpeg", ""),
+                "email": "arjun.mehta@edunova.edu.in",
+                "qualification_detail": "M.Tech Robotics & AI",
+                "experience_years": 9,
+                "specializations": "Robotics, Artificial Intelligence, Coding",
+                "achievements": "Teams under Arjun have won 3 state-level robotics championships.",
+                "bio": "Arjun runs the Innovation Lab and teaches students to build, code and compete with robots.",
+            },
+            {
+                "first_name": "Kavya", "last_name": "Reddy",
+                "designation": "Senior Mathematics Teacher", "photo": copied.get("kavya_reddy.jpeg", ""),
+                "email": "kavya.reddy@edunova.edu.in",
+                "qualification_detail": "M.Sc. Mathematics, B.Ed.",
+                "experience_years": 8,
+                "specializations": "Mathematics, Olympiad Coaching, Vedic Maths",
+                "achievements": "Coached 40+ students to National Mathematics Olympiad medals.",
+                "bio": "Kavya makes mathematics visual and intuitive, from foundational algebra to olympiad-level problem solving.",
+            },
+        ]
+        for i, member in enumerate(faculty_seed):
+            defaults = {k: v for k, v in member.items() if k not in ("first_name", "last_name")}
+            defaults["sort_order"] = i
+            defaults["is_active"] = True
+            FacultyMember.objects.update_or_create(
+                first_name=member["first_name"],
+                last_name=member["last_name"],
+                defaults=defaults,
+            )
 
         self.stdout.write(self.style.SUCCESS("Public portal seed data loaded."))

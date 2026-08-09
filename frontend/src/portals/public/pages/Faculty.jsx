@@ -29,8 +29,12 @@ export default function Faculty() {
       client.get('/api/website/faculty/').catch(() => ({ data: [] })),
       client.get('/api/website/stats/').catch(() => ({ data: null })),
     ]).then(([facultyRes, statsRes]) => {
-      setFaculty(facultyRes.data)
-      setStats(statsRes.data)
+      // API returns a paginated envelope ({ results: [...] }) — unwrap it,
+      // and fall back gracefully to whatever shape we get so the page never
+      // crashes on the initial render.
+      const raw = facultyRes?.data
+      setFaculty(Array.isArray(raw) ? raw : (raw?.results || []))
+      setStats(statsRes?.data || null)
       setLoading(false)
     })
   }, [])

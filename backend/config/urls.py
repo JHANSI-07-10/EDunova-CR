@@ -1,15 +1,27 @@
 from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
-from django.conf.urls.static import static
+from django.views.static import serve
 from drf_spectacular.renderers import OpenApiJsonRenderer, OpenApiYamlRenderer
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularSwaggerView,
     SpectacularRedocView,
 )
+from rest_framework.routers import DefaultRouter
+from apps.cms.views import CampusViewSet, CampusVisitView, FacultyMemberViewSet, WebsiteStatsView
 from .status_view import status_dashboard
+
+# Public website namespace — the frontend fetches the faculty directory from
+# /api/website/faculty/ (and headline stats from the dedicated path above).
+website_router = DefaultRouter()
+website_router.register("faculty", FacultyMemberViewSet, basename="website-faculty")
+
+# The Contact page also talks to the old-style /api/campuses/ URLs (list +
+# visit booking). Mount the CMS campus viewset there too so those calls work.
+campuses_router = DefaultRouter()
+campuses_router.register("", CampusViewSet, basename="campuses")
 
 # The status dashboard lists every API route and surfaces raw DB errors —
 # only expose it publicly during local development. In production it is
@@ -24,6 +36,14 @@ urlpatterns = [
     path("", _status_view, name="status-dashboard"),
     path("admin/", admin.site.urls),
     path("api/cms/", include("apps.cms.urls")),
+    # The public website frontend calls the /api/website/* namespace (faculty
+    # directory, headline stats). The faculty router is mounted here too so
+    # no frontend change is needed; stats is the aggregate counters object.
+    path("api/website/stats/", WebsiteStatsView.as_view(), name="website-stats"),
+    path("api/website/", include(website_router.urls)),
+    # Keep the Contact page's /api/campuses/* calls working (list + visit booking).
+    path("api/campuses/visit/", CampusVisitView.as_view(), name="campus-visit"),
+    path("api/campuses/", include(campuses_router.urls)),
     path("api/admissions/", include("apps.admissions.urls")),
     path("api/", include("portal.urls")),
     # OpenAPI / Swagger documentation. JSON is the default representation so
@@ -51,5 +71,16 @@ urlpatterns = [
 
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Serve uploaded media locally in every environment. In production, files
+# normally live in Supabase Storage (CDN URLs), so this only serves the
+# local-fallback files that actually exist under MEDIA_ROOT — e.g. seeded
+# CMS images — and never interferes with CDN-backed uploads.
+# NB: django.conf.urls.static.static() is a no-op when DEBUG=False (Django
+# 5.1+), so mount the serve view explicitly.
+urlpatterns += [
+    re_path(
+        r"^media/(?P<path>.*)$",
+        serve,
+        kwargs={"document_root": settings.MEDIA_ROOT},
+    ),
+]

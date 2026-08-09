@@ -136,6 +136,32 @@ export default function ContactPage() {
   const [formStatus, setFormStatus] = useState('idle') // idle | sending | sent | error
   const [validationErrors, setValidationErrors] = useState({})
 
+  // Call Now fallback for desktop: copy the number + show feedback (no tel: dialler)
+  const [phoneCopied, setPhoneCopied] = useState(false)
+  const handleCallNow = (e) => {
+    const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+    if (isMobile) return // let the tel: link do its job
+    e.preventDefault()
+    const number = headOffice.phone
+    const done = () => {
+      setPhoneCopied(true)
+      setTimeout(() => setPhoneCopied(false), 2500)
+    }
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(number).then(done).catch(() => {
+        const ta = document.createElement('textarea')
+        ta.value = number
+        document.body.appendChild(ta)
+        ta.select()
+        try { document.execCommand('copy') } catch (_) { /* ignore */ }
+        document.body.removeChild(ta)
+        done()
+      })
+    } else {
+      done()
+    }
+  }
+
   // Default Head Office details
   const headOffice = {
     name: "EduNova Global Academy Private Limited",
@@ -417,9 +443,16 @@ export default function ContactPage() {
 
             {/* HO Buttons */}
             <div className="grid grid-cols-2 gap-3 mt-6 pt-5 border-t border-slate-50">
-              <a href={`tel:${headOffice.phone}`} className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-3 px-2 rounded-xl transition-all">
-                <PhoneCall size={14} /> Call Now
-              </a>
+              <div className="relative">
+                <a href={`tel:${headOffice.phone}`} onClick={handleCallNow} className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-3 px-2 rounded-xl transition-all">
+                  <PhoneCall size={14} /> Call Now
+                </a>
+                {phoneCopied && (
+                  <div className="absolute left-1/2 -translate-x-1/2 bottom-full mb-2 whitespace-nowrap bg-slate-900 text-white text-[11px] font-semibold px-3 py-1.5 rounded-lg shadow-lg z-20 animate-fade-in">
+                    ✓ {headOffice.phone} copied — paste it in your phone to call
+                  </div>
+                )}
+              </div>
               <a href={`mailto:${headOffice.email}`} className="flex items-center justify-center gap-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold py-3 px-2 rounded-xl transition-all">
                 <Mail size={14} /> Email Us
               </a>
@@ -439,7 +472,7 @@ export default function ContactPage() {
               <div>
                 <input
                   required
-                  placeholder="Full Name (*)"
+                  placeholder="Full Name"
                   value={contactForm.name}
                   onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                   className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${validationErrors.name ? "border-red-500" : "border-slate-100"
@@ -454,7 +487,7 @@ export default function ContactPage() {
                   <input
                     required
                     type="email"
-                    placeholder="Email (*)"
+                    placeholder="Email"
                     value={contactForm.email}
                     onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
                     className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${validationErrors.email ? "border-red-500" : "border-slate-100"
@@ -467,7 +500,7 @@ export default function ContactPage() {
                 <div>
                   <input
                     required
-                    placeholder="Phone (*)"
+                    placeholder="Phone"
                     value={contactForm.phone}
                     onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
                     className={`w-full bg-slate-50 border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-academic-blue/15 ${validationErrors.phone ? "border-red-500" : "border-slate-100"
@@ -481,7 +514,7 @@ export default function ContactPage() {
               <div>
                 <textarea
                   required
-                  placeholder="Your message details... (*)"
+                  placeholder="Your message details..."
                   rows={4}
                   value={contactForm.message}
                   onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
@@ -690,12 +723,14 @@ export default function ContactPage() {
                 <p className="text-xs text-slate-500 font-sub">Explore campus markers and layouts visually</p>
               </div>
               <div className="flex gap-2">
-                <button
-                  onClick={() => setMapMode(m => m === 'Standard' ? 'Satellite' : m === 'Satellite' ? 'Terrain' : 'Standard')}
+                <a
+                  href={`https://maps.google.com/?q=${selectedCampus?.latitude || headOffice.latitude},${selectedCampus?.longitude || headOffice.longitude}`}
+                  target="_blank"
+                  rel="noreferrer"
                   className="flex items-center gap-1.5 bg-slate-50 border border-slate-100 hover:bg-slate-100 text-slate-600 text-xs px-3 py-2 rounded-xl transition-all"
                 >
-                  <Layers size={12} /> {mapMode} View
-                </button>
+                  <Layers size={12} /> Open in Google Maps
+                </a>
                 <button
                   onClick={() => setFullScreen(!fullScreen)}
                   className="bg-slate-50 border border-slate-100 hover:bg-slate-100 text-slate-600 p-2 rounded-xl transition-all"
@@ -713,123 +748,39 @@ export default function ContactPage() {
                 <button onClick={() => setZoomLevel(z => Math.max(z - 1, 5))} className="w-9 h-9 bg-white hover:bg-slate-100 text-slate-800 rounded-xl flex items-center justify-center shadow-md font-bold transition-all"><ZoomOut size={16} /></button>
               </div>
 
-              {/* Satellite / Terrain Overlay Simulator */}
-              <div className={`absolute inset-0 opacity-20 pointer-events-none transition-opacity ${mapMode === 'Satellite' ? 'bg-emerald-950/40 mix-blend-overlay' : mapMode === 'Terrain' ? 'bg-amber-950/20' : ''}`} />
+              {/* Real base map layer — Google Maps embed (no API key required) */}
+              <iframe
+                title={`Map — ${selectedCampus?.name || 'Head Office (Dwarka)'}`}
+                src={`https://maps.google.com/maps?q=${selectedCampus?.latitude || headOffice.latitude},${selectedCampus?.longitude || headOffice.longitude}&z=${zoomLevel}&output=embed`}
+                className="absolute inset-0 w-full h-full border-0"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                allowFullScreen
+              />
 
-              {/* North India Map Sketch Graphic (Delhi NCR, Jaipur, Lucknow region) */}
-              <svg className="w-full h-full opacity-60 pointer-events-none text-slate-800" viewBox="0 0 800 600" fill="none">
-                {/* Major Expressways / Highways */}
-                <path d="M 400,300 L 450,220" stroke="#ffd700" strokeWidth="1" strokeDasharray="3,3" opacity="0.4" />
-                <path d="M 400,300 L 530,340" stroke="#ffffff" strokeWidth="1.5" opacity="0.3" />
-                <path d="M 400,300 L 250,420" stroke="#ffffff" strokeWidth="1.5" opacity="0.3" />
-                <path d="M 400,300 L 520,180" stroke="#ffffff" strokeWidth="1.5" opacity="0.3" />
-
-                {/* River Yamuna simulation */}
-                <path d="M 380,50 Q 420,200 400,300 T 480,450 T 600,550" stroke="#1e293b" strokeWidth="6" strokeLinecap="round" opacity="0.5" />
-                <path d="M 380,50 Q 420,200 400,300 T 480,450 T 600,550" stroke="#38bdf8" strokeWidth="2" strokeLinecap="round" opacity="0.4" />
-
-                {/* Animated Route Line from Head Office (Dwarka) to Selected Branch */}
-                {selectedCampus && selectedCampus.id !== 1 && (() => {
-                  let targetLeft = 400;
-                  let targetTop = 300;
-                  if (selectedCampus.name.includes("Noida")) { targetLeft = 430; targetTop = 295; }
-                  else if (selectedCampus.name.includes("Gurugram")) { targetLeft = 370; targetTop = 320; }
-                  else if (selectedCampus.name.includes("Faridabad")) { targetLeft = 415; targetTop = 330; }
-                  else if (selectedCampus.name.includes("Jaipur")) { targetLeft = 240; targetTop = 410; }
-                  else if (selectedCampus.name.includes("Lucknow")) { targetLeft = 550; targetTop = 360; }
-
-                  if (targetLeft === 400 && targetTop === 300) return null;
-
-                  return (
-                    <>
-                      <defs>
-                        <linearGradient id="routeGrad" x1="400" y1="300" x2={targetLeft} y2={targetTop} gradientUnits="userSpaceOnUse">
-                          <stop offset="0%" stopColor="#FBBF24" />
-                          <stop offset="100%" stopColor="#F97316" />
-                        </linearGradient>
-                      </defs>
-                      {/* Outer shadow glow path */}
-                      <line
-                        x1="400"
-                        y1="300"
-                        x2={targetLeft}
-                        y2={targetTop}
-                        stroke="url(#routeGrad)"
-                        strokeWidth="4"
-                        strokeLinecap="round"
-                        opacity="0.4"
-                        className="blur-sm"
-                      />
-                      {/* Inner dashed moving path */}
-                      <line
-                        x1="400"
-                        y1="300"
-                        x2={targetLeft}
-                        y2={targetTop}
-                        stroke="url(#routeGrad)"
-                        strokeWidth="2.5"
-                        strokeLinecap="round"
-                        strokeDasharray="6,6"
-                        className="animate-dash"
-                      />
-                      <style>{`
-                        @keyframes dash {
-                          to {
-                            stroke-dashoffset: -20;
-                          }
-                        }
-                        .animate-dash {
-                          animation: dash 1s linear infinite;
-                          pointer-events: none;
-                        }
-                      `}</style>
-                    </>
-                  )
-                })()}
-              </svg>
-
-              {/* Delhi Area boundaries indicator */}
-              <div className="absolute top-[280px] left-[380px] w-24 h-24 border border-dashed border-white/10 rounded-full flex items-center justify-center pointer-events-none">
-                <span className="text-[10px] text-slate-500 uppercase tracking-widest">Delhi NCR</span>
+              {/* Campus pin on the map */}
+              <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full z-10 pointer-events-none flex flex-col items-center">
+                <span className="w-4 h-4 rounded-full bg-academic-blue border-2 border-white shadow-lg" />
+                <span className="text-[9px] px-2 py-0.5 rounded-md mt-1 shadow-md bg-slate-900/90 text-white whitespace-nowrap">
+                  {selectedCampus ? (selectedCampus.name.includes('Head Office') ? `⭐ ${selectedCampus.name}` : selectedCampus.name) : 'Head Office (Dwarka)'}
+                </span>
               </div>
 
-              {/* Branch Campus Markers */}
-              {filteredCampuses.map(c => {
-                // Map lat/long coordinates onto our custom vector grid relative position
-                // Noida is slightly east of Dwarka (400px, 300px)
-                // Gurugram is slightly southwest
-                // Faridabad is southeast
-                // Jaipur is far southwest (longer distance)
-                // Lucknow is far east
-                let top = 300
-                let left = 400
-                if (c.name.includes("Noida")) { left = 430; top = 295; }
-                else if (c.name.includes("Gurugram")) { left = 370; top = 320; }
-                else if (c.name.includes("Faridabad")) { left = 415; top = 330; }
-                else if (c.name.includes("Jaipur")) { left = 240; top = 410; }
-                else if (c.name.includes("Lucknow")) { left = 550; top = 360; }
-                else if (c.name.includes("Head Office") || c.name.includes("Dwarka")) { left = 400; top = 300; }
+              {/* Zoom controls */}
+              <div className="absolute bottom-4 right-4 z-10 flex flex-col gap-1.5">
+                <button onClick={() => setZoomLevel(z => Math.min(z + 1, 15))} className="w-9 h-9 bg-white hover:bg-slate-100 text-slate-800 rounded-xl flex items-center justify-center shadow-md font-bold transition-all"><ZoomIn size={16} /></button>
+                <button onClick={() => setZoomLevel(z => Math.max(z - 1, 5))} className="w-9 h-9 bg-white hover:bg-slate-100 text-slate-800 rounded-xl flex items-center justify-center shadow-md font-bold transition-all"><ZoomOut size={16} /></button>
+              </div>
 
-                const isCurrentlySelected = selectedCampus && selectedCampus.id === c.id
-                const isHQ = c.name.includes("Head Office") || c.name.includes("Dwarka")
-
-                return (
-                  <button
-                    key={c.id}
-                    onClick={() => setSelectedCampus(c)}
-                    className="absolute -translate-x-1/2 -translate-y-1/2 group z-10 flex flex-col items-center"
-                    style={{ top: `${top}px`, left: `${left}px` }}
-                  >
-                    <div className={`rounded-full border-2 border-white shadow-lg transition-all duration-200 group-hover:scale-125
-                      ${isCurrentlySelected ? 'bg-red-500 w-4 h-4 ring-4 ring-red-500/20' : isHQ ? 'bg-academic-gold w-4 h-4 animate-pulse' : 'bg-academic-blue w-3.5 h-3.5'}`}
-                    />
-                    <span className={`text-[9px] px-2 py-0.5 rounded-md mt-1 shadow-md font-medium whitespace-nowrap transition-colors
-                      ${isCurrentlySelected ? 'bg-red-500 text-white' : isHQ ? 'bg-slate-900 border border-slate-800 text-academic-gold font-semibold' : 'bg-slate-800 border border-slate-700 text-slate-200 group-hover:bg-slate-700'}`}>
-                      {isHQ ? `⭐ ${c.name}` : c.name}
-                    </span>
-                  </button>
-                )
-              })}
+              {/* Open in Google Maps */}
+              <a
+                href={`https://maps.google.com/?q=${selectedCampus?.latitude || headOffice.latitude},${selectedCampus?.longitude || headOffice.longitude}`}
+                target="_blank"
+                rel="noreferrer"
+                className="absolute bottom-4 left-4 z-10 bg-white hover:bg-slate-100 text-slate-800 text-[10px] font-bold px-3 py-2 rounded-xl shadow-md flex items-center gap-1.5 transition-colors"
+              >
+                <Navigation size={12} /> Open in Maps
+              </a>
 
               {/* Clicked Info Window Popup Simulation */}
               {selectedCampus && (

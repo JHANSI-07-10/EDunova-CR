@@ -2,6 +2,12 @@ export function setupGlobalInputValidation() {
   document.addEventListener('input', (e) => {
     const target = e.target;
     if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+      // Email fields must never be filtered — they legitimately contain @, .,
+      // digits, hyphens and underscores. The placeholder "name@example.com"
+      // previously triggered the text-only rule below, silently stripping
+      // those characters and making valid addresses impossible to type.
+      if (target.type === 'email') return;
+
       const name = (target.name || target.placeholder || target.id || '').toLowerCase();
       
       // Attempt to get label text if available
@@ -19,8 +25,12 @@ export function setupGlobalInputValidation() {
       let modified = false;
 
       // 1. Text Only (Names, Religions, Nationalities, etc.)
+      // Guarded against 'email' so a label like "Email Address" or a
+      // placeholder containing "name" (e.g. name@example.com) never turns a
+      // real text/email field into a letters-only filter.
       if (
         (ident.includes('name') || ident.includes('religion') || ident.includes('nationality') || ident.includes('city') || ident.includes('state') || ident.includes('relation') || ident.includes('occupation')) &&
+        !ident.includes('email') &&
         !ident.includes('school') && !ident.includes('company') && !ident.includes('username')
       ) {
         const filtered = newValue.replace(/[^A-Za-z\s]/g, '');
