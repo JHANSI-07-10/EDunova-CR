@@ -58,13 +58,11 @@ class SchoolSettingsViewSet(PublicReadViewSet):
 
 @extend_schema_view(
     list=extend_schema(
-        operation_id="WebsiteCampusList",
         summary="List campuses",
         description="Public list of school campuses.",
         tags=WEBSITE_TAG,
     ),
     retrieve=extend_schema(
-        operation_id="WebsiteCampusRetrieve",
         summary="Get a campus",
         description="Retrieve a single campus by id.",
         tags=WEBSITE_TAG,
@@ -78,7 +76,6 @@ class CampusViewSet(PublicReadViewSet):
     pagination_class = None
 
     @extend_schema(
-        operation_id="WebsiteCampusNearest",
         summary="Find nearest campus",
         description=(
             "Return the campus closest to the supplied latitude/longitude "
@@ -567,13 +564,11 @@ class ContactSubmissionViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet)
 
 @extend_schema_view(
     list=extend_schema(
-        operation_id="WebsiteFacultyList",
         summary="List faculty members",
         description="Public list of active faculty members for the website faculty directory.",
         tags=WEBSITE_TAG,
     ),
     retrieve=extend_schema(
-        operation_id="WebsiteFacultyRetrieve",
         summary="Get a faculty member",
         description="Retrieve a single faculty member by id.",
         tags=WEBSITE_TAG,

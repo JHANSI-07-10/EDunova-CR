@@ -1067,7 +1067,7 @@ class AdmissionEnquiriesView(AdminMixin, APIView):
             OpenApiParameter("status", type=OpenApiTypes.STR, location=OpenApiParameter.QUERY, required=False),
             OpenApiParameter("search", type=OpenApiTypes.STR, location=OpenApiParameter.QUERY, required=False),
         ],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         qs = AdmissionEnquiry.objects.all().order_by("-submitted_at")
@@ -1088,8 +1088,8 @@ class AdmissionEnquiriesView(AdminMixin, APIView):
         summary="Register a manual admission enquiry",
         description="Creates an admission enquiry from the admin 'Register Admission' form (father_* fields are mapped to parent_*).",
         tags=["Admissions"],
-        request=serializers.DictField(),
-        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={201: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request):
         d = request.data
@@ -1144,7 +1144,7 @@ class AdmissionApplicationDetailView(AdminMixin, APIView):
         summary="Admission application detail",
         description="Full application record with workflow state, documents, fee and allocation.",
         tags=["Admissions"],
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def get(self, request, registration_number):
         try:
@@ -1162,7 +1162,7 @@ class AdmissionEligibilityView(AdminMixin, APIView):
         summary="Run admission eligibility check",
         description="Evaluates age, academics and documents against the target class and flags duplicates.",
         tags=["Admissions"],
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request, registration_number):
         try:
@@ -1250,8 +1250,8 @@ class AdmissionWorkflowActionView(AdminMixin, APIView):
         summary="Admission workflow panel action",
         description="Executes a workflow action for a panel (counselling, interview, seat, decision, fee, confirm, allocation, modules).",
         tags=["Admissions"],
-        request=serializers.DictField(),
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request, registration_number, panel):
         try:
@@ -1404,7 +1404,7 @@ class AdmissionNotificationsView(AdminMixin, APIView):
         summary="Admission workflow notifications",
         description="Lists workflow notifications for an application.",
         tags=["Admissions"],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request, registration_number):
         if not AdmissionEnquiry.objects.filter(registration_number=registration_number).exists():
@@ -1449,7 +1449,7 @@ class AdmissionReportsView(AdminMixin, APIView):
         summary="Admission reports overview",
         description="Aggregate admission analytics: totals, status/source/gender/curriculum breakdowns and fee collected.",
         tags=["Admissions"],
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def get(self, request):
         qs = AdmissionEnquiry.objects.all()
@@ -2666,7 +2666,6 @@ class ContactMessagesView(AdminMixin, APIView):
     here for the admin portal."""
 
     @extend_schema(
-        operation_id="AdminContactMessagesList",
         summary="List contact form submissions",
         description="Returns all public contact-page submissions, newest first.",
         tags=["Contact"],
@@ -2690,7 +2689,6 @@ class ContactMessagesView(AdminMixin, APIView):
         )
 
     @extend_schema(
-        operation_id="AdminContactMessageResolve",
         summary="Mark a contact submission resolved / unresolved",
         description="Toggles is_resolved on a single contact submission.",
         tags=["Contact"],

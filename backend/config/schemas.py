@@ -29,6 +29,22 @@ class _GenericObjectSerializer(serializers.Serializer):
 class EduNovaAutoSchema(AutoSchema):
     """AutoSchema that keeps serializer-less raw-SQL views documented."""
 
+    def get_operation_id(self):
+        """Make auto-generated operation ids collision-free for multi-route views.
+
+        drf-spectacular strips path variables when tokenizing the path, so a
+        view class mounted at BOTH /items/ and /items/{id}/ (list + detail)
+        produces the same operation id and triggers a "has collisions" warning
+        with numeral suffixes. Detail routes keep the variable in `self.path`,
+        so append a stable `_item` marker there to make every id unique.
+        Explicit operation_ids from @extend_schema are unaffected (they use a
+        generated subclass that returns the literal value).
+        """
+        operation_id = super().get_operation_id()
+        if "{" in getattr(self, "path", ""):
+            operation_id = f"{operation_id}_item"
+        return operation_id
+
     def _get_serializer(self):
         view = self.view
         context = build_serializer_context(view)

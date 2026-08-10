@@ -5,6 +5,7 @@ Backs the admin Recruitment page:
   GET/POST/PATCH /admin-portal/interviews/  list / schedule / update interviews
 """
 from django.utils.dateparse import parse_datetime
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
@@ -47,7 +48,7 @@ class RecruitmentView(APIView):
         summary="List job applications",
         description="Returns all candidate applications, newest first, with the job title resolved.",
         tags=["Recruitment"],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         qs = JobApplication.objects.select_related("job_posting").order_by("-applied_at")
@@ -58,8 +59,8 @@ class RecruitmentView(APIView):
         summary="Update application status",
         description="Update the review status (Pending / Interview / Hired / Rejected) of an application.",
         tags=["Recruitment"],
-        request=serializers.DictField(),
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def patch(self, request):
         app_id = request.data.get("id")
@@ -86,7 +87,7 @@ class InterviewView(APIView):
         summary="List interviews",
         description="Returns applications that have been scheduled for interview.",
         tags=["Recruitment"],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         qs = JobApplication.objects.select_related("job_posting").filter(interview_status__in=["Scheduled", "Completed", "Cancelled"]).order_by("-interview_date")
@@ -97,8 +98,8 @@ class InterviewView(APIView):
         summary="Schedule an interview",
         description="Sets interview date, interviewer and location/link for an application and marks it Scheduled.",
         tags=["Recruitment"],
-        request=serializers.DictField(),
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request):
         app_id = request.data.get("application_id")
@@ -128,8 +129,8 @@ class InterviewView(APIView):
         summary="Update interview",
         description="Mark an interview Completed or Cancelled, with optional feedback.",
         tags=["Recruitment"],
-        request=serializers.DictField(),
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def patch(self, request):
         interview_id = request.data.get("id")

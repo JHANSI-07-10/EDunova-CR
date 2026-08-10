@@ -6,6 +6,7 @@
 """
 from django.db import connection
 from django.utils.crypto import get_random_string
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
@@ -22,7 +23,7 @@ class StudentRevaluationView(StudentOnlyMixin, APIView):
         summary="List revaluation requests",
         description="Returns the student's revaluation requests.",
         tags=["Student"],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         if not table_exists("portal_revaluation"):
@@ -39,8 +40,8 @@ class StudentRevaluationView(StudentOnlyMixin, APIView):
         summary="Request revaluation",
         description="Files a revaluation request for one of the student's results.",
         tags=["Student"],
-        request=serializers.DictField(),
-        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={201: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request):
         result_id = request.data.get("result_id")
@@ -81,7 +82,7 @@ class StudentSupplementaryView(StudentOnlyMixin, APIView):
         summary="List supplementary registrations",
         description="Returns the student's supplementary exam registrations.",
         tags=["Student"],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         if not table_exists("portal_supplementary_request"):
@@ -98,8 +99,8 @@ class StudentSupplementaryView(StudentOnlyMixin, APIView):
         summary="Register for a supplementary exam",
         description="Registers the student for a supplementary exam in a failed subject.",
         tags=["Student"],
-        request=serializers.DictField(),
-        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={201: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request):
         subject_id = request.data.get("subject_id")
@@ -144,7 +145,7 @@ class StudentAcademicCertificatesView(StudentOnlyMixin, APIView):
         summary="List certificates",
         description="Returns the student's certificate requests.",
         tags=["Student"],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         if not table_exists("portal_certificate_request"):
@@ -161,8 +162,8 @@ class StudentAcademicCertificatesView(StudentOnlyMixin, APIView):
         summary="Request a certificate",
         description="Files a certificate request for the student.",
         tags=["Student"],
-        request=serializers.DictField(),
-        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={201: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request):
         cert_type = request.data.get("certificate_type")

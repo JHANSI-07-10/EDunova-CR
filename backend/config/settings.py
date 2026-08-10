@@ -147,6 +147,11 @@ STATIC_URL = "static/"
 # by the container entrypoint (entrypoint.sh runs collectstatic --noinput);
 # without it the deploy crashes with ImproperlyConfigured.
 STATIC_ROOT = BASE_DIR / "staticfiles"
+# Safety net: if a deploy skips collectstatic (plain-gunicorn Render start
+# command instead of the Docker entrypoint), WhiteNoise falls back to Django's
+# static finders so admin/Swagger CSS+JS are still served — never a plain,
+# unstyled HTML page. collectstatic remains the primary path.
+WHITENOISE_USE_FINDERS = True
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 

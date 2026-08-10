@@ -9,6 +9,7 @@ All entities are Django-managed models in apps.cms (they are NOT the raw
 portal_class / portal_subject tables, which are managed via SimpleTableView).
 """
 from django.db import IntegrityError
+from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
 from rest_framework import serializers
 from rest_framework.response import Response
@@ -48,7 +49,7 @@ class AcademicCrudView(APIView):
         summary="List records",
         description="Returns all records for this academic entity.",
         tags=["Academic"],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         objs = self.model.objects.all()
@@ -59,8 +60,8 @@ class AcademicCrudView(APIView):
         summary="Create record",
         description="Creates a new record.",
         tags=["Academic"],
-        request=serializers.DictField(),
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request):
         try:
@@ -75,8 +76,8 @@ class AcademicCrudView(APIView):
         summary="Update record",
         description="Partially updates a record by id.",
         tags=["Academic"],
-        request=serializers.DictField(),
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def patch(self, request, pk):
         try:
@@ -97,7 +98,7 @@ class AcademicCrudView(APIView):
         summary="Delete record",
         description="Deletes a record by id.",
         tags=["Academic"],
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def delete(self, request, pk):
         try:
@@ -173,7 +174,7 @@ class AcademicDashboardView(APIView):
         summary="Academic dashboard stats",
         description="Aggregate counts across all academic content plus recent items.",
         tags=["Academic"],
-        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+        responses={200: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def get(self, request):
         def count(model):

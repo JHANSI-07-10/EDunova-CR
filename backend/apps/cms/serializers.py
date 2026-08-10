@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 from .models import (
     SchoolSettings, Campus, AcademicProgram, Department, LeadershipMember,
@@ -52,6 +53,7 @@ class FacultyMemberSerializer(serializers.ModelSerializer):
             "specializations", "achievements", "bio",
         ]
 
+    @extend_schema_field(serializers.URLField(allow_null=True))
     def get_photo_url(self, obj):
         if not obj.photo:
             return None

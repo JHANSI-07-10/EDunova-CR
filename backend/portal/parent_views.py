@@ -1267,7 +1267,7 @@ class ParentReportCardView(ParentMixin, APIView):
         tags=["Parent"],
         parameters=[CHILD_ID_PARAMETER, EXAM_NAME_PARAMETER],
         responses={
-            200: serializers.DictField(),
+            200: OpenApiTypes.OBJECT,
             400: ValidationErrorSerializer,
             403: DetailErrorSerializer,
         },
@@ -1293,7 +1293,7 @@ class ParentRevaluationView(ParentMixin, APIView):
         description="Returns revaluation requests for one of the parent's children.",
         tags=["Parent"],
         parameters=[CHILD_ID_PARAMETER],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         child_id = request.query_params.get("child_id")
@@ -1313,8 +1313,8 @@ class ParentRevaluationView(ParentMixin, APIView):
         summary="Request revaluation",
         description="Files a revaluation request for one of the parent's children.",
         tags=["Parent"],
-        request=serializers.DictField(),
-        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={201: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request):
         d = request.data
@@ -1363,7 +1363,7 @@ class ParentCertificatesView(ParentMixin, APIView):
         description="Returns certificate requests/issued certificates for one of the parent's children.",
         tags=["Parent"],
         parameters=[CHILD_ID_PARAMETER],
-        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
     def get(self, request):
         child_id = request.query_params.get("child_id")
@@ -1383,8 +1383,8 @@ class ParentCertificatesView(ParentMixin, APIView):
         summary="Request a certificate",
         description="Files a certificate request for one of the parent's children.",
         tags=["Parent"],
-        request=serializers.DictField(),
-        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+        request=OpenApiTypes.OBJECT,
+        responses={201: OpenApiTypes.OBJECT, **ERROR_RESPONSES},
     )
     def post(self, request):
         d = request.data
