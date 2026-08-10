@@ -14,12 +14,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps first so the layer is cached until requirements change.
-# --only-binary :all: prevents dependency setup scripts from running inside the
-# image (all pinned requirements ship wheels for python:3.12-slim).
-COPY requirements.txt ./
+# Install Python deps first so the layer is cached until the lock changes.
+# requirements.lock is the hash-locked resolution for python:3.12-slim
+# (see the header of that file); --require-hashes makes every wheel hash-verified
+# and --only-binary :all: prevents any setup script from running in the image.
+COPY requirements.lock ./
 RUN python -m pip install --upgrade "pip==25.0.1" \
-    && python -m pip install --only-binary :all: -r requirements.txt
+    && python -m pip install --require-hashes --only-binary=:all: -r requirements.lock
 
 # Copy only the application code — never build artifacts, env files or docs.
 COPY manage.py entrypoint.sh pyproject.toml runtime.txt ./

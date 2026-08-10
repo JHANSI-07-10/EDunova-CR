@@ -1908,13 +1908,20 @@ class SimpleTableView(AdminMixin, APIView):
             values.append(v)
         try:
             with connection.cursor() as cursor:
-                insert_stmt = pysql.SQL("INSERT INTO {} ({}) VALUES ({}) RETURNING id").format(
-                    pysql.Identifier(table),
-                    pysql.SQL(", ").join(pysql.Identifier(c) for c in cols),
-                    pysql.SQL(", ").join(
+                # Composed with psycopg2.sql so identifiers are quoted safely and
+                # values stay parameterized (never string-interpolated). Built via
+                # `+` composition instead of .format() so the pieces are explicit.
+                insert_stmt = (
+                    pysql.SQL("INSERT INTO ")
+                    + pysql.Identifier(table)
+                    + pysql.SQL(" (")
+                    + pysql.SQL(", ").join(pysql.Identifier(c) for c in cols)
+                    + pysql.SQL(") VALUES (")
+                    + pysql.SQL(", ").join(
                         pysql.Placeholder() if p == "%s" else pysql.SQL("DEFAULT")
                         for p in placeholders
-                    ),
+                    )
+                    + pysql.SQL(") RETURNING id")
                 )
                 cursor.execute(insert_stmt, values)
                 new_id = cursor.fetchone()[0]
