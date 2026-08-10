@@ -1846,6 +1846,30 @@ _SIMPLE_TABLE_WHITELIST = frozenset({
 })
 
 
+def _compose_insert_statement(table, cols, placeholders):
+    """Compose a parameterized INSERT statement using psycopg2.sql.
+
+    Table and column names are quoted via ``Identifier`` (nothing is
+    string-interpolated) and values are always passed as separate bind
+    parameters; the pieces marked ``DEFAULT`` map empty-payload columns to
+    their per-column database default. Kept in its own helper so the
+    request-handling path only ever executes the composed, parameterized
+    statement.
+    """
+    return (
+        pysql.SQL("INSERT INTO ")
+        + pysql.Identifier(table)
+        + pysql.SQL(" (")
+        + pysql.SQL(", ").join(pysql.Identifier(c) for c in cols)
+        + pysql.SQL(") VALUES (")
+        + pysql.SQL(", ").join(
+            pysql.Placeholder() if p == "%s" else pysql.SQL("DEFAULT")
+            for p in placeholders
+        )
+        + pysql.SQL(") RETURNING id")
+    )
+
+
 class SimpleTableView(AdminMixin, APIView):
     table = None
     columns = ()          # columns accepted on create, in order
@@ -1908,22 +1932,9 @@ class SimpleTableView(AdminMixin, APIView):
             values.append(v)
         try:
             with connection.cursor() as cursor:
-                # Composed with psycopg2.sql so identifiers are quoted safely and
-                # values stay parameterized (never string-interpolated). Built via
-                # `+` composition instead of .format() so the pieces are explicit.
-                insert_stmt = (
-                    pysql.SQL("INSERT INTO ")
-                    + pysql.Identifier(table)
-                    + pysql.SQL(" (")
-                    + pysql.SQL(", ").join(pysql.Identifier(c) for c in cols)
-                    + pysql.SQL(") VALUES (")
-                    + pysql.SQL(", ").join(
-                        pysql.Placeholder() if p == "%s" else pysql.SQL("DEFAULT")
-                        for p in placeholders
-                    )
-                    + pysql.SQL(") RETURNING id")
+                cursor.execute(
+                    _compose_insert_statement(table, cols, placeholders), values
                 )
-                cursor.execute(insert_stmt, values)
                 new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response(
