@@ -53,7 +53,7 @@ class Command(BaseCommand):
         admin.last_name = "Lakshmi"
         admin.is_staff = True
         admin.is_superuser = True
-        admin.set_password("Edunova@123")
+        admin.set_password("Edunova@1234")
         admin.save()
         admin.groups.add(admin_group)
 
@@ -127,5 +127,5 @@ class Command(BaseCommand):
         self.stdout.write("")
         self.stdout.write("Admin Login")
         self.stdout.write("Email    : jhansilakshmi1004@gmail.com")
-        self.stdout.write("Password : Edunova@123")
+        self.stdout.write("Password : Edunova@1234")
         self.stdout.write("======================================")
