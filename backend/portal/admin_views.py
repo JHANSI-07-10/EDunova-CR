@@ -5,8 +5,9 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.contrib.auth.models import Group
-from django.db import connection, transaction
+from django.db import connection, models, transaction
 from django.utils.crypto import get_random_string
+from django.utils.dateparse import parse_datetime
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     extend_schema,
@@ -19,7 +20,7 @@ from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.admissions.models import AdmissionEnquiry
+from apps.admissions.models import AdmissionEnquiry, generate_registration_number
 from apps.cms.models import ContactSubmission
 from .doc_schemas import (
     DetailErrorSerializer,
@@ -721,10 +722,19 @@ class AdminDashboardView(AdminMixin, APIView):
 # -> Confirmed/Rejected), including credential generation on Confirmed.
 # ---------------------------------------------------------------------------
 NEXT_STATUS = {
-    "Registered": "Verification",
-    "Verification": "Screening",
-    "Screening": "Fee_Pending",
-    "Fee_Pending": "Confirmed",
+    "Enquiry": "Registered",
+    "Registered": "Counselling_Pending",
+    "Counselling_Pending": "Counselling_Done",
+    "Counselling_Done": "Verification",
+    "Verification": "Eligibility_Check",
+    "Eligibility_Check": "Screening",
+    "Screening": "Interview_Pending",
+    "Interview_Pending": "Interview_Done",
+    "Interview_Done": "Seat_Available",
+    "Seat_Available": "Fee_Pending",
+    "Seat_Waitlisted": "Fee_Pending",
+    "Fee_Pending": "Approved",
+    "Approved": "Confirmed",
 }
 
 
@@ -947,6 +957,530 @@ class AdmissionActionView(AdminMixin, APIView):
             return Response(serialise(payload))
 
         return Response({"detail": "Unknown action. Use 'advance' or 'reject'."}, status=400)
+
+
+# ---------------------------------------------------------------------------
+# Admissions workflow — full 12-phase pipeline (frontend Admissions.jsx)
+# ---------------------------------------------------------------------------
+DOC_FIELDS = [
+    "doc_birth_certificate",
+    "doc_aadhaar_card",
+    "doc_passport_photo",
+    "doc_parent_id",
+    "doc_address_proof",
+    "doc_previous_marks",
+    "doc_transfer_certificate",
+]
+
+
+def _admission_list_payload(e):
+    return {
+        "registration_number": e.registration_number,
+        "applicant_name": e.applicant_name,
+        "date_of_birth": serialise(e.date_of_birth),
+        "gender": e.gender,
+        "target_class": e.target_class,
+        "curriculum": e.curriculum or "CBSE",
+        "parent_name": e.parent_name,
+        "parent_phone": e.parent_phone,
+        "parent_email": e.parent_email,
+        "preferred_branch": e.preferred_branch,
+        "source_of_enquiry": e.source_of_enquiry,
+        "scholarship_applied": e.scholarship_applied,
+        "status": e.status,
+        "counselling_status": e.counselling_status or "",
+        "is_eligible": e.is_eligible,
+        "interview_required": e.interview_required,
+        "interview_result": e.interview_result or "",
+        "seat_allocated": e.seat_allocated,
+        "allocated_class": e.allocated_class,
+        "allocated_section": e.allocated_section,
+        "is_waitlisted": e.is_waitlisted,
+        "fee_paid": e.fee_paid,
+        "rejection_reason": e.rejection_reason,
+        "submitted_at": serialise(e.submitted_at),
+    }
+
+
+def _admission_detail_payload(e):
+    payload = _admission_list_payload(e)
+    payload.update({
+        "father_name": e.father_name,
+        "father_phone": e.father_phone,
+        "father_email": e.father_email,
+        "mother_name": e.mother_name,
+        "mother_phone": e.mother_phone,
+        "address": e.address,
+        "city": e.city,
+        "state": e.state,
+        "pincode": e.pincode,
+        "has_medical_conditions": e.has_medical_conditions,
+        "medical_details": e.medical_details,
+        "blood_group": e.blood_group,
+        "prev_school_name": e.prev_school_name,
+        "prev_school_grade": e.prev_school_grade,
+        "percentage": e.percentage,
+        "interview_date": serialise(e.interview_date),
+        "waitlist_position": e.waitlist_position,
+        "fee": {
+            "total_amount": float(e.fee_amount or 0),
+            "scholarship_discount": float(e.scholarship_discount or 0),
+            "net_amount": float(e.net_fee or 0),
+        } if (e.fee_amount or e.net_fee or e.scholarship_discount) else None,
+        "allocation": {
+            "class_id": e.allocated_class,
+            "section": e.allocated_section,
+            "house": e.house,
+            "roll_number": e.student_roll_number,
+        } if (e.allocated_class or e.allocated_section or e.student_roll_number) else None,
+    })
+    for field in DOC_FIELDS:
+        f = getattr(e, field, None)
+        payload[field] = f.url if f else None
+    return payload
+
+
+def _add_notification(title, message, sender_id=None, recipient_type="All"):
+    """Insert an admission workflow notification into portal_notification."""
+    if not table_exists("portal_notification"):
+        return
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "INSERT INTO portal_notification (sender_id, recipient_type, title, message) "
+            "VALUES (%s, %s, %s, %s)",
+            [sender_id, recipient_type, title, message],
+        )
+
+
+class AdmissionEnquiriesView(AdminMixin, APIView):
+    """GET  /admin-portal/admissions/enquiries/  (list with search+status filters)
+    POST /admin-portal/admissions/enquiries/  (manual registration form)"""
+
+    @extend_schema(
+        operation_id="AdminAdmissionEnquiriesList",
+        summary="List admission enquiries",
+        description="Returns admission applications with optional status and search (name/email/reg no) filters.",
+        tags=["Admissions"],
+        parameters=[
+            OpenApiParameter("status", type=OpenApiTypes.STR, location=OpenApiParameter.QUERY, required=False),
+            OpenApiParameter("search", type=OpenApiTypes.STR, location=OpenApiParameter.QUERY, required=False),
+        ],
+        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        qs = AdmissionEnquiry.objects.all().order_by("-submitted_at")
+        status_filter = request.query_params.get("status")
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        search = request.query_params.get("search", "").strip()
+        if search:
+            qs = qs.filter(
+                models.Q(applicant_name__icontains=search)
+                | models.Q(parent_email__icontains=search)
+                | models.Q(registration_number__icontains=search)
+            )
+        return Response(serialise([_admission_list_payload(e) for e in qs[:200]]))
+
+    @extend_schema(
+        operation_id="AdminAdmissionEnquiryCreate",
+        summary="Register a manual admission enquiry",
+        description="Creates an admission enquiry from the admin 'Register Admission' form (father_* fields are mapped to parent_*).",
+        tags=["Admissions"],
+        request=serializers.DictField(),
+        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        d = request.data
+        applicant_name = (d.get("applicant_name") or "").strip()
+        if not applicant_name:
+            return Response({"detail": "Applicant name is required."}, status=400)
+        dob = d.get("date_of_birth")
+        if not dob:
+            return Response({"detail": "Date of birth is required."}, status=400)
+
+        # Manual form sends father_* fields; model requires parent_*.
+        parent_name = d.get("parent_name") or d.get("father_name") or applicant_name
+        parent_phone = d.get("parent_phone") or d.get("father_phone") or ""
+        parent_email = d.get("parent_email") or d.get("father_email") or ""
+        if not parent_phone:
+            return Response({"detail": "Parent phone is required."}, status=400)
+        if not parent_email:
+            return Response({"detail": "Parent email is required."}, status=400)
+
+        enquiry = AdmissionEnquiry.objects.create(
+            registration_number=generate_registration_number(),
+            applicant_name=applicant_name,
+            date_of_birth=dob,
+            gender=d.get("gender", "Male"),
+            target_class=d.get("target_class", "Class 1"),
+            parent_name=parent_name,
+            parent_phone=parent_phone,
+            parent_email=parent_email,
+            father_name=d.get("father_name", ""),
+            father_phone=d.get("father_phone", ""),
+            father_email=d.get("father_email", ""),
+            address=d.get("address", ""),
+            source_of_enquiry=d.get("source_of_enquiry", "Walk-in"),
+            preferred_branch=d.get("preferred_branch", ""),
+            curriculum=d.get("curriculum", "CBSE"),
+            scholarship_applied=bool(d.get("scholarship_applied", False)),
+            status="Registered",
+            reviewed_by=request.user.get_full_name() or request.user.username,
+        )
+        log_action(request.user, "admission.manual_register", "admission", enquiry.registration_number)
+        return Response(serialise({
+            "detail": "Admission registered successfully.",
+            "registration_number": enquiry.registration_number,
+        }), status=201)
+
+
+class AdmissionApplicationDetailView(AdminMixin, APIView):
+    """GET /admin-portal/admissions/<reg>/application/"""
+
+    @extend_schema(
+        operation_id="AdminAdmissionApplicationDetail",
+        summary="Admission application detail",
+        description="Full application record with workflow state, documents, fee and allocation.",
+        tags=["Admissions"],
+        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+    )
+    def get(self, request, registration_number):
+        try:
+            enquiry = AdmissionEnquiry.objects.get(registration_number=registration_number)
+        except AdmissionEnquiry.DoesNotExist:
+            return Response({"detail": "Application not found."}, status=404)
+        return Response(serialise(_admission_detail_payload(enquiry)))
+
+
+class AdmissionEligibilityView(AdminMixin, APIView):
+    """POST /admin-portal/admissions/<reg>/eligibility/ — runs the eligibility check."""
+
+    @extend_schema(
+        operation_id="AdminAdmissionEligibilityCheck",
+        summary="Run admission eligibility check",
+        description="Evaluates age, academics and documents against the target class and flags duplicates.",
+        tags=["Admissions"],
+        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+    )
+    def post(self, request, registration_number):
+        try:
+            enquiry = AdmissionEnquiry.objects.get(registration_number=registration_number)
+        except AdmissionEnquiry.DoesNotExist:
+            return Response({"detail": "Application not found."}, status=404)
+
+        # Age check vs. typical age for target class (Class N -> age N+5).
+        import re as _re
+        m = _re.search(r"(\d+)", enquiry.target_class or "")
+        expected_age = (int(m.group(1)) + 5) if m else 6
+        age = None
+        age_reason = "Date of birth not provided."
+        if enquiry.date_of_birth:
+            age = (date.today() - enquiry.date_of_birth).days / 365.25
+            if abs(age - expected_age) <= 2.5:
+                age_reason = f"Age {age:.1f} years is within range for {enquiry.target_class} (typical {expected_age})."
+            else:
+                age_reason = f"Age {age:.1f} years is outside the typical range for {enquiry.target_class} (expected ~{expected_age})."
+        age_eligible = age is not None and abs(age - expected_age) <= 2.5
+
+        # Academic check: percentage present and reasonable, or previous school recorded.
+        academic_reason = "No previous academic record provided."
+        academic_eligible = False
+        try:
+            pct = float(enquiry.percentage) if enquiry.percentage else None
+        except (TypeError, ValueError):
+            pct = None
+        if pct is not None and 0 <= pct <= 100:
+            academic_eligible = pct >= 35
+            academic_reason = f"Previous percentage {pct}% recorded." if academic_eligible else f"Previous percentage {pct}% is below the 35% minimum."
+        elif enquiry.prev_school_name:
+            academic_eligible = True
+            academic_reason = f"Previous school {enquiry.prev_school_name} recorded."
+
+        # Documents check.
+        missing = [f for f in DOC_FIELDS if not getattr(enquiry, f, None)]
+        documents_eligible = len(missing) == 0
+        documents_reason = "All required documents uploaded." if documents_eligible else f"Missing: {', '.join(missing)}."
+
+        # Duplicate check on parent phone/email across active applications.
+        duplicate = AdmissionEnquiry.objects.exclude(pk=enquiry.pk).filter(
+            models.Q(parent_phone=enquiry.parent_phone) | models.Q(parent_email__iexact=enquiry.parent_email)
+        ).exclude(status__in=["Rejected", "Withdrawn"]).exists()
+
+        overall = age_eligible and academic_eligible and documents_eligible
+        enquiry.is_eligible = overall
+        enquiry.eligibility_notes = f"{age_reason} {academic_reason} {documents_reason}"
+        enquiry.status = "Eligibility_Check"
+        enquiry.save(update_fields=["is_eligible", "eligibility_notes", "status"])
+        log_action(request.user, "admission.eligibility", "admission", registration_number, {"eligible": overall})
+        return Response({
+            "age_eligible": age_eligible,
+            "age_reason": age_reason,
+            "academic_eligible": academic_eligible,
+            "academic_reason": academic_reason,
+            "documents_eligible": documents_eligible,
+            "documents_reason": documents_reason,
+            "duplicate_check": duplicate,
+            "overall_eligible": overall,
+        })
+
+
+class AdmissionWorkflowActionView(AdminMixin, APIView):
+    """POST /admin-portal/admissions/<reg>/<panel>/ for counselling, interview,
+    seat, decision, fee, confirm, allocation and modules panels."""
+
+    @extend_schema(
+        operation_id="AdminAdmissionPanelAction",
+        summary="Admission workflow panel action",
+        description="Executes a workflow action for a panel (counselling, interview, seat, decision, fee, confirm, allocation, modules).",
+        tags=["Admissions"],
+        request=serializers.DictField(),
+        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+    )
+    def post(self, request, registration_number, panel):
+        try:
+            enquiry = AdmissionEnquiry.objects.get(registration_number=registration_number)
+        except AdmissionEnquiry.DoesNotExist:
+            return Response({"detail": "Application not found."}, status=404)
+
+        d = request.data
+        if panel == "counselling":
+            action = d.get("action")
+            if action == "assign_counsellor":
+                enquiry.counsellor_id = d.get("counsellor_id") or enquiry.counsellor_id
+                enquiry.counselling_status = "Assigned"
+                enquiry.status = "Counselling_Pending"
+                enquiry.save()
+                _add_notification("Counselling assigned", f"A counsellor has been assigned for {enquiry.applicant_name}.", request.user.id)
+            elif action == "complete_counselling":
+                enquiry.counselling_status = "Completed"
+                enquiry.counselling_notes = d.get("notes", enquiry.counselling_notes)
+                enquiry.counselling_date = date.today()
+                enquiry.status = "Counselling_Done"
+                enquiry.save()
+                _add_notification("Counselling completed", f"Counselling completed for {enquiry.applicant_name}.", request.user.id)
+            else:
+                return Response({"detail": "Unknown counselling action."}, status=400)
+            log_action(request.user, "admission.counselling", "admission", registration_number, {"action": action})
+            return Response(serialise(_admission_detail_payload(enquiry)))
+
+        if panel == "interview":
+            action = d.get("action")
+            if action == "schedule":
+                raw = d.get("interview_date")
+                parsed = parse_datetime(raw) if raw else None
+                if raw and not parsed:
+                    return Response({"detail": "Invalid interview_date format."}, status=400)
+                enquiry.interview_date = parsed
+                enquiry.interview_required = True
+                enquiry.interview_scheduled = True
+                enquiry.interview_result = "Scheduled"
+                enquiry.status = "Interview_Pending"
+                enquiry.save()
+                _add_notification("Interview scheduled", f"Interview scheduled for {enquiry.applicant_name}.", request.user.id)
+            elif action == "complete":
+                enquiry.interview_result = d.get("recommendation", "Recommended")
+                enquiry.status = "Interview_Done"
+                enquiry.save()
+                _add_notification("Interview completed", f"Interview completed with result: {enquiry.interview_result}.", request.user.id)
+            else:
+                return Response({"detail": "Unknown interview action."}, status=400)
+            log_action(request.user, "admission.interview", "admission", registration_number, {"action": action})
+            return Response(serialise(_admission_detail_payload(enquiry)))
+
+        if panel == "seat":
+            action = d.get("action")
+            if action == "allocate":
+                enquiry.seat_allocated = True
+                enquiry.is_waitlisted = False
+                enquiry.allocated_class = enquiry.target_class
+                enquiry.allocated_section = d.get("section", "A")
+                enquiry.status = "Seat_Available"
+                enquiry.save()
+                _add_notification("Seat allocated", f"Seat allocated to {enquiry.applicant_name} in {enquiry.allocated_class}-{enquiry.allocated_section}.", request.user.id)
+            elif action == "waitlist":
+                enquiry.is_waitlisted = True
+                enquiry.seat_allocated = False
+                enquiry.waitlist_position = (enquiry.waitlist_position or 0) + 1
+                enquiry.status = "Seat_Waitlisted"
+                enquiry.save()
+                _add_notification("Waitlisted", f"{enquiry.applicant_name} added to the waitlist.", request.user.id)
+            else:
+                return Response({"detail": "Unknown seat action."}, status=400)
+            log_action(request.user, "admission.seat", "admission", registration_number, {"action": action})
+            return Response(serialise(_admission_detail_payload(enquiry)))
+
+        if panel == "decision":
+            action = d.get("action")
+            if action != "approve":
+                return Response({"detail": "Unknown decision action."}, status=400)
+            try:
+                enquiry.fee_amount = float(d.get("fee_amount") or 0)
+                enquiry.scholarship_discount = float(d.get("scholarship_discount") or 0)
+            except (TypeError, ValueError):
+                return Response({"detail": "Invalid fee amount."}, status=400)
+            enquiry.net_fee = enquiry.fee_amount - enquiry.scholarship_discount
+            enquiry.status = "Approved"
+            enquiry.save()
+            _add_notification("Admission approved", f"Admission approved for {enquiry.applicant_name}. Invoice generated for ₹{enquiry.net_fee}.", request.user.id)
+            log_action(request.user, "admission.approve", "admission", registration_number, {"fee": float(enquiry.fee_amount)})
+            return Response(serialise(_admission_detail_payload(enquiry)))
+
+        if panel == "fee":
+            action = d.get("action")
+            if action != "pay":
+                return Response({"detail": "Unknown fee action."}, status=400)
+            enquiry.fee_paid = True
+            enquiry.fee_transaction_id = d.get("transaction_id", "") or get_random_string(12).upper()
+            enquiry.save()
+            _add_notification("Payment recorded", f"Fee payment of ₹{enquiry.net_fee} recorded for {enquiry.applicant_name}.", request.user.id)
+            log_action(request.user, "admission.fee_paid", "admission", registration_number)
+            return Response(serialise(_admission_detail_payload(enquiry)))
+
+        if panel == "confirm":
+            if enquiry.status not in ("Approved", "Fee_Pending", "Confirmed"):
+                return Response({"detail": f"Cannot confirm from status '{enquiry.status}'."}, status=400)
+            enquiry.status = "Confirmed"
+            enquiry.save()
+            student, parent, credentials = _generate_credentials(enquiry)
+            _add_notification("Admission confirmed", f"Admission confirmed for {enquiry.applicant_name}. Login credentials generated.", request.user.id)
+            log_action(request.user, "admission.confirm", "admission", registration_number)
+            payload = {"status": enquiry.status, "credentials": credentials}
+            return Response(serialise(payload))
+
+        if panel == "allocation":
+            enquiry.allocated_class = d.get("class_id", enquiry.allocated_class) or enquiry.target_class
+            enquiry.allocated_section = d.get("section", enquiry.allocated_section or "A")
+            enquiry.house = d.get("house", enquiry.house)
+            enquiry.student_roll_number = d.get("roll_number", enquiry.student_roll_number)
+            enquiry.save()
+            log_action(request.user, "admission.allocation", "admission", registration_number)
+            return Response(serialise(_admission_detail_payload(enquiry)))
+
+        if panel == "modules":
+            module_type = d.get("module_type")
+            if module_type not in ("Transport", "Hostel", "Library", "LMS"):
+                return Response({"detail": "Invalid module type."}, status=400)
+            _add_notification(f"{module_type} allocated", f"{module_type} module allocated for {enquiry.applicant_name}.", request.user.id)
+            log_action(request.user, "admission.module_allocated", "admission", registration_number, {"module": module_type})
+            return Response(serialise(_admission_detail_payload(enquiry)))
+
+        return Response({"detail": f"Unknown panel '{panel}'."}, status=400)
+
+
+class AdmissionNotificationsView(AdminMixin, APIView):
+    """GET /admin-portal/admissions/<reg>/notifications/"""
+
+    @extend_schema(
+        operation_id="AdminAdmissionNotifications",
+        summary="Admission workflow notifications",
+        description="Lists workflow notifications for an application.",
+        tags=["Admissions"],
+        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+    )
+    def get(self, request, registration_number):
+        if not AdmissionEnquiry.objects.filter(registration_number=registration_number).exists():
+            return Response({"detail": "Application not found."}, status=404)
+        if not table_exists("portal_notification"):
+            return Response([])
+        rs = rows(
+            "SELECT id, title, message, created_at FROM portal_notification "
+            "WHERE title ILIKE %s OR message ILIKE %s ORDER BY id DESC LIMIT 50",
+            [f"%{registration_number}%", f"%{registration_number}%"],
+        )
+        items = []
+        for r in rs or []:
+            items.append({
+                "id": r["id"],
+                "channel": "System",
+                "title": r["title"],
+                "message": r["message"],
+                "is_sent": True,
+                "created_at": serialise(r.get("created_at")),
+            })
+        # Fall back to most recent notifications when none match the reg number.
+        if not items:
+            rs = rows("SELECT id, title, message, created_at FROM portal_notification ORDER BY id DESC LIMIT 20")
+            for r in rs or []:
+                items.append({
+                    "id": r["id"],
+                    "channel": "System",
+                    "title": r["title"],
+                    "message": r["message"],
+                    "is_sent": True,
+                    "created_at": serialise(r.get("created_at")),
+                })
+        return Response(items)
+
+
+class AdmissionReportsView(AdminMixin, APIView):
+    """GET /admin-portal/admissions/reports/?type=overview"""
+
+    @extend_schema(
+        operation_id="AdminAdmissionReports",
+        summary="Admission reports overview",
+        description="Aggregate admission analytics: totals, status/source/gender/curriculum breakdowns and fee collected.",
+        tags=["Admissions"],
+        responses={200: serializers.DictField(), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        qs = AdmissionEnquiry.objects.all()
+        status_counts = {}
+        source_counts = {}
+        gender_counts = {}
+        curriculum_counts = {}
+        for e in qs:
+            status_counts[e.status] = status_counts.get(e.status, 0) + 1
+            src = e.source_of_enquiry or "Unknown"
+            source_counts[src] = source_counts.get(src, 0) + 1
+            g = e.gender or "Unknown"
+            gender_counts[g] = gender_counts.get(g, 0) + 1
+            c = e.curriculum or "CBSE"
+            curriculum_counts[c] = curriculum_counts.get(c, 0) + 1
+        fee_collected = sum(float(e.net_fee or 0) for e in qs.filter(fee_paid=True))
+        return Response({
+            "total_enquiries": qs.count(),
+            "fee_collected": fee_collected,
+            "status_counts": status_counts,
+            "source_counts": source_counts,
+            "gender_counts": gender_counts,
+            "curriculum_counts": curriculum_counts,
+        })
+
+
+class AdmissionReportExportView(AdminMixin, APIView):
+    """GET /admin-portal/admissions/report/ — CSV export of the pipeline."""
+
+    @extend_schema(
+        operation_id="AdminAdmissionReportExport",
+        summary="Export admissions report (CSV)",
+        description="Downloads all admission applications as a CSV file.",
+        tags=["Admissions"],
+        responses={200: OpenApiTypes.BINARY, **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        from django.http import HttpResponse
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="admissions-report.csv"'
+        import csv as _csv
+
+        writer = _csv.writer(response)
+        writer.writerow([
+            "Registration Number", "Applicant", "Date of Birth", "Gender", "Target Class",
+            "Curriculum", "Parent Name", "Parent Phone", "Parent Email", "Status",
+            "Counselling", "Eligible", "Interview", "Seat", "Fee Paid", "Submitted At",
+        ])
+        for e in AdmissionEnquiry.objects.all().order_by("-submitted_at"):
+            writer.writerow([
+                e.registration_number, e.applicant_name, e.date_of_birth, e.gender, e.target_class,
+                e.curriculum or "CBSE", e.parent_name, e.parent_phone, e.parent_email, e.status,
+                e.counselling_status or "", "Yes" if e.is_eligible else "No",
+                e.interview_result or ("Required" if e.interview_required else "Not Required"),
+                f"{e.allocated_class}-{e.allocated_section}" if e.seat_allocated else ("Waitlisted" if e.is_waitlisted else "Not allocated"),
+                "Yes" if e.fee_paid else "No",
+                e.submitted_at.strftime("%Y-%m-%d %H:%M") if e.submitted_at else "",
+            ])
+        return response
 
 
 # ---------------------------------------------------------------------------

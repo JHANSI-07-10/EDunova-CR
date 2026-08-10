@@ -87,6 +87,22 @@ export default function Admissions() {
 
   useEffect(() => { load(); }, [statusFilter, search]);
 
+  async function downloadReport() {
+    try {
+      const res = await api.get("/admin-portal/admissions/report/", { responseType: "blob" });
+      const url = window.URL.createObjectURL(new Blob([res.data]));
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "admissions-report.csv";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch {
+      setToast("Could not download the report.");
+    }
+  }
+
   const loadDetail = useCallback(async (regNo) => {
     try {
       const { data } = await api.get(`/admin-portal/admissions/${regNo}/application/`);
@@ -129,10 +145,10 @@ export default function Admissions() {
           <p className="text-xs text-ink-secondary">Complete 18-phase admission pipeline management.</p>
         </div>
         <div className="flex items-center gap-2">
-          <a href={`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/api\/?$/, "")}/admin-portal/admissions/report/`} target="_blank" rel="noopener noreferrer"
+          <button onClick={downloadReport}
              className="flex items-center gap-2 border border-slate-200 text-slate-700 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-50">
             <Download size={16} /> Download Report
-          </a>
+          </button>
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-2 bg-academic-blue text-white rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-academic-blue/90">
             <Plus size={16} /> Register Admission

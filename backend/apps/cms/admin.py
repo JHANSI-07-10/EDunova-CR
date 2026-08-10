@@ -5,6 +5,8 @@ from .models import (
     JobApplication, CampusVisitBooking,
     GalleryAlbum, GalleryImage, Achievement, Testimonial, FAQ, Document,
     JobPosting, ContactSubmission, ScholarshipInfo, FacultyMember,
+    AcademicLevel, ClassDetail, SubjectDetail, ClassSubjectMapping,
+    CurriculumEntry, FacultyProfile, FacultySubjectAssignment, AcademicDownload,
 )
 
 admin.site.register(SchoolSettings)
@@ -56,3 +58,50 @@ class CampusVisitBookingAdmin(admin.ModelAdmin):
     list_display = ["visitor_name", "visitor_email", "visitor_phone", "visit_date", "visit_time", "booked_at"]
     search_fields = ["visitor_name", "visitor_email", "visitor_phone"]
     readonly_fields = ["booked_at"]
+
+
+@admin.register(AcademicLevel)
+class AcademicLevelAdmin(admin.ModelAdmin):
+    list_display = ["name", "sort_order", "is_published"]
+    list_editable = ["sort_order", "is_published"]
+
+
+@admin.register(ClassDetail)
+class ClassDetailAdmin(admin.ModelAdmin):
+    list_display = ["class_id", "academic_level", "is_published"]
+    list_filter = ["is_published"]
+
+
+@admin.register(SubjectDetail)
+class SubjectDetailAdmin(admin.ModelAdmin):
+    list_display = ["subject_id", "is_published"]
+    list_filter = ["is_published"]
+
+
+@admin.register(ClassSubjectMapping)
+class ClassSubjectMappingAdmin(admin.ModelAdmin):
+    list_display = ["class_id", "subject_id", "is_compulsory", "sort_order"]
+    list_editable = ["is_compulsory", "sort_order"]
+
+
+@admin.register(CurriculumEntry)
+class CurriculumEntryAdmin(admin.ModelAdmin):
+    list_display = ["class_id", "curriculum_name", "is_published"]
+    list_filter = ["curriculum_name", "is_published"]
+
+
+@admin.register(FacultyProfile)
+class FacultyProfileAdmin(admin.ModelAdmin):
+    list_display = ["user_id", "designation", "experience_years", "is_published"]
+    list_filter = ["is_published"]
+
+
+@admin.register(FacultySubjectAssignment)
+class FacultySubjectAssignmentAdmin(admin.ModelAdmin):
+    list_display = ["faculty_id", "class_id", "subject_id"]
+
+
+@admin.register(AcademicDownload)
+class AcademicDownloadAdmin(admin.ModelAdmin):
+    list_display = ["title", "file_type", "category", "is_published"]
+    list_filter = ["file_type", "category", "is_published"]

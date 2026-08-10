@@ -1,6 +1,10 @@
 from django.urls import path
 
-from . import auth_views, teacher_views, views, parent_views, admin_views, facilities_views, exam_extras_views, lms_extras_views, notification_views
+from . import (
+    auth_views, teacher_views, views, parent_views, admin_views, facilities_views,
+    exam_extras_views, lms_extras_views, notification_views,
+    recruitment_views, academic_views,
+)
 
 urlpatterns = [
     # Auth (credentials -> OTP -> JWT), shared by every portal
@@ -93,11 +97,40 @@ urlpatterns = [
     path("parent/ptm/", parent_views.PtmBookingView.as_view()),
     path("parent/feedback/", parent_views.FeedbackView.as_view()),
     path("parent/lms/progress/", parent_views.ParentLmsProgressView.as_view()),
+    path("parent/report-card/", parent_views.ParentReportCardView.as_view()),
+    path("parent/exams/revaluation/", parent_views.ParentRevaluationView.as_view()),
+    path("parent/exams/certificates/", parent_views.ParentCertificatesView.as_view()),
 
     # Admin portal
     path("admin-portal/dashboard/", admin_views.AdminDashboardView.as_view()),
     path("admin-portal/admissions/", admin_views.AdmissionListView.as_view()),
+    path("admin-portal/admissions/enquiries/", admin_views.AdmissionEnquiriesView.as_view()),
+    path("admin-portal/admissions/reports/", admin_views.AdmissionReportsView.as_view()),
+    path("admin-portal/admissions/report/", admin_views.AdmissionReportExportView.as_view()),
     path("admin-portal/admissions/<str:registration_number>/action/", admin_views.AdmissionActionView.as_view()),
+    path("admin-portal/admissions/<str:registration_number>/application/", admin_views.AdmissionApplicationDetailView.as_view()),
+    path("admin-portal/admissions/<str:registration_number>/eligibility/", admin_views.AdmissionEligibilityView.as_view()),
+    path("admin-portal/admissions/<str:registration_number>/notifications/", admin_views.AdmissionNotificationsView.as_view()),
+    path("admin-portal/admissions/<str:registration_number>/<str:panel>/", admin_views.AdmissionWorkflowActionView.as_view()),
+    path("admin-portal/recruitment/", recruitment_views.RecruitmentView.as_view()),
+    path("admin-portal/interviews/", recruitment_views.InterviewView.as_view()),
+    path("admin-portal/academic/class-details/", academic_views.ClassDetailView.as_view()),
+    path("admin-portal/academic/class-details/<int:pk>/", academic_views.ClassDetailView.as_view()),
+    path("admin-portal/academic/subject-details/", academic_views.SubjectDetailView.as_view()),
+    path("admin-portal/academic/subject-details/<int:pk>/", academic_views.SubjectDetailView.as_view()),
+    path("admin-portal/academic/class-subjects/", academic_views.ClassSubjectMappingView.as_view()),
+    path("admin-portal/academic/class-subjects/<int:pk>/", academic_views.ClassSubjectMappingView.as_view()),
+    path("admin-portal/academic/curriculum/", academic_views.CurriculumView.as_view()),
+    path("admin-portal/academic/curriculum/<int:pk>/", academic_views.CurriculumView.as_view()),
+    path("admin-portal/academic/faculty/", academic_views.FacultyProfileView.as_view()),
+    path("admin-portal/academic/faculty/<int:pk>/", academic_views.FacultyProfileView.as_view()),
+    path("admin-portal/academic/faculty-subjects/", academic_views.FacultySubjectAssignmentView.as_view()),
+    path("admin-portal/academic/faculty-subjects/<int:pk>/", academic_views.FacultySubjectAssignmentView.as_view()),
+    path("admin-portal/academic/downloads/", academic_views.AcademicDownloadView.as_view()),
+    path("admin-portal/academic/downloads/<int:pk>/", academic_views.AcademicDownloadView.as_view()),
+    path("admin-portal/academic/levels/", academic_views.AcademicLevelView.as_view()),
+    path("admin-portal/academic/levels/<int:pk>/", academic_views.AcademicLevelView.as_view()),
+    path("admin-portal/academic/dashboard/", academic_views.AcademicDashboardView.as_view()),
     path("admin-portal/users/", admin_views.UserListView.as_view()),
     path("admin-portal/users/<int:user_id>/", admin_views.UserDetailView.as_view()),
     path("admin-portal/users/<int:user_id>/reset-password/", admin_views.UserDetailView.as_view()),

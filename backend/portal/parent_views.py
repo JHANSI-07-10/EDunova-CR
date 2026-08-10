@@ -1,6 +1,7 @@
 from uuid import uuid4
 
 from django.db import connection
+from django.utils.crypto import get_random_string
 
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, inline_serializer
@@ -16,6 +17,7 @@ from .doc_schemas import (
     LeaveSubmitResponseSerializer,
     ERROR_RESPONSES,
     MONTH_PARAMETER,
+    EXAM_NAME_PARAMETER,
 )
 from .views import table_exists, rows, row, serialise, current_class_for_student
 from .roles import IsParent, log_action
@@ -1235,4 +1237,157 @@ class ParentLmsProgressView(ParentMixin, APIView):
             })
             
         return Response(serialise({"courses": result_data}))
+
+
+# ---------------------------------------------------------------------------
+# Parent exam extras — report card, revaluation, certificates
+# (frontend parent/pages/Results.jsx tabs)
+# ---------------------------------------------------------------------------
+class ParentReportCardView(ParentMixin, APIView):
+    """GET /parent/report-card/?child_id=&exam_name= — child's report card."""
+
+    @extend_schema(
+        operation_id="ParentChildReportCard",
+        summary="Get child report card",
+        description="Returns a report card for one of the parent's children for a given exam round.",
+        tags=["Parent"],
+        parameters=[CHILD_ID_PARAMETER, EXAM_NAME_PARAMETER],
+        responses={
+            200: serializers.DictField(),
+            400: ValidationErrorSerializer,
+            403: DetailErrorSerializer,
+        },
+    )
+    def get(self, request):
+        child_id = request.query_params.get("child_id")
+        exam_name = request.query_params.get("exam_name")
+        if not _assert_own_child(request.user.id, child_id):
+            return Response({"detail": "Not your child, or child not found."}, status=403)
+        if not exam_name:
+            return Response({"detail": "exam_name is required."}, status=400)
+        from .exam_extras_views import _report_card_data
+        return Response(serialise(_report_card_data(child_id, exam_name)))
+
+
+class ParentRevaluationView(ParentMixin, APIView):
+    """GET /parent/exams/revaluation/?child_id= — list requests
+    POST /parent/exams/revaluation/ — create a request"""
+
+    @extend_schema(
+        operation_id="ParentRevaluationList",
+        summary="List child revaluation requests",
+        description="Returns revaluation requests for one of the parent's children.",
+        tags=["Parent"],
+        parameters=[CHILD_ID_PARAMETER],
+        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        child_id = request.query_params.get("child_id")
+        if not _assert_own_child(request.user.id, child_id):
+            return Response({"detail": "Not your child, or child not found."}, status=403)
+        if not table_exists("portal_revaluation"):
+            return Response([])
+        data = rows(
+            "SELECT id, subject_name, exam_name, reason, status, teacher_remarks, requested_at "
+            "FROM portal_revaluation WHERE student_id=%s ORDER BY id DESC",
+            [child_id],
+        )
+        return Response(serialise(data))
+
+    @extend_schema(
+        operation_id="ParentRevaluationCreate",
+        summary="Request revaluation",
+        description="Files a revaluation request for one of the parent's children.",
+        tags=["Parent"],
+        request=serializers.DictField(),
+        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        d = request.data
+        child_id = d.get("child_id")
+        if not _assert_own_child(request.user.id, child_id):
+            return Response({"detail": "Not your child, or child not found."}, status=403)
+        result_id = d.get("result_id")
+        reason = (d.get("reason") or "").strip()
+        if not result_id or not reason:
+            return Response({"detail": "result_id and reason are required."}, status=400)
+
+        subject_name = ""
+        exam_name = ""
+        if table_exists("portal_result") and table_exists("portal_exam_schedule") and table_exists("portal_subject"):
+            info = row(
+                """
+                SELECT COALESCE(s.name,'') AS subject_name, COALESCE(e.exam_name,'') AS exam_name
+                FROM portal_result r
+                LEFT JOIN portal_exam_schedule e ON e.id = r.exam_schedule_id
+                LEFT JOIN portal_subject s ON s.id = e.subject_id
+                WHERE r.id=%s AND r.student_id=%s
+                """,
+                [result_id, child_id],
+            )
+            if info:
+                subject_name = info["subject_name"]
+                exam_name = info["exam_name"]
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO portal_revaluation (student_id, result_id, subject_name, exam_name, reason, status) "
+                "VALUES (%s, %s, %s, %s, %s, 'Pending')",
+                [child_id, result_id, subject_name, exam_name, reason],
+            )
+        log_action(request.user, "parent.revaluation_requested", "revaluation", child_id)
+        return Response({"detail": "Revaluation request submitted."}, status=201)
+
+
+class ParentCertificatesView(ParentMixin, APIView):
+    """GET /parent/exams/certificates/?child_id= — list certificate requests
+    POST /parent/exams/certificates/ — request a certificate"""
+
+    @extend_schema(
+        operation_id="ParentCertificateList",
+        summary="List child certificates",
+        description="Returns certificate requests/issued certificates for one of the parent's children.",
+        tags=["Parent"],
+        parameters=[CHILD_ID_PARAMETER],
+        responses={200: serializers.ListSerializer(child=serializers.DictField()), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        child_id = request.query_params.get("child_id")
+        if not _assert_own_child(request.user.id, child_id):
+            return Response({"detail": "Not your child, or child not found."}, status=403)
+        if not table_exists("portal_certificate_request"):
+            return Response([])
+        data = rows(
+            "SELECT id, certificate_type, exam_name, status, verification_code, requested_at, issued_date "
+            "FROM portal_certificate_request WHERE student_id=%s ORDER BY id DESC",
+            [child_id],
+        )
+        return Response(serialise(data))
+
+    @extend_schema(
+        operation_id="ParentCertificateCreate",
+        summary="Request a certificate",
+        description="Files a certificate request for one of the parent's children.",
+        tags=["Parent"],
+        request=serializers.DictField(),
+        responses={201: serializers.DictField(), **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        d = request.data
+        child_id = d.get("child_id")
+        if not _assert_own_child(request.user.id, child_id):
+            return Response({"detail": "Not your child, or child not found."}, status=403)
+        cert_type = d.get("certificate_type")
+        if not cert_type:
+            return Response({"detail": "certificate_type is required."}, status=400)
+        exam_name = d.get("exam_name", "")
+        code = get_random_string(10).upper()
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO portal_certificate_request (student_id, certificate_type, exam_name, status, verification_code) "
+                "VALUES (%s, %s, %s, 'Pending', %s)",
+                [child_id, cert_type, exam_name, code],
+            )
+        log_action(request.user, "parent.certificate_requested", "certificate", child_id)
+        return Response({"detail": "Certificate request submitted.", "verification_code": code}, status=201)
 

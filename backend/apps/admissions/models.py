@@ -16,12 +16,22 @@ class AdmissionEnquiry(models.Model):
     that do not exist in the live table yet) are added by migration 0004.
     """
     STATUS_CHOICES = [
+        ("Enquiry", "Enquiry"),
         ("Registered", "Registered"),
+        ("Counselling_Pending", "Counselling_Pending"),
+        ("Counselling_Done", "Counselling_Done"),
         ("Verification", "Verification"),
+        ("Eligibility_Check", "Eligibility_Check"),
         ("Screening", "Screening"),
+        ("Interview_Pending", "Interview_Pending"),
+        ("Interview_Done", "Interview_Done"),
+        ("Seat_Available", "Seat_Available"),
+        ("Seat_Waitlisted", "Seat_Waitlisted"),
         ("Fee_Pending", "Fee_Pending"),
+        ("Approved", "Approved"),
         ("Confirmed", "Confirmed"),
         ("Rejected", "Rejected"),
+        ("Withdrawn", "Withdrawn"),
     ]
 
     registration_number = models.CharField(
@@ -109,6 +119,7 @@ class AdmissionEnquiry(models.Model):
     # --- Admin workflow fields (admission pipeline) -------------------------
     allocated_class = models.CharField(max_length=200, blank=True, default="")
     allocated_section = models.CharField(max_length=200, blank=True, default="")
+    house = models.CharField(max_length=50, blank=True, default="", help_text="House (Red/Blue/Green/Yellow) for academic allocation")
     counselling_date = models.DateTimeField(null=True, blank=True)
     counselling_notes = models.TextField(blank=True, default="")
     counselling_status = models.CharField(max_length=50, blank=True, default="")

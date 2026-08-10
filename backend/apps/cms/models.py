@@ -335,11 +335,165 @@ class JobApplication(models.Model):
     status = models.CharField(max_length=20, default="pending")
     applied_at = models.DateTimeField(auto_now_add=True)
 
+    # --- Interview workflow (admin-managed) -------------------------------
+    interview_date = models.DateTimeField(null=True, blank=True)
+    interviewer_name = models.CharField(max_length=150, blank=True, default="")
+    location_or_link = models.CharField(max_length=300, blank=True, default="")
+    interview_status = models.CharField(
+        max_length=20, blank=True, default="",
+        help_text="Scheduled / Completed / Cancelled",
+    )
+    feedback = models.TextField(blank=True, default="")
+
     class Meta:
         ordering = ["-applied_at"]
 
     def __str__(self):
         return f"{self.applicant_name} → {self.job_posting.title}"
+
+
+class AcademicLevel(models.Model):
+    """Admin-managed academic level (e.g. Primary, Middle, Secondary)."""
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True, default="")
+    icon_name = models.CharField(max_length=50, blank=True, default="")
+    sort_order = models.PositiveIntegerField(default=0)
+    is_published = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["sort_order", "name"]
+
+    def __str__(self):
+        return self.name
+
+
+class ClassDetail(models.Model):
+    """Rich per-class academic content shown on the public class pages."""
+    class_id = models.IntegerField(help_text="ID of the portal_class row")
+    academic_level = models.CharField(max_length=100, blank=True, default="")
+    description = models.TextField(blank=True, default="")
+    age_criteria = models.CharField(max_length=200, blank=True, default="")
+    student_teacher_ratio = models.CharField(max_length=50, blank=True, default="")
+    learning_objectives = models.TextField(blank=True, default="")
+    academic_approach = models.TextField(blank=True, default="")
+    facilities = models.TextField(blank=True, default="")
+    activities = models.TextField(blank=True, default="")
+    co_curricular = models.TextField(blank=True, default="")
+    assessment_pattern = models.TextField(blank=True, default="")
+    promotion_policy = models.TextField(blank=True, default="")
+    learning_outcomes = models.TextField(blank=True, default="")
+    cover_image_url = models.URLField(blank=True, default="")
+    is_published = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["class_id"]
+
+    def __str__(self):
+        return f"ClassDetail #{self.class_id}"
+
+
+class SubjectDetail(models.Model):
+    """Rich per-subject academic content shown on the public subject pages."""
+    subject_id = models.IntegerField(help_text="ID of the portal_subject row")
+    description = models.TextField(blank=True, default="")
+    learning_outcomes = models.TextField(blank=True, default="")
+    teaching_methodology = models.TextField(blank=True, default="")
+    activities = models.TextField(blank=True, default="")
+    projects = models.TextField(blank=True, default="")
+    assessment = models.TextField(blank=True, default="")
+    recommended_books = models.TextField(blank=True, default="")
+    cover_image_url = models.URLField(blank=True, default="")
+    is_published = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["subject_id"]
+
+    def __str__(self):
+        return f"SubjectDetail #{self.subject_id}"
+
+
+class ClassSubjectMapping(models.Model):
+    """Which subjects are taught in which class (compulsory/elective)."""
+    class_id = models.IntegerField()
+    subject_id = models.IntegerField()
+    is_compulsory = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ["class_id", "sort_order"]
+        unique_together = (("class_id", "subject_id"),)
+
+    def __str__(self):
+        return f"Class {self.class_id} → Subject {self.subject_id}"
+
+
+class CurriculumEntry(models.Model):
+    """Curriculum / syllabus detail per class."""
+    class_id = models.IntegerField()
+    curriculum_name = models.CharField(max_length=50, default="CBSE")
+    syllabus_description = models.TextField(blank=True, default="")
+    learning_outcomes = models.TextField(blank=True, default="")
+    semester_info = models.CharField(max_length=200, blank=True, default="")
+    topics_covered = models.TextField(blank=True, default="")
+    brochure_url = models.URLField(blank=True, default="")
+    is_published = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["class_id", "curriculum_name"]
+
+    def __str__(self):
+        return f"Class {self.class_id} — {self.curriculum_name}"
+
+
+class FacultyProfile(models.Model):
+    """Admin-managed faculty profile linked to a portal user account."""
+    user_id = models.IntegerField(unique=True, help_text="ID of the auth user")
+    designation = models.CharField(max_length=150)
+    qualification_detail = models.CharField(max_length=300, blank=True, default="")
+    experience_years = models.PositiveIntegerField(null=True, blank=True)
+    specializations = models.CharField(max_length=500, blank=True, default="")
+    achievements = models.TextField(blank=True, default="")
+    research = models.TextField(blank=True, default="")
+    bio = models.TextField(blank=True, default="")
+    photo_url = models.URLField(blank=True, default="")
+    is_published = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["id"]
+
+    def __str__(self):
+        return f"FacultyProfile user#{self.user_id} — {self.designation}"
+
+
+class FacultySubjectAssignment(models.Model):
+    """Which faculty profile teaches which class+subject."""
+    faculty_id = models.IntegerField()
+    class_id = models.IntegerField()
+    subject_id = models.IntegerField()
+
+    class Meta:
+        ordering = ["faculty_id"]
+
+    def __str__(self):
+        return f"Faculty {self.faculty_id} → Class {self.class_id} / Subject {self.subject_id}"
+
+
+class AcademicDownload(models.Model):
+    """Academic resources (syllabus, prospectus, calendar...) for download."""
+    title = models.CharField(max_length=200)
+    description = models.TextField(blank=True, default="")
+    file_url = models.URLField()
+    file_type = models.CharField(max_length=10, default="PDF")
+    category = models.CharField(max_length=50, default="Curriculum")
+    target_class_id = models.IntegerField(null=True, blank=True)
+    target_audience = models.CharField(max_length=200, blank=True, default="")
+    is_published = models.BooleanField(default=False)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self):
+        return self.title
 
 
 class CampusVisitBooking(models.Model):
