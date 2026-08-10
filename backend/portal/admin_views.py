@@ -4449,19 +4449,18 @@ class TransportSettingsView(AdminMixin, APIView):
                 return Response({"detail": "'annual_transport_fee' must be a number."}, status=400)
         cols = [c for c in ("contact_number", "annual_transport_fee", "fee_due_date", "gps_update_interval_sec") if c in payload]
         values = [payload[c] for c in cols]
+        if not cols:
+            return Response({"detail": "No settings fields were provided."}, status=400)
+        stmt = _compose_upsert_settings(cols)
         with connection.cursor() as cursor:
-            cursor.execute(
-                _compose_upsert_settings(cols, values)
-            )
+            cursor.execute(stmt, values)
         log_action(request.user, "transport.settings.update", "portal_transport_settings", 1, dict(zip(cols, values, strict=False)))
         return Response(serialise(row("SELECT * FROM portal_transport_settings WHERE id = 1")))
 
 
-def _compose_upsert_settings(cols, values):
+def _compose_upsert_settings(cols):
     """Upsert the single-row transport settings table (id = 1)."""
-    if not cols:
-        return pysql.SQL("SELECT 1")
-    stmt = (
+    return (
         pysql.SQL("INSERT INTO portal_transport_settings (id, ")
         + pysql.SQL(", ").join(pysql.Identifier(c) for c in cols)
         + pysql.SQL(") VALUES (1, ")
@@ -4472,7 +4471,6 @@ def _compose_upsert_settings(cols, values):
             for c in cols
         )
     )
-    return (stmt, values)
 
 
 class TransportReportsView(AdminMixin, APIView):
