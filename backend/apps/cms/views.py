@@ -578,6 +578,21 @@ class ContactSubmissionViewSet(mixins.CreateModelMixin, viewsets.GenericViewSet)
 
 
 @extend_schema_view(
+    create=extend_schema(
+        operation_id="WebsiteContactCreateV2",
+        summary="Submit a contact enquiry (website namespace)",
+        description="Public write-only endpoint: the website contact form POSTs here.",
+        tags=WEBSITE_TAG,
+    )
+)
+class WebsiteContactSubmissionViewSet(ContactSubmissionViewSet):
+    """Same write-only contact form, mounted at /api/website/contact/ — the
+    default the deployed frontend uses. Kept as a thin subclass so the OpenAPI
+    schema keeps two distinct operation ids (one per path)."""
+    pass
+
+
+@extend_schema_view(
     list=extend_schema(
         summary="List faculty members",
         description="Public list of active faculty members for the website faculty directory.",

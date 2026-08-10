@@ -685,7 +685,11 @@ class AdminDashboardView(AdminMixin, APIView):
         def count(table, where=""):
             if not table_exists(table):
                 return 0
-            r = row(f"SELECT COUNT(*)::int AS c FROM {table} {where}")
+            r = row(
+                pysql.SQL("SELECT COUNT(*)::int AS c FROM {} {}").format(
+                    pysql.Identifier(table), pysql.SQL(where)
+                )
+            )
             return r["c"] if r else 0
 
         pending_admissions = AdmissionEnquiry.objects.exclude(status__in=["Confirmed", "Rejected"]).count()
@@ -1861,7 +1865,10 @@ class SimpleTableView(AdminMixin, APIView):
         if not table_exists(self.table):
             return Response([])
         table = self._safe_table()
-        return Response(serialise(rows(f"SELECT * FROM {table} ORDER BY {self.order_by}")))
+        query = pysql.SQL("SELECT * FROM {} ORDER BY {}").format(
+            pysql.Identifier(table), pysql.SQL(self.order_by)
+        )
+        return Response(serialise(rows(query)))
 
     def validate_create(self, payload):
         """Optional per-view create validation hook.
@@ -2489,7 +2496,7 @@ class BackupExportView(AdminMixin, APIView):
         snapshot = {}
         for t in EXPORT_TABLES:
             if table_exists(t):
-                snapshot[t] = rows(f"SELECT * FROM {t}")
+                snapshot[t] = rows(pysql.SQL("SELECT * FROM {}").format(pysql.Identifier(t)))
         log_action(request.user, "backup.export", "database", "-", {"tables": list(snapshot.keys())})
         return Response(serialise({"generated_at": date.today().isoformat(), "tables": snapshot}))
 

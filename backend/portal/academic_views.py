@@ -11,6 +11,7 @@ portal_class / portal_subject tables, which are managed via SimpleTableView).
 from django.db import IntegrityError
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import extend_schema
+from psycopg2 import sql as pysql
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -183,7 +184,7 @@ class AcademicDashboardView(APIView):
         def count_table(table):
             if not table_exists(table):
                 return 0
-            r = row(f"SELECT COUNT(*)::int AS c FROM {table}")
+            r = row(pysql.SQL("SELECT COUNT(*)::int AS c FROM {}").format(pysql.Identifier(table)))
             return r["c"] if r else 0
 
         total_classes = count_table("portal_class")

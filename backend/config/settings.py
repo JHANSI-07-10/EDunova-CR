@@ -3,6 +3,7 @@ EduNova Global Academy — Integrated Backend
 Public website CMS/admissions + Student Portal + Teacher Portal.
 Database target: Supabase PostgreSQL using DATABASE_URL.
 """
+import secrets
 from datetime import timedelta
 from pathlib import Path
 import dj_database_url
@@ -10,7 +11,9 @@ import sys
 from decouple import config
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = config("DJANGO_SECRET_KEY", default="dev-secret-key-change-in-production")
+# SECRET_KEY is assigned further down (after _startup_warn is defined) so a
+# missing value raises a loud, actionable warning in production instead of
+# shipping on a hardcoded placeholder. See the SECRET_KEY block below.
 # SAFE-BY-DEFAULT: DEBUG defaults to False. You must explicitly opt into DEBUG=True
 # in your local .env for development. Never set DEBUG=True on any host reachable
 # from the internet (see DEV_STATIC_OTP below for the related OTP risk).
@@ -61,6 +64,9 @@ MIDDLEWARE = [
     # WhiteNoise serves the collected static files (Django admin CSS/JS) on
     # platforms with no static hosting of their own (Render).
     "whitenoise.middleware.WhiteNoiseMiddleware",
+    # Compresses dynamic responses (JSON APIs, OpenAPI schema). Big win for the
+    # ~1.4 MB schema and every student/teacher list payload.
+    "django.middleware.gzip.GZipMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "portal.middleware.ExceptionLoggingMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -70,6 +76,10 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "portal.middleware.AuditTrailMiddleware",
+    # Structured access logging for /api/* requests (see portal.middleware).
+    "portal.middleware.RequestLoggingMiddleware",
+    # Content-Security-Policy + Permissions-Policy + X-Permitted-Cross-Domain-Policies.
+    "portal.middleware.SecurityHeadersMiddleware",
 ]
 
 ROOT_URLCONF = "config.urls"
@@ -217,7 +227,7 @@ REST_FRAMEWORK = {
         "otp_login_account": "5/min",
         "otp_verify_account": "5/min",
         "otp_resend_account": "3/min",
-        "otp_login_ip": "40/min",
+        "otp_login_ip": "5/min",
         "otp_verify_ip": "40/min",
         "otp_resend_ip": "20/min",
         # General purpose: authenticated file uploads (throttled per user).
@@ -334,6 +344,46 @@ else:
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_REFERRER_POLICY = "same-origin"
 
+# ---------------------------------------------------------------------------
+# Content-Security-Policy / Permissions-Policy (emitted by
+# portal.middleware.SecurityHeadersMiddleware on every response)
+# ---------------------------------------------------------------------------
+# The default policy is permissive where the frontend needs it (Google Fonts,
+# Supabase Storage CDN images, Maps/YouTube embeds) but stays restrictive on
+# scripts/styles/objects. Override in the host env without code changes:
+#   SECURITY_CSP=off      -> no CSP header at all
+#   SECURITY_CSP=default   -> the policy below (default)
+#   SECURITY_CSP=strict    -> default-src 'self' (Swagger UI /api/docs/ and the
+#                             Django admin need the default, not strict, policy)
+SECURITY_CSP = config("SECURITY_CSP", default="default")
+_CSP_DEFAULT = (
+    "default-src 'self'; "
+    "script-src 'self' 'unsafe-inline'; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
+    "font-src 'self' https://fonts.gstatic.com data:; "
+    "img-src 'self' data: blob: https:; "
+    "connect-src 'self'; "
+    "frame-src 'self' https://maps.google.com https://www.youtube.com; "
+    "base-uri 'self'; "
+    "form-action 'self'; "
+    "object-src 'none'"
+)
+_CSP_STRICT = "default-src 'self'; object-src 'none'; frame-ancestors 'none'"
+# HTML pages (Swagger UI, Django admin, landing page) carry the lenient policy
+# (they ship inline scripts/styles); machine-readable responses (/api/* JSON,
+# OpenAPI schema) carry the strict one. `off` disables the header entirely.
+if SECURITY_CSP == "off":
+    CSP_HTML_POLICY = ""
+    CSP_API_POLICY = ""
+else:
+    CSP_HTML_POLICY = _CSP_DEFAULT
+    CSP_API_POLICY = _CSP_STRICT
+
+SECURITY_PERMISSIONS_POLICY = config(
+    "SECURITY_PERMISSIONS_POLICY",
+    default="camera=(), geolocation=(), microphone=(), payment=(), usb=(), interest-cohort=()",
+)
+
 # Symmetric key (Fernet, 32 url-safe base64 bytes) used to encrypt the local
 # JSON backup file before it's written to disk / uploaded to Supabase
 # Storage. Generate one with:
@@ -375,6 +425,24 @@ OTP_LENGTH = 6
 # ---------------------------------------------------------------------------
 def _startup_warn(message: str) -> None:
     print(f"\n[EduNova config warning] {message}\n", file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# SECRET_KEY
+# ---------------------------------------------------------------------------
+# There is intentionally no hardcoded default: an empty DJANGO_SECRET_KEY falls
+# back to a fresh random key so the server can still boot locally, but every
+# non-DEBUG, non-test boot raises a warning because restarting would then log
+# everyone out (and rotated tokens/sessions would silently break).
+SECRET_KEY = config("DJANGO_SECRET_KEY", default="")
+if not SECRET_KEY:
+    SECRET_KEY = secrets.token_urlsafe(64)
+    if not DEBUG and not RUNNING_TESTS:
+        _startup_warn(
+            "DJANGO_SECRET_KEY is not set; an ephemeral random key is in use. "
+            "Sessions, password resets and JWT signatures will be invalidated "
+            "on every restart. Set DJANGO_SECRET_KEY (>= 32 bytes) now."
+        )
 
 
 _db_host = str(DATABASES.get("default", {}).get("HOST") or "").lower()
@@ -489,6 +557,11 @@ LOGGING = {
         "edunova.errors": {
             "handlers": ["console"],
             "level": "ERROR",
+            "propagate": False,
+        },
+        "edunova.request": {
+            "handlers": ["console"],
+            "level": "INFO",
             "propagate": False,
         },
     },

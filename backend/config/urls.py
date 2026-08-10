@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.admin.views.decorators import staff_member_required
 from django.urls import path, include, re_path
 from django.conf import settings
+from django.views.decorators.cache import cache_page
 from django.views.static import serve
 from drf_spectacular.renderers import OpenApiJsonRenderer, OpenApiYamlRenderer
 from drf_spectacular.views import (
@@ -20,13 +21,20 @@ from apps.cms.views import (
     WebsiteStatsView,
     WebsiteSubjectDetailView,
     WebsiteSubjectListView,
+    WebsiteContactSubmissionViewSet,
 )
 from .status_view import backend_live_view, status_dashboard
+
+# JSON 404/500 envelopes for /api/* (HTML for everything else).
+handler404 = "portal.exceptions.api_json_404"
+handler500 = "portal.exceptions.api_json_500"
 
 # Public website namespace — the frontend fetches the faculty directory from
 # /api/website/faculty/ (and headline stats from the dedicated path above).
 website_router = DefaultRouter()
 website_router.register("faculty", FacultyMemberViewSet, basename="website-faculty")
+# The deployed frontend posts contact enquiries to /api/website/contact/.
+website_router.register("contact", WebsiteContactSubmissionViewSet, basename="website-contact")
 
 # The Contact page also talks to the old-style /api/campuses/ URLs (list +
 # visit booking). Mount the CMS campus viewset there too so those calls work.
@@ -66,11 +74,15 @@ urlpatterns = [
     path("api/admissions/", include("apps.admissions.urls")),
     path("api/", include("portal.urls")),
     # OpenAPI / Swagger documentation. JSON is the default representation so
-    # the Swagger UI can consume it; ?format=yaml still works.
+    # the Swagger UI can consume it; ?format=yaml still works. The schema is
+    # cached for an hour — it is large (~1.4 MB / 214 paths) and expensive to
+    # regenerate on every docs hit.
     path(
         "api/schema/",
-        SpectacularAPIView.as_view(
-            renderer_classes=[OpenApiJsonRenderer, OpenApiYamlRenderer]
+        cache_page(60 * 60)(
+            SpectacularAPIView.as_view(
+                renderer_classes=[OpenApiJsonRenderer, OpenApiYamlRenderer]
+            )
         ),
         name="schema",
     ),

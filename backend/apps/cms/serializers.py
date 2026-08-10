@@ -173,10 +173,13 @@ class CampusVisitBookingSerializer(serializers.ModelSerializer):
 
 
 class ContactSubmissionSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(max_length=150, trim_whitespace=True, allow_blank=False)
+    message = serializers.CharField(max_length=5000, trim_whitespace=True, allow_blank=False)
+
     class Meta:
         model = ContactSubmission
         fields = ["id", "name", "email", "phone", "message", "is_resolved", "submitted_at"]
-        read_only_fields = ["id", "submitted_at"]
+        read_only_fields = ["id", "submitted_at", "is_resolved"]
 
 
 class ScholarshipInfoSerializer(serializers.ModelSerializer):

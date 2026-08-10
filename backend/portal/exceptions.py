@@ -21,7 +21,8 @@ from django.core.exceptions import (
     ValidationError as DjangoValidationError,
 )
 from django.db.utils import DatabaseError, IntegrityError, OperationalError, ProgrammingError
-from django.http import Http404
+from django.http import Http404, JsonResponse
+from django.views.defaults import page_not_found, server_error
 from rest_framework import exceptions as drf_exceptions
 from rest_framework.response import Response
 from rest_framework.views import exception_handler
@@ -121,3 +122,32 @@ def edunova_exception_handler(exc, context):
     if isinstance(data, dict) and "code" not in data:
         data["code"] = _error_code(exc)
     return response
+
+
+def api_json_404(request, exception=None):
+    """Django handler404: keep /api/* responses JSON on unmatched routes.
+
+    DRF views return JSON 404s via the registered EXCEPTION_HANDLER, but a
+    request to a URL that matches no route never reaches DRF — Django's default
+    handler would otherwise return an HTML page to API clients.
+    """
+    if request.path.startswith("/api/"):
+        return JsonResponse(
+            {"detail": "The requested resource was not found.", "code": "not_found"},
+            status=404,
+        )
+    return page_not_found(request, exception)
+
+
+def api_json_500(request, *args, **kwargs):
+    """Django handler500: JSON envelope for /api/* requests, HTML otherwise."""
+    if request.path.startswith("/api/"):
+        logger.exception("Unhandled server error on %s %s", request.method, request.path)
+        return JsonResponse(
+            {
+                "detail": "An unexpected server error occurred. Please try again later.",
+                "code": "internal_error",
+            },
+            status=500,
+        )
+    return server_error(request)

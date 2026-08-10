@@ -13,10 +13,15 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DJANGO_SETTINGS_MODULE: config.settings
-      DJANGO_SECRET_KEY: ci-only-secret-key-not-for-prod
+      DJANGO_SECRET_KEY: ci-only-secret-key-not-for-prod-0123456789012345678901234
       DEBUG: 'False'
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
       DB_SSL_REQUIRE: 'False'
+      # The test client speaks plain HTTP; without this the TLS redirect
+      # middleware turns every status assertion into a 301 and the suite fails.
+      SECURE_SSL_REDIRECT: 'False'
+      # Django's test client connects to the host "testserver".
+      ALLOWED_HOSTS: localhost,127.0.0.1,testserver
     services:
       postgres:
         image: postgres:16
