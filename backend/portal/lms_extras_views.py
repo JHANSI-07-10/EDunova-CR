@@ -22,7 +22,6 @@ from rest_framework.views import APIView
 
 from .doc_schemas import (
     DetailErrorSerializer,
-    ValidationErrorSerializer,
     IdDetailResponseSerializer,
     COURSE_ID_PARAMETER,
     STUDENT_ID_PARAMETER,

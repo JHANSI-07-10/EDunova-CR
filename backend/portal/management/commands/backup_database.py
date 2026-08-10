@@ -81,7 +81,7 @@ class Command(BaseCommand):
         try:
             from cryptography.fernet import Fernet
         except ImportError:
-            raise CommandError("The 'cryptography' package is required for encrypted backups — pip install cryptography")
+            raise CommandError("The 'cryptography' package is required for encrypted backups — pip install cryptography") from None
 
         snapshot = {"generated_at": datetime.now().isoformat(), "portal_tables": {}}
         with connection.cursor() as cursor:
@@ -90,7 +90,7 @@ class Command(BaseCommand):
                     continue
                 cursor.execute(f"SELECT * FROM {table}")
                 cols = [c[0] for c in cursor.description]
-                snapshot["portal_tables"][table] = [dict(zip(cols, r)) for r in cursor.fetchall()]
+                snapshot["portal_tables"][table] = [dict(zip(cols, r, strict=True)) for r in cursor.fetchall()]
 
         buf = io.StringIO()
         call_command("dumpdata", "cms", "admissions", "auth", "--indent", "2", stdout=buf)

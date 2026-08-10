@@ -4,12 +4,11 @@ Tests for the OTP authentication flow.
 Run with:
     python manage.py test portal.tests.test_auth
 """
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TestCase, override_settings
-from django.urls import reverse
 
 # Tests run with DEBUG=False, so use a real (locmem) email backend — the
 # console backend would make login_step1 return 503 instead of sending.
@@ -68,7 +67,7 @@ class LoginStep1Tests(TestCase):
         self.assertEqual(resp.status_code, 400)
 
     def test_inactive_user_returns_400(self):
-        inactive = _make_user(username="inactive", email="inactive@edunova.edu", active=False)
+        _make_user(username="inactive", email="inactive@edunova.edu", active=False)
         resp = self.client.post(LOGIN_URL, {"email": "inactive@edunova.edu", "password": "TestPass@99"}, content_type="application/json")
         self.assertEqual(resp.status_code, 400)
 

@@ -123,7 +123,7 @@ class Command(BaseCommand):
         self.stdout.write("======================================")
         self.stdout.write("Parent Login")
         self.stdout.write("Email    : veereshgollapu@gmail.com")
-        self.stdout.write("Password : Edunova@1234)
+        self.stdout.write("Password : Edunova@1234")
         self.stdout.write("")
         self.stdout.write("Admin Login")
         self.stdout.write("Email    : jhansilakshmi1004@gmail.com")

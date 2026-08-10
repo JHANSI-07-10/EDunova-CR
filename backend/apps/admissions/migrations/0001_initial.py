@@ -1,6 +1,4 @@
-import uuid
 
-import django.core.files.storage
 from django.db import migrations, models
 
 import apps.admissions.models

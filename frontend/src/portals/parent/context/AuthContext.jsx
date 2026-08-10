@@ -1,44 +1,13 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../lib/api";
-import * as otpAuth from "../../../lib/useOtpAuth";
-import SessionTimeout from "../../../components/SessionTimeout";
+import { createRoleAuthContext } from "../../shared/roleAuthContext";
 
-const AuthContext = createContext(null);
-
-const KEYS = {
-  access: "edunova_parent_access",
-  refresh: "edunova_parent_refresh",
-  user: "edunova_parent_user",
-  child: "edunova_parent_active_child",
-};
-
-function isTokenValid(token) {
-  if (!token) return false;
-  try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
-    return payload.exp * 1000 > Date.now();
-  } catch {
-    return false;
-  }
-}
-
-function loadStoredUser() {
-  const access = localStorage.getItem(KEYS.access);
-  const refresh = localStorage.getItem(KEYS.refresh);
-  const raw = localStorage.getItem(KEYS.user);
-  if (!raw) return null;
-  if (isTokenValid(access) || isTokenValid(refresh)) {
-    try { return JSON.parse(raw); } catch { /* fall through */ }
-  }
-  Object.values(KEYS).forEach((k) => localStorage.removeItem(k));
-  return null;
-}
-
-export function AuthProvider({ children }) {
-  const [user, setUser] = useState(loadStoredUser);
+// Parent-portal extra state: the list of the parent's children and the
+// currently selected child, persisted in localStorage.
+function useParentExtra({ user, keys }) {
   const [kids, setKids] = useState([]);
   const [activeChildId, setActiveChildId] = useState(
-    () => localStorage.getItem(KEYS.child) || null
+    () => localStorage.getItem(keys.child) || null
   );
 
   useEffect(() => {
@@ -50,7 +19,7 @@ export function AuthProvider({ children }) {
         if (!activeChildId && data.length) {
           const id = String(data[0].id);
           setActiveChildId(id);
-          localStorage.setItem(KEYS.child, id);
+          localStorage.setItem(keys.child, id);
         }
       })
       .catch(() => {});
@@ -60,48 +29,26 @@ export function AuthProvider({ children }) {
   function selectChild(id) {
     const sid = String(id);
     setActiveChildId(sid);
-    localStorage.setItem(KEYS.child, sid);
+    localStorage.setItem(keys.child, sid);
   }
 
-  async function requestOtp(identifier, password) {
-    const data = await otpAuth.requestOtp(identifier, password);
-    if (data.user_type !== "Parent") {
-      throw { response: { data: { detail: "This portal is for parents only." } } };
-    }
-    return data;
-  }
-
-  async function verifyOtp(userId, otp) {
-    const data = await otpAuth.verifyOtp(userId, otp);
-    if (data.user?.user_type !== "Parent") {
-      throw { response: { data: { detail: "This portal is for parents only." } } };
-    }
-    localStorage.setItem(KEYS.access, data.access);
-    localStorage.setItem(KEYS.refresh, data.refresh);
-    localStorage.setItem(KEYS.user, JSON.stringify(data.user));
-    setUser(data.user);
-    return data;
-  }
-
-  async function resendOtp(userId) {
-    return otpAuth.resendOtp(userId);
-  }
-
-  function logout() {
-    Object.values(KEYS).forEach((k) => localStorage.removeItem(k));
-    setUser(null);
-    setKids([]);
-    setActiveChildId(null);
-  }
-
-  return (
-    <AuthContext.Provider
-      value={{ user, kids, activeChildId, selectChild, requestOtp, verifyOtp, resendOtp, logout }}
-    >
-      {user && <SessionTimeout logout={logout} />}
-      {children}
-    </AuthContext.Provider>
-  );
+  return {
+    value: { kids, activeChildId, selectChild },
+    onLogout: () => {
+      setKids([]);
+      setActiveChildId(null);
+    },
+  };
 }
 
-export const useAuth = () => useContext(AuthContext);
+const { AuthProvider, useAuth } = createRoleAuthContext({
+  role: "Parent",
+  keysPrefix: "edunova_parent",
+  errorDetail: "This portal is for parents only.",
+  extra: {
+    hook: useParentExtra,
+    keys: { child: "edunova_parent_active_child" },
+  },
+});
+
+export { AuthProvider, useAuth };

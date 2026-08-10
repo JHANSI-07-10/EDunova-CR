@@ -83,9 +83,7 @@ class AuditTrailMiddleware:
 
         user = getattr(request, "user", None)
         if user is None or not getattr(user, "is_authenticated", False):
-            actor_id = None
-        else:
-            actor_id = user.id
+            user = None
 
         # Derive a readable target like "teacher/assignments/123" from the path.
         parts = [p for p in path.strip("/").split("/") if p]

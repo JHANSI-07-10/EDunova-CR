@@ -14,7 +14,6 @@ from .doc_schemas import (
     DetailErrorSerializer,
     ValidationErrorSerializer,
     IdDetailResponseSerializer,
-    LeaveRequestSerializer,
     LeaveSubmitResponseSerializer,
     ERROR_RESPONSES,
     MONTH_PARAMETER,
@@ -1140,19 +1139,19 @@ class ParentLmsProgressView(ParentMixin, APIView):
         child_id = request.query_params.get("child_id")
         if not child_id:
             return Response({"detail": "child_id parameter is required."}, status=400)
-            
+
         # Verify parent-child relationship
         relation = row("SELECT user_id FROM portal_student_profile WHERE user_id=%s AND parent_id=%s", [child_id, request.user.id])
         if not relation:
             return Response({"detail": "Unauthorized or child not found."}, status=403)
-            
+
         # Find child class enrollment
         enroll = row("SELECT class_id FROM portal_student_enrollment WHERE student_id=%s ORDER BY academic_year DESC LIMIT 1", [child_id])
         if not enroll:
             return Response({"courses": [], "detail": "Child is not enrolled in any class."})
-            
+
         class_id = enroll["class_id"]
-        
+
         # Get courses
         courses = rows(
             """
@@ -1162,7 +1161,7 @@ class ParentLmsProgressView(ParentMixin, APIView):
             WHERE c.class_id = %s
             """, [class_id]
         )
-        
+
         result_data = []
         for course in courses:
             # 1. Progress %
@@ -1173,9 +1172,9 @@ class ParentLmsProgressView(ParentMixin, APIView):
                 WHERE student_id=%s AND content_id IN (SELECT id FROM portal_course_content WHERE course_id=%s)
                 """, [child_id, course["id"]]
             )["count"]
-            
+
             progress_percent = round((comp_res / total_res) * 100, 1) if total_res > 0 else 0.0
-            
+
             # 2. Completed Chapters
             chapters = rows("SELECT id, title FROM portal_chapter WHERE course_id=%s", [course["id"]])
             completed_chapters_count = 0
@@ -1186,7 +1185,7 @@ class ParentLmsProgressView(ParentMixin, APIView):
                     WHERE lesson_id IN (SELECT id FROM portal_lesson WHERE chapter_id=%s)
                     """, [ch["id"]]
                 )["count"]
-                
+
                 ch_comp = row(
                     """
                     SELECT COUNT(*)::int AS count FROM portal_course_progress 
@@ -1196,10 +1195,10 @@ class ParentLmsProgressView(ParentMixin, APIView):
                     )
                     """, [child_id, ch["id"]]
                 )["count"]
-                
+
                 if ch_res > 0 and ch_res == ch_comp:
                     completed_chapters_count += 1
-            
+
             # 3. Attendance for this class
             attendance_summary = row(
                 """
@@ -1212,7 +1211,7 @@ class ParentLmsProgressView(ParentMixin, APIView):
             attendance_percentage = 100.0
             if attendance_summary and attendance_summary["total"] > 0:
                 attendance_percentage = round((attendance_summary["present"] / attendance_summary["total"]) * 100, 1)
-                
+
             # 4. Assignments Status
             assignments = rows(
                 """
@@ -1223,10 +1222,10 @@ class ParentLmsProgressView(ParentMixin, APIView):
                 WHERE a.class_id = %s AND a.subject_id = %s
                 """, [child_id, class_id, course["subject_id"]]
             )
-            
+
             completed_assignments = sum(1 for a in assignments if a.get("submitted_at") is not None)
             total_assignments = len(assignments)
-            
+
             # 5. Quizzes Total
             quizzes = rows(
                 """
@@ -1235,7 +1234,7 @@ class ParentLmsProgressView(ParentMixin, APIView):
                 WHERE q.course_id = %s
                 """, [course["id"]]
             )
-            
+
             # 6. Upcoming Tests
             upcoming_tests = rows(
                 """
@@ -1245,7 +1244,7 @@ class ParentLmsProgressView(ParentMixin, APIView):
                 ORDER BY exam_date LIMIT 3
                 """, [class_id, course["subject_id"]]
             )
-            
+
             # 7. Weak Subject check
             avg_score = 0
             score_count = 0
@@ -1255,11 +1254,11 @@ class ParentLmsProgressView(ParentMixin, APIView):
                     score_count += 1
             avg_percent = (avg_score / score_count) * 100 if score_count > 0 else None
             is_weak = avg_percent is not None and avg_percent < 50.0
-            
+
             # 8. Teacher remarks
             remarks = [a["teacher_feedback"] for a in assignments if a.get("teacher_feedback")]
             recent_remark = remarks[0] if remarks else "Consistent effort. Shows good understanding of the topics."
-            
+
             result_data.append({
                 "id": course["id"],
                 "subject_name": course["subject_name"],
@@ -1278,7 +1277,7 @@ class ParentLmsProgressView(ParentMixin, APIView):
                 "is_weak": is_weak,
                 "recent_remark": recent_remark
             })
-            
+
         return Response(serialise({"courses": result_data}))
 
 

@@ -89,7 +89,7 @@ class Command(BaseCommand):
                     INSERT INTO portal_course_content (course_id, content_type, title, resource_url, sort_order)
                     VALUES (%s,'PDF_Notes','Chapter 1 — Linear Equations','https://example.com/demo-notes.pdf',1)
                 """, [course_id])
-            for i, day in enumerate(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]):
+            for _, day in enumerate(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]):
                 c.execute("""
                     INSERT INTO portal_timetable (class_id, subject_id, teacher_id, day_of_week, start_time, end_time)
                     SELECT %s,%s,%s,%s,'09:00','09:45'

@@ -44,7 +44,7 @@ def _read_row(user_id):
         )
         cols = [c[0] for c in cur.description]
         row = cur.fetchone()
-    return dict(zip(cols, row)) if row else None
+    return dict(zip(cols, row, strict=True)) if row else None
 
 
 _ResponseSerializer = inline_serializer(

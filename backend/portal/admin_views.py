@@ -1,4 +1,3 @@
-import json
 from datetime import date, timedelta
 from django.utils.timezone import now
 
@@ -878,11 +877,11 @@ class AdmissionListView(AdminMixin, APIView):
         d = request.data
         from django.utils.crypto import get_random_string
         reg_num = f"REG-{get_random_string(8).upper()}"
-        
+
         # Ensure model is imported locally
         from apps.admissions.models import AdmissionEnquiry
 
-        enquiry = AdmissionEnquiry.objects.create(
+        AdmissionEnquiry.objects.create(
             registration_number=reg_num,
             applicant_name=d.get("applicant_name"),
             date_of_birth=d.get("date_of_birth"),
@@ -1544,9 +1543,8 @@ class UserListView(AdminMixin, APIView):
     )
     def get(self, request):
         from django.contrib.auth.models import User
-        from .roles import get_role
         role_filter = request.query_params.get("role")
-        
+
         users = User.objects.all().prefetch_related("groups").order_by("-date_joined")
         data = []
         for u in users:
@@ -1629,7 +1627,7 @@ class UserListView(AdminMixin, APIView):
                     )
                     _ensure_group("Parent")
                     parent_user.groups.add(Group.objects.get(name="Parent"))
-                    
+
                     with connection.cursor() as cursor:
                         if table_exists("portal_user_profile"):
                             cursor.execute(
@@ -1722,7 +1720,7 @@ class UserDetailView(AdminMixin, APIView):
             target = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"detail": "User not found."}, status=404)
-        
+
         role = "User"
         if target.groups.exists():
             role = target.groups.first().name
@@ -1772,7 +1770,7 @@ class UserDetailView(AdminMixin, APIView):
             target = User.objects.get(id=user_id)
         except User.DoesNotExist:
             return Response({"detail": "User not found."}, status=404)
-        
+
         role = "User"
         if target.groups.exists():
             role = target.groups.first().name
@@ -1825,16 +1823,42 @@ class RolesView(AdminMixin, APIView):
 # ---------------------------------------------------------------------------
 # Generic small CRUD helper for simple lookup-style portal_* tables
 # ---------------------------------------------------------------------------
+# Every table this generic helper may touch. `SimpleTableView` builds its SQL
+# by interpolating the table/column identifiers, so they must come from this
+# fixed whitelist (never from request data). Add a new table here when a new
+# SimpleTableView subclass is added.
+_SIMPLE_TABLE_WHITELIST = frozenset({
+    "portal_class",
+    "portal_subject",
+    "portal_vehicle",
+    "portal_route",
+    "portal_transport_allocation",
+    "portal_fee_structure",
+    "portal_book",
+    "portal_hostel",
+})
+
+
 class SimpleTableView(AdminMixin, APIView):
     table = None
     columns = ()          # columns accepted on create, in order
     order_by = "id"
     int_columns = ()      # columns that must coerce to int (FKs, quantities)
 
+    def _safe_table(self):
+        """Return the table name only if it is in the whitelist."""
+        if self.table not in _SIMPLE_TABLE_WHITELIST:
+            raise RuntimeError(
+                f"Table {self.table!r} is not in the SimpleTableView whitelist; "
+                "add it to _SIMPLE_TABLE_WHITELIST in admin_views.py first."
+            )
+        return self.table
+
     def get(self, request):
         if not table_exists(self.table):
             return Response([])
-        return Response(serialise(rows(f"SELECT * FROM {self.table} ORDER BY {self.order_by}")))
+        table = self._safe_table()
+        return Response(serialise(rows(f"SELECT * FROM {table} ORDER BY {self.order_by}")))
 
     def validate_create(self, payload):
         """Optional per-view create validation hook.
@@ -1850,6 +1874,7 @@ class SimpleTableView(AdminMixin, APIView):
             return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
         if not isinstance(request.data, dict):
             return Response({"detail": "A JSON object body is required."}, status=400)
+        table = self._safe_table()
         reject = self.validate_create(request.data)
         if reject is not None:
             return reject
@@ -1875,14 +1900,22 @@ class SimpleTableView(AdminMixin, APIView):
         placeholder_sql = ",".join(placeholders)
         try:
             with connection.cursor() as cursor:
-                cursor.execute(f"INSERT INTO {self.table} ({col_sql}) VALUES ({placeholder_sql}) RETURNING id", values)
+                cursor.execute(f"INSERT INTO {table} ({col_sql}) VALUES ({placeholder_sql}) RETURNING id", values)
                 new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response(
                 {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
                 status=400,
             )
-        log_action(request.user, f"{self.table}.create", self.table, new_id, dict(zip(self.columns, [str(v) for v in values])))
+        # `values` is intentionally shorter than `self.columns` when a column
+        # fell back to its DB DEFAULT (skipped above), so zip must not be strict.
+        log_action(
+            request.user,
+            f"{self.table}.create",
+            self.table,
+            new_id,
+            dict(zip(self.columns, [str(v) for v in values], strict=False)),
+        )
         return Response({"id": new_id, "detail": "Created."}, status=201)
 
 
@@ -2607,7 +2640,7 @@ class AdminLmsAnalyticsView(AdminMixin, APIView):
     def get(self, request):
         if not table_exists("portal_course_content"):
             return Response({"uploads": [], "stats": {}})
-            
+
         # Recent uploads
         uploads = rows(
             """
@@ -2623,24 +2656,24 @@ class AdminLmsAnalyticsView(AdminMixin, APIView):
             ORDER BY cc.uploaded_at DESC LIMIT 50
             """
         )
-        
+
         # Statistics
         total_courses = row("SELECT COUNT(*)::int AS c FROM portal_course")["c"]
         total_chapters = row("SELECT COUNT(*)::int AS c FROM portal_chapter")["c"] if table_exists("portal_chapter") else 0
         total_lessons = row("SELECT COUNT(*)::int AS c FROM portal_lesson")["c"] if table_exists("portal_lesson") else 0
         total_resources = row("SELECT COUNT(*)::int AS c FROM portal_course_content")["c"]
-        
+
         resources_by_type = rows(
             """
             SELECT content_type AS type, COUNT(*)::int AS count
             FROM portal_course_content GROUP BY content_type
             """
         )
-        
+
         # Estimated storage (each resource is ~2.4MB on average, simulated metrics)
         file_count = row("SELECT COUNT(*)::int AS c FROM portal_course_content WHERE content_type IN ('PDF', 'PPT', 'DOC', 'Image', 'Audio', 'PDF_Notes')")["c"]
         estimated_storage_mb = round(file_count * 2.4, 2)
-        
+
         return Response(serialise({
             "uploads": uploads,
             "stats": {
@@ -2678,7 +2711,7 @@ class AdminLmsAnalyticsView(AdminMixin, APIView):
         resource_id = request.query_params.get("id")
         if not resource_id:
             return Response({"detail": "id parameter required."}, status=400)
-            
+
         with connection.cursor() as cursor:
             # Clean up associated Quiz or Assignment if referenced
             ref = row("SELECT quiz_id, assignment_id FROM portal_course_content WHERE id=%s", [resource_id])
@@ -2688,7 +2721,7 @@ class AdminLmsAnalyticsView(AdminMixin, APIView):
                     cursor.execute("DELETE FROM portal_quiz WHERE id=%s", [ref["quiz_id"]])
                 if ref.get("assignment_id"):
                     cursor.execute("DELETE FROM portal_assignment WHERE id=%s", [ref["assignment_id"]])
-                    
+
         log_action(request.user, "lms_resource.delete", "portal_course_content", resource_id, {"id": resource_id})
         return Response({"detail": "Resource deleted."})
 

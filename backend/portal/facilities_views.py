@@ -22,7 +22,6 @@ from .doc_schemas import (
     ERROR_RESPONSES,
     IdDetailResponseSerializer,
     STUDENT_ID_PARAMETER,
-    ValidationErrorSerializer,
 )
 from .parent_views import ParentMixin, _assert_own_child
 from .roles import log_action

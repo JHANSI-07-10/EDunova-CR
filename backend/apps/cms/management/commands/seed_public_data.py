@@ -6,7 +6,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand
 from apps.cms.models import (
     SchoolSettings, AcademicProgram, Department, SchoolStat, WhyChooseItem,
-    TechnologyPartner, CMSPage, FAQ, ScholarshipInfo, FacultyMember,
+    TechnologyPartner, CMSPage, FAQ, ScholarshipInfo, FacultyMember, Campus,
 )
 
 

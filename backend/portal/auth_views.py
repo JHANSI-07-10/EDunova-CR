@@ -1,6 +1,5 @@
 import logging
 import secrets
-import sys
 
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
@@ -245,7 +244,7 @@ def login_step1(request):
             user_obj = User.objects.filter(username__iexact=identifier).first()
             if user_obj:
                 user = authenticate(username=user_obj.username, password=password)
-    except Exception as exc:
+    except Exception:
         logger.exception("Database query failed during login")
         return Response(
             {"detail": "Database connection error. Please try again in a few moments."},
@@ -287,7 +286,7 @@ def login_step1(request):
     else:
         try:
             send_login_otp_email(user, otp)
-        except Exception as e:
+        except Exception:
             logger.exception("Failed to send OTP email")
             if settings.DEBUG:
                 print("\n" + "="*50)

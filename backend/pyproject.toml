@@ -1,0 +1,24 @@
+[tool.ruff]
+# The codebase (raw-SQL portal views) uses ~100-120 char lines; 88 is too tight.
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+# F = pyflakes (unused imports/vars, undefined names)
+# E/W = pycodestyle (errors, whitespace)
+# B = bugbear (common reliability bugs)
+# C4 = flake8-comprehensions (simplify list/dict comprehensions)
+select = ["E", "F", "W", "B", "C4"]
+
+[tool.ruff.lint.per-file-ignores]
+# Migrations are mostly generated; don't churn them with style rules.
+"**/migrations/*.py" = ["E501"]
+
+[tool.pytest.ini_options]
+# Only takes effect once pytest-django is installed (dev dependency).
+DJANGO_SETTINGS_MODULE = "config.settings"
+python_files = ["test_*.py"]
+# Run the existing suite with coverage from the repo root:
+#   cd backend && python -m coverage run --source=portal,apps manage.py test --keepdb \
+#                && python -m coverage xml
+# (produces coverage.xml, consumed by sonar-project.properties)

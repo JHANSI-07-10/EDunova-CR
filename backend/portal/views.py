@@ -9,14 +9,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework import serializers, status
 
-from drf_spectacular.utils import extend_schema, OpenApiParameter, OpenApiExample, inline_serializer
+from drf_spectacular.utils import extend_schema, OpenApiParameter, inline_serializer
 
 logger = logging.getLogger("edunova")
 
 from .doc_schemas import (
     DetailErrorSerializer,
     ValidationErrorSerializer,
-    IdDetailResponseSerializer,
     LeaveRequestSerializer,
     LeaveSubmitResponseSerializer,
     ChatRequestSerializer,
@@ -597,7 +596,7 @@ def rows(sql, params=None):
     with connection.cursor() as cursor:
         cursor.execute(sql, params or [])
         cols = [c[0] for c in cursor.description]
-        return [dict(zip(cols, r)) for r in cursor.fetchall()]
+        return [dict(zip(cols, r, strict=True)) for r in cursor.fetchall()]
 
 
 def row(sql, params=None):
@@ -979,7 +978,7 @@ class AssignmentListView(StudentOnlyMixin, APIView):
             WHERE a.class_id=%s ORDER BY a.due_date DESC
             """, [request.user.id, cls["class_id"]]
         )
-        
+
         # Strip correct answers if not submitted yet to prevent cheating
         import json
         for row_dict in data:
@@ -1029,7 +1028,7 @@ class AssignmentSubmitView(StudentOnlyMixin, APIView):
     def post(self, request, assignment_id):
         if not table_exists("portal_assignment_submission"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
-        
+
         assign = row("SELECT id, assignment_type, quiz_questions, max_marks FROM portal_assignment WHERE id=%s", [assignment_id])
         if not assign:
             return Response({"detail": "Assignment not found."}, status=404)
@@ -1111,7 +1110,7 @@ class CourseListView(StudentOnlyMixin, APIView):
                 "SELECT id, title, description, sort_order FROM portal_chapter WHERE course_id=%s ORDER BY sort_order, id",
                 [c["id"]]
             ) if table_exists("portal_chapter") else []
-            
+
             for ch in chapters:
                 # 1.5 Fetch Chapter-level Resources (directly attached)
                 ch["resources"] = rows(
@@ -1130,7 +1129,7 @@ class CourseListView(StudentOnlyMixin, APIView):
                     "SELECT id, title, description, sort_order FROM portal_lesson WHERE chapter_id=%s ORDER BY sort_order, id",
                     [ch["id"]]
                 ) if table_exists("portal_lesson") else []
-                
+
                 for les in lessons:
                     # 3. Fetch Resources for each Lesson
                     resources = rows(
@@ -1144,7 +1143,7 @@ class CourseListView(StudentOnlyMixin, APIView):
                         ORDER BY r.sort_order, r.id
                         """, [request.user.id, les["id"]]
                     ) if table_exists("portal_course_content") else []
-                    
+
                     # Check assignment status for resources
                     for res in resources:
                         if res.get("assignment_id"):
@@ -1625,7 +1624,7 @@ class FileUploadView(APIView):
 
             file_url = client.storage.from_(bucket_name).get_public_url(unique_filename)
             return Response({"url": file_url})
-        except Exception as e:
+        except Exception:
             logger.exception("Supabase upload failed; falling back to local storage")
             from django.core.files.storage import default_storage
             filename = default_storage.save(f"uploads/{_uuid.uuid4()}_{name}", file_obj)
@@ -1650,10 +1649,10 @@ class StudentAIChatView(StudentOnlyMixin, APIView):
 
         msg_lower = message.lower()
         user_id = request.user.id
-        
+
         cls = current_class_for_student(user_id)
         class_id = cls["class_id"] if cls else None
-        
+
         # 1. Homework / Assignment queries
         if any(w in msg_lower for w in ["homework", "hw", "assignment", "assignments", "task"]):
             if class_id:
@@ -1703,7 +1702,7 @@ class StudentAIChatView(StudentOnlyMixin, APIView):
                         if day not in days:
                             days[day] = []
                         days[day].append(f"{item['subject_name']} ({item['start_time']} - {item['end_time']}) by {item['teacher_name']}")
-                    
+
                     reply = "Here is your class timetable:\n" + "\n".join(
                         f"🗓️ **{d}**:\n" + "\n".join(f"  • {session}" for session in sessions)
                         for d, sessions in days.items()

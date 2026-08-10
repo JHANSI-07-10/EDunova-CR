@@ -8,8 +8,7 @@ Kept in its own file for the same reason as facilities_views.py: easy to
 find, doesn't bloat admin_views.py/views.py further.
 """
 from django.db import connection
-from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema, OpenApiParameter, inline_serializer
+from drf_spectacular.utils import extend_schema, inline_serializer
 from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView

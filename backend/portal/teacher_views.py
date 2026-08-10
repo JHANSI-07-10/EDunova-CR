@@ -772,7 +772,7 @@ def teacher_classes(user_id):
         ORDER BY class_name
     """
     data = rows(sql, [user_id, user_id])
-    
+
     result = []
     for r in data:
         allocations = rows(
@@ -1244,7 +1244,7 @@ class AssignmentSubmissionsView(TeacherMixin, APIView):
     def patch(self, request, assignment_id, submission_id):
         if not table_exists("portal_assignment_submission"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
-        
+
         marks = request.data.get("marks_obtained")
         assign = row("SELECT max_marks FROM portal_assignment WHERE id=%s", [assignment_id])
         grade = None
@@ -1820,10 +1820,10 @@ class AssignmentScanPDFView(TeacherMixin, APIView):
             try:
                 import urllib.request
                 import json
-                
+
                 url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={gemini_key}"
                 headers = {"Content-Type": "application/json"}
-                
+
                 prompt = (
                     "You are an expert assessment parser. Extract multiple-choice questions from the following text. "
                     "Return a JSON object with a single root key 'questions' containing an array of objects. "
@@ -1835,7 +1835,7 @@ class AssignmentScanPDFView(TeacherMixin, APIView):
                     "Format the response strictly as valid JSON matching the specified schema. Output NO markdown formatting or text besides the raw JSON.\n\n"
                     f"Text to parse:\n{text}"
                 )
-                
+
                 payload = {
                     "contents": [{
                         "parts": [{
@@ -1846,25 +1846,25 @@ class AssignmentScanPDFView(TeacherMixin, APIView):
                         "responseMimeType": "application/json"
                     }
                 }
-                
+
                 req = urllib.request.Request(
                     url,
                     data=json.dumps(payload).encode("utf-8"),
                     headers=headers,
                     method="POST"
                 )
-                
+
                 with urllib.request.urlopen(req, timeout=25) as response:
                     res_body = json.loads(response.read().decode("utf-8"))
                     content = res_body["candidates"][0]["content"]["parts"][0]["text"]
-                    
+
                     content_clean = content.strip()
                     if content_clean.startswith("```json"):
                         content_clean = content_clean[7:]
                     if content_clean.endswith("```"):
                         content_clean = content_clean[:-3]
                     content_clean = content_clean.strip()
-                    
+
                     parsed = json.loads(content_clean)
                     if "questions" in parsed and isinstance(parsed["questions"], list):
                         questions = parsed["questions"]
@@ -1882,7 +1882,7 @@ class AssignmentScanPDFView(TeacherMixin, APIView):
         lines = [line.strip() for line in text.split("\n") if line.strip()]
         questions = []
         current_q = None
-        
+
         q_re = re.compile(r'^(?:Q(?:uestion)?\s*\d+[\.:\)]|\d+[\.:\)])\s*(.*)', re.IGNORECASE)
         opt_re = re.compile(r'^\s*[\(\[]?([A-Da-d])[\)\]\.]?\s+(.*)')
         ans_re = re.compile(r'^\s*(?:Correct\s+Answer|Correct\s+Option|Correct|Answer|Ans|Option)\s*[:\.-]?\s*([A-Da-d]|\S+)', re.IGNORECASE)
@@ -1939,14 +1939,14 @@ class AssignmentScanPDFView(TeacherMixin, APIView):
         for q in questions:
             if not q["question_text"].strip():
                 continue
-            
+
             for idx in range(4):
                 if not q["options"][idx].strip():
                     q["options"][idx] = f"Option {chr(65+idx)}"
-                    
+
             o_clean = [o.strip().lower() for o in q["options"]]
             ans_clean = q["correct_answer"].strip().lower()
-            
+
             if ans_clean in o_clean:
                 q["correct_answer"] = q["options"][o_clean.index(ans_clean)]
         return cleaned_questions
@@ -1966,7 +1966,7 @@ class TeacherLmsCoursesView(TeacherMixin, APIView):
     def get(self, request):
         if not table_exists("portal_academic_allocation") or not table_exists("portal_course"):
             return Response([])
-        
+
         # Auto-create courses for any allocated subjects if they do not exist
         allocations = rows(
             """
@@ -2211,7 +2211,7 @@ class TeacherLmsLessonsView(TeacherMixin, APIView):
         description = d.get("description", "").strip()
         if not lid or not title:
             return Response({"detail": "id and title are required."}, status=400)
-            
+
         with connection.cursor() as cursor:
             cursor.execute(
                 "UPDATE portal_lesson SET title=%s, description=%s WHERE id=%s",
@@ -2319,7 +2319,7 @@ class TeacherLmsResourcesView(TeacherMixin, APIView):
                     [course_id, title]
                 )
                 quiz_id = cursor.fetchone()[0]
-                
+
                 # Insert questions if provided
                 questions = d.get("questions", [])
                 for q in questions:
@@ -2357,10 +2357,10 @@ class TeacherLmsResourcesView(TeacherMixin, APIView):
         description = d.get("description", "").strip()
         due_date = d.get("due_date")
         max_marks = d.get("max_marks")
-        
+
         if not rid or not title:
             return Response({"detail": "id and title are required."}, status=400)
-            
+
         with connection.cursor() as cursor:
             cursor.execute(
                 """
@@ -2371,7 +2371,7 @@ class TeacherLmsResourcesView(TeacherMixin, APIView):
                 """,
                 [title, resource_url, description, due_date, max_marks, rid]
             )
-            
+
             # If this is linked to an assignment, update assignment details too!
             ref = row("SELECT quiz_id, assignment_id FROM portal_course_content WHERE id=%s", [rid])
             if ref and ref.get("assignment_id"):

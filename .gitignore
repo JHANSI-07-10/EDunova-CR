@@ -38,6 +38,15 @@ Thumbs.db
 *.log
 npm-debug.log*
 
+# --- Coverage / test reports ---
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+pytest.xml
+pytest.html
+frontend/coverage/
+
 # --- Docker ---
 docker-compose.override.yml
 # Playwright E2E artifacts

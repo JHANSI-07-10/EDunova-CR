@@ -27,7 +27,7 @@ from apps.cms.models import (
 )
 from .doc_schemas import ERROR_RESPONSES
 from .roles import IsAdmin, log_action
-from .views import row, rows, serialise, table_exists
+from .views import row, serialise, table_exists
 
 
 def _payload(obj, model):
