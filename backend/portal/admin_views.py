@@ -20,6 +20,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.admissions.models import AdmissionEnquiry
+from apps.cms.models import ContactSubmission
 from .doc_schemas import (
     DetailErrorSerializer,
     ValidationErrorSerializer,
@@ -869,6 +870,7 @@ class AdmissionListView(AdminMixin, APIView):
         
         # Ensure model is imported locally
         from apps.admissions.models import AdmissionEnquiry
+
         enquiry = AdmissionEnquiry.objects.create(
             registration_number=reg_num,
             applicant_name=d.get("applicant_name"),
@@ -2035,4 +2037,68 @@ class AdminLmsAnalyticsView(AdminMixin, APIView):
                     
         log_action(request.user, "lms_resource.delete", "portal_course_content", resource_id, {"id": resource_id})
         return Response({"detail": "Resource deleted."})
+
+
+_ContactMessageItem = inline_serializer(
+    name="AdminContactMessageItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "name": serializers.CharField(required=False),
+        "email": serializers.CharField(required=False),
+        "phone": serializers.CharField(required=False),
+        "message": serializers.CharField(required=False),
+        "is_resolved": serializers.BooleanField(required=False),
+        "submitted_at": serializers.CharField(required=False),
+    },
+)
+
+
+# ---------------------------------------------------------------------------
+# Contact submissions (public Contact page -> admin inbox)
+# ---------------------------------------------------------------------------
+class ContactMessagesView(AdminMixin, APIView):
+    """Lists public contact-form submissions and lets admins toggle their
+    resolved state. Cross-portal sync: the public /api/cms/contact/ POST lands
+    here for the admin portal."""
+
+    @extend_schema(
+        operation_id="AdminContactMessagesList",
+        summary="List contact form submissions",
+        description="Returns all public contact-page submissions, newest first.",
+        tags=["Contact"],
+        responses={200: serializers.ListSerializer(child=_ContactMessageItem), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        submissions = ContactSubmission.objects.all().order_by("-submitted_at")
+        return Response(
+            [
+                {
+                    "id": s.id,
+                    "name": s.name,
+                    "email": s.email,
+                    "phone": s.phone,
+                    "message": s.message,
+                    "is_resolved": s.is_resolved,
+                    "submitted_at": s.submitted_at.isoformat(),
+                }
+                for s in submissions
+            ]
+        )
+
+    @extend_schema(
+        operation_id="AdminContactMessageResolve",
+        summary="Mark a contact submission resolved / unresolved",
+        description="Toggles is_resolved on a single contact submission.",
+        tags=["Contact"],
+        responses={200: DetailErrorSerializer, 404: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
+    def patch(self, request, message_id):
+        try:
+            submission = ContactSubmission.objects.get(id=message_id)
+        except ContactSubmission.DoesNotExist:
+            return Response({"detail": "Contact submission not found."}, status=404)
+        submission.is_resolved = bool(request.data.get("is_resolved", True))
+        submission.save(update_fields=["is_resolved"])
+        log_action(request.user, "contact.update", "ContactSubmission", message_id, {"is_resolved": submission.is_resolved})
+        return Response({"detail": "Contact submission updated."})
 

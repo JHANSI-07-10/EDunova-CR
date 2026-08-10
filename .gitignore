@@ -19,6 +19,8 @@ backend/edunova
 backend/media/
 backend/staticfiles/
 backend/backups/
+# Generated OpenAPI export (regenerate with `python manage.py spectacular`)
+backend/schema.yml
 
 # --- Node / frontend ---
 node_modules/

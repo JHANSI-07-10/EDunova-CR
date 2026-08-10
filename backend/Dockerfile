@@ -31,4 +31,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
 
 # entrypoint applies the portal schema + collects static files before serving.
 ENTRYPOINT ["/app/entrypoint.sh"]
-CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--access-logfile", "-", "--error-logfile", "-"]
+# 2 workers x 4 threads = 8 concurrent requests (sync-only workers cap at 1
+# each). Kept modest so per-thread pooled DB connections stay under Supabase's
+# 15-session pooler cap. --timeout 120 keeps slow cold DB/SMTP ops from being
+# killed by gunicorn's default 30s worker timeout.
+CMD ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "2", "--threads", "4", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]

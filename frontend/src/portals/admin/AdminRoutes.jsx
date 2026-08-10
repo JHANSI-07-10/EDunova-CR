@@ -33,6 +33,7 @@ import Campuses from "./pages/Campuses";
 import Scholarships from "./pages/Scholarships";
 import Timetable from "./pages/Timetable";
 import Recruitment from "./pages/Recruitment";
+import Enquiries from "./pages/Enquiries";
 
 export default function AdminRoutes() {
   return (
@@ -74,6 +75,7 @@ export default function AdminRoutes() {
           <Route path="payroll" element={<Payroll />} />
           <Route path="campuses" element={<Campuses />} />
           <Route path="recruitment" element={<Recruitment />} />
+          <Route path="enquiries" element={<Enquiries />} />
           <Route path="*" element={<PortalNotFound homePath="/admin" />} />
         </Route>
       </Routes>

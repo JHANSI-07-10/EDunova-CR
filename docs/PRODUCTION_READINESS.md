@@ -11,14 +11,17 @@ Status legend: `[ ]` pending · `[x]` done · `[!]` blocked
 
 ## 0. Blocker — the deployed backend must actually run
 
-- [ ] **(env)** `DATABASE_URL` on Render/Supabase uses the **IPv4 pooler** host
-      (`aws-0-<REGION>.pooler.supabase.com:5432`, user `postgres.<REF>`), NOT
-      the IPv6-only direct host `db.<REF>.supabase.co`.
+- [x] **(env)** `DATABASE_URL` uses the **transaction-mode pooler**
+      (`aws-1-ap-southeast-2.pooler.supabase.com:6543`, user `postgres.<REF>`)
+      — port 5432 (session mode) caps at 15 persistent connections and
+      exhausts under load (mass 500s); port 6543 recycles per transaction.
 - [ ] **(env)** `ALLOWED_HOSTS` on the host includes the backend domain
       (e.g. `edunova-cr-ax7h.onrender.com`) — otherwise every request 400s.
-- [ ] **(env)** SMTP email configured (`EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend`
-      + `EMAIL_HOST`/`EMAIL_HOST_USER`/`EMAIL_HOST_PASSWORD`) — OTP login
-      refuses with 503 until this is set.
+- [x] **(env)** `BREVO_API_KEY` set (an `xkeysib-…` key from Brevo → SMTP &
+      API) — OTP emails go out via the Brevo **HTTPS API** (`api.brevo.com`),
+      which works from Render's network; SMTP port 587 is blocked there.
+      If SMTP fallback is used instead, `EMAIL_HOST_USER` must be the relay
+      login (`b157b5001@smtp-brevo.com`), not the Brevo dashboard login.
 - [ ] **(env)** `CORS_ALLOWED_ORIGINS` (and `CSRF_TRUSTED_ORIGINS`) list every
       deployed frontend origin.
 - [ ] Deploy and confirm `GET {API}/api/auth/login/` returns 400 for bad
@@ -36,17 +39,24 @@ Status legend: `[ ]` pending · `[x]` done · `[!]` blocked
       crash; Supabase Storage in prod, local `MEDIA_ROOT` fallback in dev.
 - [ ] **(env)** Rotate the Supabase DB password + regenerate the service-role
       key if any past delivery shipped them (SETUP.md §0).
-- [ ] **(env)** Change all demo credentials (`student@edunova.edu` etc.) or
-      delete demo accounts; never enable `DEV_STATIC_OTP`.
+- [x] Demo accounts use the owner's real gmail addresses (admin
+      `jhansilakshmi1004@gmail.com`, teacher `ravitejamandugula57@gmail.com`,
+      student `tarannumarshiya489@gmail.com`, parent `veereshgollapu@gmail.com`;
+      password `Edunova@123`) — the seed scripts (`seed_portal_demo`,
+      `seed_parent_admin`) are fixed to never overwrite them back to
+      `@edunova.edu`; never enable `DEV_STATIC_OTP`.
 - [ ] `DJANGO_SECRET_KEY` set to a long random value on the host.
 - [ ] `BACKUP_ENCRYPTION_KEY` set (backup command refuses to run without it).
 
 ## 2. Operational reliability
 
 - [ ] Backend serves behind HTTPS with a real domain (Render/Cloudflare).
-- [ ] **Multi-worker decision:** OTP + rate limits use Django's in-process
-      cache — pin Gunicorn to **1 worker**, or point `CACHES` at Redis /
-      move OTP storage to the DB. (1 worker is fine for launch scale.)
+- [x] **Multi-worker cache:** gunicorn runs **2 workers × 4 threads** (8
+      concurrent requests; per-thread pooled DB connections stay under
+      Supabase's 15-session cap). `CACHES` is LocMemCache by default and
+      switches to **Redis automatically when `REDIS_URL` is set** — do set it
+      so OTPs + rate limits + the 60s response cache are shared across
+      workers.
 - [ ] Scheduled `python manage.py backup_database` (cron) with the encrypted
       output landing in Supabase Storage.
 - [ ] Monitoring/alerting: at minimum a UptimeRobot/Healthchecks ping on
@@ -57,9 +67,8 @@ Status legend: `[ ]` pending · `[x]` done · `[!]` blocked
 
 ## 3. Data & schema integrity
 
-- [ ] `apps/cms` has **no migrations** — generate and review one
-      (`python manage.py makemigrations cms`), then `migrate --fake-initial`
-      against the real DB so a fresh environment can reproduce the schema.
+- [x] `apps/cms` migrations are complete (`0001_initial` … `0007`); a fresh
+      environment reproduces the CMS schema with a plain `manage.py migrate`.
 - [ ] `portal_*` tables are hand-applied SQL — record the applied state with
       `python manage.py apply_portal_schema --check` and keep the SQL files
       versioned with any changes.

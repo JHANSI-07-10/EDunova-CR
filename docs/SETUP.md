@@ -41,10 +41,10 @@ re-committed by accident.
 | Toast auto-dismiss bug | ✅ Fixed — `animate-[fadeIn_.2s_ease]` referenced a `fadeIn` keyframe that was never defined anywhere, in all four portals' `Common.jsx`, so `onAnimationEnd` never fired and toasts never auto-dismissed. Now defined in both `tailwind.config.js` and `index.css`. |
 | Portal schema apply command | ✅ Fixed — now applies all 3 SQL files in order, and records what's applied in `portal_schema_migrations` (`python manage.py apply_portal_schema --check` reports current state without changing anything). |
 | Privilege escalation via `is_staff` | ✅ Fixed — `get_role()` now only auto-grants Admin Portal authority to real superusers, not any `is_staff` account (e.g. a CMS content editor). The duplicate, subtly-different copy of this logic in `auth_views.py` was also removed — it now delegates to `portal.roles.get_role()` so there's a single source of truth. |
-| OTP brute-force protection | ✅ Added — `AnonRateThrottle`-based limits on login/verify/resend (10/min, 10/min, 5/min per IP). Uses Django's default in-process cache; **for a multi-worker production deployment, point `CACHES` at Redis** or the limit is effectively `rate × worker count`, not a hard cap. |
+| OTP brute-force protection | ✅ Added — two-layer limits: tight per-account (5/min login, 5/min verify, 3/min resend) plus a generous per-IP backstop (40/min, 40/min, 20/min). Cache is LocMemCache locally; set `REDIS_URL` in production so limits + OTPs are shared across gunicorn workers instead of multiplying per worker. |
 | Exam extras: rank lists + report cards | ✅ Added — per-subject rank list generation, overall class rank (summed across subjects), and printable report cards, both admin- and student-facing. Built on the `portal_result`/`portal_exam_schedule` tables that already existed. |
 | LMS extras: forums + digital notes + analytics | ✅ Added — `portal_forum_topic`/`portal_forum_post`/`portal_digital_note`/`portal_course_progress` tables, wired into the student LMS page (Discussion & Notes panel per course, mark-complete checkboxes) and an admin/teacher analytics endpoint (`/lms/analytics/`). |
-| Automated backups | 🟡 Partially improved — `python manage.py backup_database` now writes a full timestamped JSON snapshot (every `portal_*` table + Django-managed CMS/admissions/auth data) to `backend/backups/`, runnable from cron. Still not encrypted/offsite/point-in-time — pair with Supabase's own automated-backup feature for that. |
+| Automated backups | ✅ Improved — `python manage.py backup_database` writes a full timestamped JSON snapshot (every `portal_*` table + Django-managed CMS/admissions/auth data) to `backend/backups/`, **encrypts it (Fernet via `BACKUP_ENCRYPTION_KEY`) and uploads to Supabase Storage** (see the "Backup security & durability" row below); runnable from cron. Not point-in-time — pair with Supabase's own automated-backup feature for that. |
 | Exam cycle naming | ✅ Fixed — `exam_name` is now a fixed set of choices (`Unit_Test_1`…`Board_Exam`) enforced server-side, not free text. Previously "Mid Term" vs "Mid-Term" would silently split one exam cycle's results across two "cycles" with no error, producing incomplete rank lists/report cards. |
 | Rank-list silent no-op | ✅ Fixed — `RankListView.post` now validates the exam schedule exists and has marks entered before running, returning a real 404/400 instead of a false-success "0 students ranked" message. |
 | Report card completeness | ✅ Added — a report card now flags `is_complete: false` with a warning banner if the student has fewer subject results than their class is expected to have, instead of silently presenting a partial total as the final one. |
@@ -53,13 +53,20 @@ re-committed by accident.
 | Backup security & durability | ✅ Fixed — `backup_database` now **encrypts** the dump (Fernet, via `BACKUP_ENCRYPTION_KEY`; refuses to run without a key rather than writing plaintext) and **uploads to Supabase Storage** in addition to local disk, so it survives a container redeploy instead of silently vanishing. Also writes a manifest of what's in the file-storage buckets (LMS resources, submissions, certificates, avatars) so a restore can be checked against what should exist. |
 | Missing 404 inside portals | ✅ Fixed — none of the 4 authenticated portals had a catch-all route; an unmatched sub-path rendered a blank content area. Added a shared `PortalNotFound` component to all four. |
 | Scroll position on navigation | ✅ Fixed — React Router doesn't reset scroll on its own; added a global `ScrollToTop` so navigating away from a scrolled-down page doesn't land on the new page already scrolled down. |
+| OTP email delivery (Brevo) | ✅ Now delivered via the **Brevo HTTPS API** (`api.brevo.com`, `BREVO_API_KEY`) instead of SMTP — SMTP port 587 is blocked from Render's network, the HTTPS API is not. The OTP itself is still generated/stored/expired/verified by the existing dynamic flow; the email service only delivers the exact OTP it receives. Falls back to Django SMTP/console when no `BREVO_API_KEY` is set. |
+| Supabase pooler connection | ✅ Switched `DATABASE_URL` to the **transaction-mode pooler (port 6543)** — the session-mode pooler (5432) caps at 15 persistent sessions and exhausts under load (mass 500s). Transaction mode recycles connections per transaction. Also: `DB_CONN_MAX_AGE` + `CONN_HEALTH_CHECKS` for connection reuse. |
+| Public API response cache | ✅ All public `/api/cms/*` and `/api/website/*` read endpoints are cached 60s (`cache_page`) — measured cold ~1.8s → warm ~0.003s on the hot endpoints. |
+| Faculty module (public) | ✅ Added — `FacultyMember` model + migration, `GET /api/website/faculty/`, photos on Supabase Storage CDN (bucket auto-created by `backend/_upload_media.py`), Faculty page with search + department filters. |
+| Contact form → Admin inbox | ✅ Added — public `/api/cms/contact/` submissions are now visible to admins at `GET /api/admin-portal/contact-messages/` (list + mark resolved) and in the new Admin **Enquiries** page (`/admin/enquiries`). |
+| Portal API client dedup | ✅ The four identical portal axios clients (admin/teacher/student/parent) were collapsed into one factory (`frontend/src/api/portalClient.js`) — each portal file is now a 5-line config wrapper. |
+| Frontend env var bug | ✅ Fixed — Admin Admissions "Download Report" used the never-defined `VITE_API_URL`; now uses `VITE_API_BASE_URL` like everything else. |
 
 ### Still not implemented — and why
 
 - **AI Tutor** — needs a decision on which LLM API to call and who pays for/holds that key; not something to silently pick.
 - **OMR evaluation** — needs a decision on scanning hardware/service and an actual sample answer sheet to build the image pipeline against; nothing to safely guess here.
 - **Physical hardware integration**: GPS tracker hardware, barcode scanner hardware — the software side (tables + APIs) is ready to receive data from real devices, but no such devices exist to integrate against.
-- **Infrastructure**: Redis, Celery, Nginx, AWS/Cloudflare config, GitHub Actions CI/CD, SSL termination, monitoring/alerting, automated test suite — none of this exists; the app currently runs via `manage.py runserver` + `vite dev` only.
+- **Infrastructure**: Celery, Nginx, AWS/Cloudflare config, SSL termination, monitoring/alerting — still not provisioned. What **does** exist now: GitHub Actions CI (`.github/workflows/ci.yml` — backend tests + `manage.py check` + frontend build on every push), an automated backend test suite (`portal.tests.test_auth`, 19 tests), 60s response caching on all public CMS/website endpoints, and a Redis-ready `CACHES` config (activates when `REDIS_URL` is set). The app runs via gunicorn (2 workers × 4 threads) in production and `manage.py runserver` + `vite dev` locally.
 - **Teacher-side course authoring** (newly discovered, not previously flagged) — `teacher_views.py` has zero endpoints for creating/editing `portal_course`/`portal_course_content`/`portal_quiz`. Students can consume courses; nothing lets a teacher create one through the UI yet. Worth a explicit decision on scope/priority before building.
 
 ### A decision this doc can't make for you
@@ -78,8 +85,12 @@ pip install -r requirements.txt
 cp .env.example .env   # already done in this package; edit DATABASE_URL etc. for your own DB
 ```
 
-Edit `.env` and point `DATABASE_URL` at your own Postgres/Supabase instance,
-then apply the schema:
+Edit `.env` and point `DATABASE_URL` at your own Postgres/Supabase instance.
+Prefer the **transaction-mode pooler port 6543** (session mode on 5432 caps at
+15 persistent connections and exhausts under load):
+`postgresql://postgres.<REF>:<PASSWORD>@aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres`.
+Add `BREVO_API_KEY` (an `xkeysib-…` key from Brevo → SMTP & API) so OTP
+emails go out via the HTTPS API, then apply the schema:
 
 ```bash
 # 1. Apply all three portal extension SQL files against your Supabase/Postgres
@@ -94,7 +105,9 @@ python manage.py migrate
 
 python manage.py createsuperuser
 python manage.py seed_public_data       # optional demo content
-python manage.py seed_portal_demo       # optional demo student/teacher accounts
+python manage.py seed_portal_demo       # demo accounts (uses the real owner
+                                        # gmail addresses — see below)
+python manage.py seed_parent_admin      # admin/parent demo accounts (same)
 python manage.py runserver
 ```
 
@@ -141,25 +154,16 @@ picker) and direct links for Student / Teacher / Parent / Admin.
 
 ## 4. Known gaps worth knowing about before you rely on this
 
-- **`apps/cms` has no migration files.** This is a pre-existing condition,
-  not something introduced here — the cms tables were evidently applied to
-  Supabase by hand at some point, same as the `portal_*` extension tables.
-  Recommended fix: run `python manage.py makemigrations cms` against your
-  own real database once, review the generated migration carefully, then
-  `migrate --fake-initial`.
-- **This sandbox has no way to install Django or run against a live
-  database**, so every backend change here was verified by (a) `python -m
-  py_compile` on every changed/added `.py` file, which passed with no syntax
-  errors, and (b) careful manual review of SQL/ORM field names against the
-  existing schema — not by an actual `manage.py check` or `migrate` run. Run
-  those yourself in a real environment before deploying, especially the
-  `admissions --fake-initial` step, which is safe only if that table's
-  columns genuinely already match `apps/admissions/migrations/0001_initial.py`.
-- **Frontend was verified with `esbuild`** (bundling the whole route tree
-  with all new Parent/Admin code, zero resolution/syntax errors) but not
-  with an actual `npm run build` or `npm run dev`, since this sandbox has no
-  network access to `npm install` the real dependency tree. Run `npm install
-  && npm run build` yourself as a final check.
+- **`apps/cms` migrations are now complete** — `apps/cms/migrations/` contains `0001_initial` … `0007_dedupe_whychoose_titles` (campus, school settings, faculty, job postings, news/events, gallery, why-choose dedupe). A fresh environment can reproduce the CMS schema with a plain `python manage.py migrate`; no `--fake-initial` needed for cms anymore. The `portal_*` extension tables are still hand-applied SQL via `python manage.py apply_portal_schema`.
+- **Backend is now fully runnable and verified in a real environment** —
+  `manage.py check` passes, the `portal.tests.test_auth` suite (19 tests)
+  passes, and all migrations are applied against the live Supabase DB. The
+  `admissions --fake-initial` note below only applies when adopting
+  migrations against a DB that was previously managed by hand-applied SQL.
+- **Frontend builds clean** — `npm run build` passes (vendor chunking in
+  `vite.config.js` keeps the main bundle under the size warning threshold)
+  and all four portals + the public site render without console errors in
+  the live dev server.
 - **The Transport module is data/API-complete but hardware-free** — see §1.
 - **Backup export is a manual JSON download**, not a real backup system —
   see §1.

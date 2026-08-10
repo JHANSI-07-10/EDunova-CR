@@ -35,7 +35,7 @@ SQL/schema:
 - `backend/portal/sql/portal_extension_auth_user.sql`: core ERP portal schema.
 - `backend/portal/sql/portal_extension_parent_admin.sql`: parent/admin/transport/audit extensions.
 - `backend/portal/sql/portal_extension_facilities.sql`: hostel/inventory/visitor/alumni/medical/LMS extras.
-- `supabase/*.sql` and `supabase/*.txt`: older/shared Supabase schemas. Important mismatch: these include non-prefixed tables like `students`, `classes`, `users`, while current code uses Django `auth_user`, Django CMS/admissions tables, and prefixed `portal_*` tables.
+- `docs/database/*.sql` (moved from `supabase/`): the original 52-table blueprint + two portal-extension copies. Important mismatch: these include non-prefixed tables like `students`, `classes`, `users`, while current code uses Django `auth_user`, Django CMS/admissions tables, and prefixed `portal_*` tables. The live schema source is `backend/portal/sql/*.sql` (applied by `apply_portal_schema`).
 
 Environment variables:
 - Backend: `DJANGO_SECRET_KEY`, `DEBUG`, `DEV_STATIC_OTP`, `ALLOWED_HOSTS`, `DATABASE_URL`, `DB_SSL_REQUIRE`, `CORS_ALLOWED_ORIGINS`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `BACKUP_ENCRYPTION_KEY`, email settings.

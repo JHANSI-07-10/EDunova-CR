@@ -129,7 +129,7 @@ export default function Admissions() {
           <p className="text-xs text-ink-secondary">Complete 18-phase admission pipeline management.</p>
         </div>
         <div className="flex items-center gap-2">
-          <a href={`${import.meta.env.VITE_API_URL}/admin-portal/admissions/report/`} target="_blank" rel="noopener noreferrer"
+          <a href={`${(import.meta.env.VITE_API_BASE_URL || "http://localhost:8000").replace(/\/api\/?$/, "")}/admin-portal/admissions/report/`} target="_blank" rel="noopener noreferrer"
              className="flex items-center gap-2 border border-slate-200 text-slate-700 rounded-xl px-4 py-2.5 text-sm font-medium hover:bg-slate-50">
             <Download size={16} /> Download Report
           </a>

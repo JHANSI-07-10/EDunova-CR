@@ -96,11 +96,14 @@ DATABASE_URL = config("DATABASE_URL", default="")
 # count stays small. Workers each keep their own pooled connections.
 DB_CONN_MAX_AGE = config("DB_CONN_MAX_AGE", default=60, cast=int)
 if DATABASE_URL:
+    # ssl_require only applies to Postgres; SQLite (used by the unit tests)
+    # has no SSL option and would reject the kwarg.
+    _use_ssl = config("DB_SSL_REQUIRE", default=True, cast=bool) and not DATABASE_URL.startswith("sqlite://")
     DATABASES = {
         "default": dj_database_url.parse(
             DATABASE_URL,
             conn_max_age=DB_CONN_MAX_AGE,
-            ssl_require=config("DB_SSL_REQUIRE", default=True, cast=bool),
+            ssl_require=_use_ssl,
         )
     }
     # The Supabase pooler (PgBouncer) silently drops idle sessions, which would
@@ -148,6 +151,26 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Cache: LocMemCache by default (single-process dev). Set REDIS_URL in
+# production to share one cache across all gunicorn workers — this makes the
+# 60s response cache on the public CMS/website endpoints and the OTP/throttle
+# counters consistent cluster-wide instead of per-worker.
+if config("REDIS_URL", default=""):
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": config("REDIS_URL"),
+            "TIMEOUT": 300,
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "edunova-cache",
+        }
+    }
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (

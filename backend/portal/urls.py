@@ -119,6 +119,8 @@ urlpatterns = [
     path("admin-portal/leaves/<int:leave_id>/decide/", admin_views.LeaveApprovalListView.as_view()),
     path("admin-portal/reports/", admin_views.ReportsView.as_view()),
     path("admin-portal/audit-log/", admin_views.AuditLogListView.as_view()),
+    path("admin-portal/contact-messages/", admin_views.ContactMessagesView.as_view()),
+    path("admin-portal/contact-messages/<int:message_id>/", admin_views.ContactMessagesView.as_view()),
     path("admin-portal/backup/export/", admin_views.BackupExportView.as_view()),
     path("admin-portal/lms/analytics/", admin_views.AdminLmsAnalyticsView.as_view()),
 

@@ -173,7 +173,7 @@ class CampusVisitBookingSerializer(serializers.ModelSerializer):
 class ContactSubmissionSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactSubmission
-        fields = ["id", "name", "email", "phone", "message", "submitted_at"]
+        fields = ["id", "name", "email", "phone", "message", "is_resolved", "submitted_at"]
         read_only_fields = ["id", "submitted_at"]
 
 

@@ -55,7 +55,7 @@ An audit is **not** "browse the site" — it is a repeatable checklist where eve
 └────────────────┘  └─────────────────┘  └─────────────────┘  └─────────────────┘
 ```
 
-**Stack (as audited):** React 18 + Vite + Tailwind (frontend) · Django 5 + DRF + SimpleJWT (backend) · PostgreSQL via Supabase pooler · SMTP/Brevo for OTP & password emails.
+**Stack (as audited):** React 18 + Vite + Tailwind (frontend) · Django 5 + DRF + SimpleJWT (backend) · PostgreSQL via Supabase transaction-mode pooler (port 6543) · OTP/password emails via the Brevo HTTPS API (`BREVO_API_KEY`), SMTP fallback only when no API key is set.
 
 **Authentication model (important for every portal audit):**
 - Step 1: `POST /api/auth/login/` with `{email, password}` → `{user_id, user_type, detail}` (an OTP email is sent).
@@ -171,7 +171,7 @@ Using valid JWTs for each role, call the other roles' dashboards:
 ### 5.4 Brute-force protection
 - [ ] Rapid repeated wrong logins for one account → per-account throttle (5/min) blocks with 429.
 - [ ] Rapid resends → resend throttle (3/min per account).
-- ⚠️ WARN: throttles & OTP storage use Django's default in-process cache. With **>1 gunicorn worker** the effective limit multiplies and OTPs can appear "expired" — audit must note the worker count (see §10 known limits).
+- ✅ INFO: throttles & OTP storage use Django's cache. LocMemCache is per-process, so **set `REDIS_URL` in production** (the `CACHES` config switches to Redis automatically) to keep limits + OTPs consistent across the 2 gunicorn workers × 4 threads; without it the effective limit is rate × worker count (see §10 known limits).
 
 ---
 
@@ -326,9 +326,9 @@ Close-out: every finding must be either fixed-and-reverified (re-run the same st
 
 ## 10. Known Limits & Audit Caveats (verify, don't assume)
 
-1. **OTP storage is Django's in-process cache** — with multiple Gunicorn workers, login can intermittently fail with "Invalid or expired OTP". Audit should record the deployed worker count. Fix direction: Redis `CACHES` or DB-backed OTP store.
-2. **Email is the only OTP delivery path.** If `EMAIL_BACKEND` is the console backend in production, login now returns 503 ("verification email service is not configured") — that is **by design**, a clear signal to configure SMTP, not a UI bug.
-3. **Supabase direct DB host is IPv6-only.** The backend must use the **pooler** `DATABASE_URL` (`aws-0-<region>.pooler.supabase.com`), or every API call 500s / the service 502s.
+1. **OTP storage is Django's cache** — LocMemCache is per-process, so with >1 gunicorn worker login can intermittently fail with "Invalid or expired OTP" unless `REDIS_URL` is set (the `CACHES` config now switches to Redis automatically). Audit should record whether `REDIS_URL` is configured.
+2. **Email is the only OTP delivery path.** In production the service uses the **Brevo HTTPS API** when `BREVO_API_KEY` is set (required — SMTP port 587 is blocked from Render's network). If `EMAIL_BACKEND` is the console backend AND no `BREVO_API_KEY` is set, login returns 503 ("verification email service is not configured") — that is **by design**, a clear signal to configure delivery, not a UI bug.
+3. **Supabase direct DB host is IPv6-only.** The backend must use the **pooler** `DATABASE_URL`. Prefer the **transaction-mode port 6543** — session mode on 5432 caps at 15 persistent connections and exhausts under load (mass 500s); the transaction pooler recycles per connection.
 4. **CORS is env-driven** (`CORS_ALLOWED_ORIGINS`). If login fails only in the browser (works via curl), check the origin is in that list.
 5. **Frontend/backend parity:** the frontend may reference pages whose endpoints must be confirmed during audit (e.g. any new module page vs `portal/urls.py`). Include an API-parity sweep: for each page, open DevTools → Network and confirm the endpoints it calls return 2xx/expected status.
 6. **Pagination:** DRF defaults to 20/page — long lists (users, admissions, reports) must page correctly with no duplicates/missing rows.

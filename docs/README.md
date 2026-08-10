@@ -68,23 +68,29 @@ graph TD
 ## 🛠️ Technology Stack
 * **Frontend**: React 18, Vite, Tailwind CSS, Lucide icons.
 * **Backend**: Django 5, Django Rest Framework (DRF), Simple JWT auth.
-* **Database**: PostgreSQL (Supabase pooler configuration).
-* **Notification Relay**: SMTP integration for OTP & password delivery via Brevo.
+* **Database**: PostgreSQL (Supabase — transaction-mode pooler, port 6543).
+* **Notification Relay**: OTP & password delivery via the **Brevo HTTPS API** (`BREVO_API_KEY`); SMTP is the local fallback when no API key is set.
 
 ---
 
 ## ⚙️ Setup Instructions
 
 ### 1. Environment Configuration
-Create a `.env` file in `backend/` using `.env.example` as a template:
+Create a `.env` file in `backend/` using `.env.example` as a template. The two
+non-negotiable keys for OTP emails to work are the API key and the DB URL
+(prefer the transaction-mode pooler port **6543** — session mode on 5432 caps
+at 15 connections and exhausts under load):
 ```env
+DATABASE_URL=postgresql://postgres.<REF>:<PASSWORD>@aws-1-ap-southeast-2.pooler.supabase.com:6543/postgres
+BREVO_API_KEY=xkeysib-...   # Brevo → SMTP & API; primary OTP email path
 DEV_STATIC_OTP=False
-EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
-EMAIL_HOST=smtp-relay.brevo.com
-EMAIL_PORT=587
-EMAIL_USE_TLS=True
-EMAIL_HOST_USER=mandugulajhansilakshmi@gmail.com
-EMAIL_HOST_PASSWORD=your-key
+# Optional SMTP fallback (only used when BREVO_API_KEY is unset):
+# EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+# EMAIL_HOST=smtp-relay.brevo.com
+# EMAIL_PORT=587
+# EMAIL_USE_TLS=True
+# EMAIL_HOST_USER=b157b5001@smtp-brevo.com   # the SMTP relay login, NOT the dashboard login
+# EMAIL_HOST_PASSWORD=your-smtp-key
 ```
 
 ### 2. Launch Dev Environments
