@@ -40,3 +40,8 @@ npm-debug.log*
 
 # --- Docker ---
 docker-compose.override.yml
+# Playwright E2E artifacts
+frontend/e2e-report/
+frontend/pw-install.log
+frontend/test-results/
+.freebuff/

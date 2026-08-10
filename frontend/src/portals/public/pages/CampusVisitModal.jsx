@@ -62,7 +62,7 @@ export default function CampusVisitModal({ isOpen, onClose, campuses, initialCam
     setValidationErrors({})
     setStatus('sending')
     try {
-      const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')
+      const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '').replace(/\/+$/, '')
       const response = await fetch(`${BASE_URL}/api/campuses/visit/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

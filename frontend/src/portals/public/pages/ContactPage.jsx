@@ -184,7 +184,7 @@ export default function ContactPage() {
   useEffect(() => {
     const fetchCampuses = async () => {
       try {
-        const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')
+        const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '').replace(/\/+$/, '')
         const res = await fetch(`${BASE_URL}/api/campuses/`)
         const data = await res.json()
         if (data && data.length > 0) {
@@ -247,7 +247,7 @@ export default function ContactPage() {
         let finalCampus = selectedCampus
         if (!finalCampus) {
           try {
-            const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '')
+            const BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000').replace(/\/api\/?$/, '').replace(/\/+$/, '').replace(/\/+$/, '')
             const res = await fetch(`${BASE_URL}/api/campuses/nearest/?lat=${latitude}&lng=${longitude}`)
             if (res.ok) {
               const data = await res.json()

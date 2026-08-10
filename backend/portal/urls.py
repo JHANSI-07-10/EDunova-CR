@@ -3,7 +3,7 @@ from django.urls import path
 from . import (
     auth_views, teacher_views, views, parent_views, admin_views, facilities_views,
     exam_extras_views, lms_extras_views, notification_views,
-    recruitment_views, academic_views,
+    recruitment_views, academic_views, student_exam_views,
 )
 
 urlpatterns = [
@@ -42,6 +42,9 @@ urlpatterns = [
     path("student/transport/", facilities_views.StudentTransportView.as_view()),
     path("student/medical-records/", facilities_views.StudentMedicalView.as_view()),
     path("student/report-card/", exam_extras_views.StudentReportCardView.as_view()),
+    path("student/exams/revaluation/", student_exam_views.StudentRevaluationView.as_view()),
+    path("student/supplementary/", student_exam_views.StudentSupplementaryView.as_view()),
+    path("student/academic-certificates/", student_exam_views.StudentAcademicCertificatesView.as_view()),
     path("lms/forum-topics/", lms_extras_views.ForumTopicListView.as_view()),
     path("lms/forum-topics/<int:topic_id>/", lms_extras_views.ForumTopicDetailView.as_view()),
     path("lms/forum-topics/<int:topic_id>/reply/", lms_extras_views.ForumPostView.as_view()),
