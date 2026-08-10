@@ -158,8 +158,47 @@ def _generate_otp() -> str:
     return str(secrets.randbelow(900000) + 100000)
 
 
+def _otp_table_exists() -> bool:
+    from django.db import connection
+
+    try:
+        with connection.cursor() as cur:
+            cur.execute(
+                "SELECT 1 FROM information_schema.tables "
+                "WHERE table_schema = 'public' AND table_name = 'portal_login_otp'"
+            )
+            return cur.fetchone() is not None
+    except Exception:
+        return False
+
+
 def _store_otp(user_id: int, otp: str) -> None:
+    """Persist the OTP so verification works across every gunicorn worker.
+
+    The DB row is the source of truth (shared by all workers even without a
+    Redis cache); the in-memory cache is kept as a fast-path + fallback for
+    local development where the portal_login_otp table may not exist.
+    """
     expiry = getattr(settings, "OTP_EXPIRY_SECONDS", 300)
+    from django.utils import timezone
+
+    try:
+        if _otp_table_exists():
+            from django.db import connection
+
+            with connection.cursor() as cur:
+                cur.execute(
+                    "DELETE FROM public.portal_login_otp WHERE user_id = %s",
+                    [user_id],
+                )
+                cur.execute(
+                    "INSERT INTO public.portal_login_otp (user_id, otp, expires_at) "
+                    "VALUES (%s, %s, %s)",
+                    [user_id, otp, timezone.now() + timezone.timedelta(seconds=expiry)],
+                )
+    except Exception as exc:
+        logger.warning("DB OTP store failed (%s); using cache only.", exc)
+    # Cache fast-path (single-process dev, and a check that mirrors the DB).
     cache.set(f"portal_login_otp:{user_id}", otp, expiry)
 
 
@@ -309,12 +348,52 @@ def login_step2_verify_otp(request):
     # DEV_STATIC_OTP is accidentally left in the env — real emailed OTP only.
     is_static = _static_otp_enabled() and otp == "123456"
 
+    # The DB row is the source of truth (shared across gunicorn workers even
+    # without a Redis cache); the in-memory cache is the local-dev fallback.
     cached = cache.get(f"portal_login_otp:{user_id}")
-    if not is_static and (not cached or otp != str(cached)):
+    valid = is_static
+    if not valid:
+        from django.utils import timezone
+
+        db_otp = None
+        if _otp_table_exists():
+            try:
+                from django.db import connection
+
+                with connection.cursor() as cur:
+                    cur.execute(
+                        "SELECT otp, used FROM public.portal_login_otp "
+                        "WHERE user_id = %s AND expires_at > %s "
+                        "ORDER BY id DESC LIMIT 1",
+                        [user_id, timezone.now()],
+                    )
+                    db_row = cur.fetchone()
+                if db_row and not db_row[1]:
+                    db_otp = db_row[0]
+            except Exception as exc:
+                logger.warning("DB OTP read failed (%s); falling back to cache.", exc)
+        expected = db_otp if db_otp is not None else (cached if cached is not None else None)
+        valid = expected is not None and otp == str(expected)
+
+    if not valid:
         return Response(
             {"detail": "Invalid or expired OTP."},
             status=status.HTTP_400_BAD_REQUEST,
         )
+
+    # Invalidate the OTP (single-use) in both stores.
+    if not is_static:
+        try:
+            if _otp_table_exists():
+                from django.db import connection
+
+                with connection.cursor() as cur:
+                    cur.execute(
+                        "UPDATE public.portal_login_otp SET used = TRUE WHERE user_id = %s",
+                        [user_id],
+                    )
+        except Exception:
+            logger.warning("DB OTP invalidation failed for user_id=%s", user_id)
 
     User = get_user_model()
     try:
