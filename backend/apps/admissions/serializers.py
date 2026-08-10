@@ -10,16 +10,50 @@ from .models import AdmissionEnquiry
 # Lenient phone check: 10-15 digits, optional leading "+", ignoring spaces/dashes.
 _PHONE_RE = re.compile(r"^\+?\d{10,15}$")
 _PERCENT_RE = re.compile(r"^(100(\.\d{1,2})?|\d{1,2}(\.\d{1,2})?)$")
+_URL_RE = re.compile(r"^https?://\S+$", re.IGNORECASE)
 
 # Uploaded proof documents: restrict to common safe formats + a size cap so a
-# public API cannot be used to store arbitrary files.
+# public API cannot be used to store arbitrary files. A plain http(s) URL is
+# also accepted as a document reference (documents may already live in
+# external storage / Supabase), see BUG-02 / LIVE-1.
 _ALLOWED_DOC_TYPES = {".pdf", ".jpg", ".jpeg", ".png", ".gif", ".webp", ".doc", ".docx"}
 _MAX_DOC_MB = 5
 
+# Gender is a free-text column in the DB but the public form only offers
+# Male / Female / Other; reject anything else instead of storing junk.
+_ALLOWED_GENDERS = {"male", "female", "other"}
+
+# Standard classes offered by the school (mirrors the public form's dropdown).
+_STANDARD_CLASSES = [
+    "nursery", "lkg", "ukg",
+] + [f"class {n}" for n in range(1, 13)]
+
+
+def _known_classes():
+    """Lower-cased set of valid target classes: the standard list plus any
+    class names actually present in the portal_class table (so pre-existing
+    records and admin-created classes keep validating)."""
+    known = set(_STANDARD_CLASSES)
+    try:
+        from django.db import connection
+        with connection.cursor() as cur:
+            cur.execute("SELECT DISTINCT LOWER(name) FROM portal_class")
+            known.update(r[0] for r in cur.fetchall() if r[0])
+    except Exception:
+        pass
+    return known
+
 
 def _check_doc(value, label):
-    if value is None:
+    """Accept either an uploaded file or an absolute http(s) URL reference."""
+    if value is None or value == "":
         return value
+    if isinstance(value, str):
+        if _URL_RE.match(value.strip()):
+            return value.strip()
+        raise serializers.ValidationError(
+            f"{label} must be an uploaded file or an http(s) URL."
+        )
     ext = os.path.splitext(value.name or "")[1].lower()
     if ext not in _ALLOWED_DOC_TYPES:
         raise serializers.ValidationError(
@@ -29,6 +63,30 @@ def _check_doc(value, label):
     if value.size and value.size > _MAX_DOC_MB * 1024 * 1024:
         raise serializers.ValidationError(f"{label} must be {_MAX_DOC_MB}MB or smaller.")
     return value
+
+
+class FlexibleDocumentField(serializers.FileField):
+    """FileField that also accepts an absolute http(s) URL string.
+
+    DRF's FileField rejects any non-file value before validators run, so the
+    URL branch must live here in to_internal_value (see BUG-02 / LIVE-1).
+    """
+
+    def to_internal_value(self, data):
+        if isinstance(data, str) and _URL_RE.match(data.strip()):
+            return data.strip()
+        return super().to_internal_value(data)
+
+    def to_representation(self, value):
+        if value is None:
+            return None
+        # Stored URL references come back as-is instead of being re-prefixed
+        # with MEDIA_URL by the FileField machinery. On a model instance the
+        # value is a FieldFile whose `.name` holds the stored string.
+        raw = getattr(value, "name", None) or value
+        if isinstance(raw, str) and _URL_RE.match(raw.strip()):
+            return raw.strip()
+        return super().to_representation(value)
 
 
 def _check_phone(value, label):
@@ -47,6 +105,15 @@ class AdmissionEnquirySerializer(serializers.ModelSerializer):
     own status by registration_number, but cannot set status/review/admin
     pipeline fields. Phone numbers, date-of-birth and percentage are
     validated at the API level (not just in the browser)."""
+
+    id_proof_document = FlexibleDocumentField(required=False, allow_null=True)
+    doc_aadhaar_card = FlexibleDocumentField(required=False, allow_null=True)
+    doc_address_proof = FlexibleDocumentField(required=False, allow_null=True)
+    doc_birth_certificate = FlexibleDocumentField(required=False, allow_null=True)
+    doc_parent_id = FlexibleDocumentField(required=False, allow_null=True)
+    doc_passport_photo = FlexibleDocumentField(required=False, allow_null=True)
+    doc_previous_marks = FlexibleDocumentField(required=False, allow_null=True)
+    doc_transfer_certificate = FlexibleDocumentField(required=False, allow_null=True)
 
     class Meta:
         model = AdmissionEnquiry
@@ -95,6 +162,25 @@ class AdmissionEnquirySerializer(serializers.ModelSerializer):
             "scholarship_discount", "student_admission_number",
             "student_roll_number",
         ]
+
+    def validate_gender(self, value):
+        if value in (None, ""):
+            return value
+        if str(value).strip().lower() not in _ALLOWED_GENDERS:
+            raise serializers.ValidationError(
+                "gender must be one of: Male, Female, Other."
+            )
+        return value
+
+    def validate_target_class(self, value):
+        if value in (None, ""):
+            return value
+        known = _known_classes()
+        if str(value).strip().lower() not in known:
+            raise serializers.ValidationError(
+                f"target_class '{value}' is not a class offered by the school."
+            )
+        return value
 
     def validate_parent_phone(self, value):
         if value in (None, ""):

@@ -1038,7 +1038,17 @@ def _admission_detail_payload(e):
     })
     for field in DOC_FIELDS:
         f = getattr(e, field, None)
-        payload[field] = f.url if f else None
+        if not f:
+            payload[field] = None
+            continue
+        # URL references (enquiries submitted with an http(s) URL as the
+        # document) are stored verbatim and must not be re-prefixed with
+        # MEDIA_URL by the FileField machinery.
+        name = getattr(f, "name", None) or str(f)
+        if name.startswith(("http://", "https://")):
+            payload[field] = name
+        else:
+            payload[field] = f.url
     return payload
 
 

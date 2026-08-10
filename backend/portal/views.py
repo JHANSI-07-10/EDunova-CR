@@ -664,6 +664,12 @@ def validate_leave_dates(payload):
             None,
             None,
         )
+    if start < date.today():
+        return (
+            Response({"detail": "start_date cannot be in the past."}, status=status.HTTP_400_BAD_REQUEST),
+            None,
+            None,
+        )
     return None, start, end
 
 

@@ -102,10 +102,25 @@ class CampusViewSet(PublicReadViewSet):
             )
             return 2 * r * math.asin(math.sqrt(a))
 
-        try:
-            lat = float(request.query_params.get("lat"))
-            lng = float(request.query_params.get("lng"))
-        except (TypeError, ValueError):
+        raw_lat = request.query_params.get("lat")
+        raw_lng = request.query_params.get("lng")
+        if raw_lat is not None or raw_lng is not None:
+            # Coordinates supplied but unparseable -> 400 instead of silently
+            # returning a fallback campus (the caller asked for a specific spot).
+            try:
+                lat = float(raw_lat)
+                lng = float(raw_lng)
+            except (TypeError, ValueError):
+                return Response(
+                    {"detail": "lat and lng must be valid numbers."},
+                    status=400,
+                )
+            if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+                return Response(
+                    {"detail": "lat must be between -90 and 90, lng between -180 and 180."},
+                    status=400,
+                )
+        else:
             lat = lng = None
 
         campuses = list(Campus.objects.all())

@@ -944,6 +944,10 @@ class ClassRosterView(TeacherMixin, APIView):
         },
     )
     def get(self, request, class_id):
+        if not table_exists("portal_class") or not row(
+            "SELECT 1 FROM portal_class WHERE id=%s", [class_id]
+        ):
+            return Response({"detail": "Class not found."}, status=404)
         if not table_exists("portal_student_enrollment"):
             return Response([])
         data = rows(
