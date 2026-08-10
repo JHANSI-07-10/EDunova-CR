@@ -69,6 +69,12 @@ jobs:
       - name: Run tests
         run: python manage.py test --verbosity 1
 
+      # apply_portal_schema creates tables that REFERENCE Django tables
+      # (auth_user, ...). On a fresh runner the main DB is empty (tests use a
+      # separate test_postgres DB), so apply migrations first.
+      - name: Migrate database
+        run: python manage.py migrate --noinput
+
       - name: Apply portal schema idempotency check
         run: python manage.py apply_portal_schema
 
