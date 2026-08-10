@@ -23,6 +23,10 @@ def _cast_debug(val):
     return str(val).lower() in ("true", "1", "yes")
 
 DEBUG = config("DEBUG", default=False, cast=_cast_debug)
+# `manage.py test` runs with DEBUG=False but its client speaks plain HTTP —
+# the request must not be 301-redirected to HTTPS or every status assertion
+# in the suite breaks. Bypass the TLS hardening below while testing.
+RUNNING_TESTS = "test" in sys.argv
 ALLOWED_HOSTS = [
     h.strip()
     for h in config("ALLOWED_HOSTS", default="localhost,127.0.0.1").split(",")
@@ -312,8 +316,10 @@ _STORAGE_MISCONFIGURED = not (SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)
 # ---------------------------------------------------------------------------
 # Production TLS / security hardening. Every flag defaults off so local
 # development over http://localhost is unaffected; enable them in production.
+# Skipped while running the test suite (RUNNING_TESTS) so the plain-HTTP test
+# client is not redirected to HTTPS (production defaults are unchanged).
 # ---------------------------------------------------------------------------
-if not DEBUG:
+if not DEBUG and not RUNNING_TESTS:
     SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
     SECURE_SSL_REDIRECT = config("SECURE_SSL_REDIRECT", default=True, cast=bool)
     SESSION_COOKIE_SECURE = config("SESSION_COOKIE_SECURE", default=True, cast=bool)
