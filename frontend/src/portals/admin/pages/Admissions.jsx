@@ -211,7 +211,7 @@ export default function Admissions() {
       {activeTab === "reports" && <AdmissionReports />}
 
       {showForm && <ManualAdmissionForm onClose={() => setShowForm(false)} onSaved={(msg) => { setShowForm(false); setToast(msg); load(); }} />}
-      {detail && <ApplicationDetailModal detail={detail} onClose={() => setDetail(null)} onAction={(msg) => { setDetail(null); setToast(msg); load(); }} />}
+      {detail && <ApplicationDetailModal detail={detail} onClose={() => setDetail(null)} onAction={(msg, stayOpen) => { if (!stayOpen) setDetail(null); setToast(msg); if (!stayOpen) load(); }} />}
       <Toast message={toast} onClose={() => setToast("")} />
     </div>
   );
@@ -296,14 +296,24 @@ function ApplicationDetailModal({ detail, onClose, onAction }) {
   const [activePanel, setActivePanel] = useState("overview");
   const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({});
+  const [localDetail, setLocalDetail] = useState(detail);
 
-  const regNo = detail.registration_number;
+  const regNo = localDetail.registration_number;
+  const currentDetail = localDetail;
 
-  async function postAction(endpoint, payload, successMsg) {
+  // Every workflow panel endpoint returns the full (updated) application
+  // record, so refresh the modal's local copy from the response. Modules
+  // allocation keeps the modal open so the newly entered details show inline.
+  async function postAction(endpoint, payload, successMsg, stayOpen) {
     setLoading(true);
     try {
-      await api.post(`/admin-portal/admissions/${regNo}/${endpoint}/`, payload);
-      onAction(successMsg);
+      const { data } = await api.post(`/admin-portal/admissions/${regNo}/${endpoint}/`, payload);
+      if (data && data.registration_number) setLocalDetail(data);
+      if (stayOpen) {
+        onAction?.(successMsg, true);
+      } else {
+        onAction(successMsg);
+      }
     } catch (e) {
       onAction(e?.response?.data?.detail || "Action failed.");
     } finally { setLoading(false); }
@@ -482,19 +492,23 @@ function EligibilityPanel({ regNo, detail, postAction, loading }) {
       {result && (
         <div className="bg-slate-50 rounded-xl p-4 space-y-2 text-sm">
           <div className="flex items-center gap-2">
-            {result.age_eligible ? <CheckCircle2 size={14} className="text-emerald-500" /> : <XCircle size={14} className="text-red-500" />}
+            {result.age_eligible ? <CheckCircle2 size={14} className="text-emerald-500" /> : <AlertTriangle size={14} className="text-amber-500" />}
             <span>{result.age_reason}</span>
           </div>
           <div className="flex items-center gap-2">
-            {result.academic_eligible ? <CheckCircle2 size={14} className="text-emerald-500" /> : <XCircle size={14} className="text-red-500" />}
+            {result.academic_eligible ? <CheckCircle2 size={14} className="text-emerald-500" /> : <AlertTriangle size={14} className="text-amber-500" />}
             <span>{result.academic_reason}</span>
           </div>
           <div className="flex items-center gap-2">
-            {result.documents_eligible ? <CheckCircle2 size={14} className="text-emerald-500" /> : <XCircle size={14} className="text-red-500" />}
+            {result.documents_eligible ? <CheckCircle2 size={14} className="text-emerald-500" /> : <AlertTriangle size={14} className="text-amber-500" />}
             <span>{result.documents_reason}</span>
           </div>
           {result.duplicate_check && <p className="text-red-600 text-xs">Duplicate admission found!</p>}
-          <p className="font-semibold mt-2">Overall: {result.overall_eligible ? 'Eligible' : 'Not Eligible'}</p>
+          {result.overall_eligible ? (
+            <p className="font-semibold mt-2">Overall: <span className="text-emerald-600">Eligible</span> <span className="text-xs font-normal text-ink-secondary">(review warnings below — final decision in the Decision panel)</span></p>
+          ) : (
+            <p className="font-semibold mt-2">Overall: <span className="text-red-600">Not Eligible</span> <span className="text-xs font-normal text-ink-secondary">(duplicate application detected)</span></p>
+          )}
         </div>
       )}
     </div>
@@ -660,21 +674,93 @@ function AllocationPanel({ regNo, detail, postAction, loading }) {
   );
 }
 
+const MODULE_FIELDS = {
+  Transport: [
+    { key: "route_name", label: "Route Name", placeholder: "e.g. Route 12 — Dwarka Sector 21" },
+    { key: "pickup_point", label: "Pickup Point", placeholder: "e.g. Sector 21 Gate 2" },
+    { key: "pickup_time", label: "Pickup Time", placeholder: "e.g. 07:30 AM" },
+  ],
+  Hostel: [
+    { key: "hostel_name", label: "Hostel Block", placeholder: "e.g. Boys Block A" },
+    { key: "room_number", label: "Room Number", placeholder: "e.g. A-204" },
+    { key: "warden_contact", label: "Warden Contact", placeholder: "e.g. +91 98765 43210" },
+  ],
+  Library: [
+    { key: "membership_type", label: "Membership Type", placeholder: "e.g. Annual / Term" },
+    { key: "library_card", label: "Library Card No.", placeholder: "e.g. LIB-2026-0042" },
+  ],
+  LMS: [
+    { key: "lms_username", label: "LMS Username", placeholder: "e.g. student.roll@edunova.edu" },
+    { key: "access_level", label: "Access Level", placeholder: "e.g. Full courses + assessments" },
+    { key: "lms_url", label: "LMS URL", placeholder: "e.g. https://lms.edunova.edu" },
+  ],
+};
+
 function ModulesPanel({ regNo, detail, postAction, loading }) {
+  const [form, setForm] = useState({});
+  const allocated = detail?.module_allocations || [];
+
+  function handleAllocate(mod) {
+    const allocation_data = {};
+    (MODULE_FIELDS[mod] || []).forEach((f) => {
+      if (form[`${mod}.${f.key}`]) allocation_data[f.key] = form[`${mod}.${f.key}`];
+    });
+    postAction("modules", { module_type: mod, allocation_data }, `${mod} allocated.`, true);
+  }
+
   return (
     <div className="space-y-4">
       <h4 className="font-semibold text-sm">Phase 15: Optional Module Allocation</h4>
+      {allocated.length > 0 && (
+        <div className="space-y-2">
+          {allocated.map((a) => (
+            <div key={a.module_type} className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm">
+              <div className="flex items-center gap-2 font-semibold text-emerald-800">
+                {a.module_type === "Transport" && <Bus size={14} />}
+                {a.module_type === "Hostel" && <Home size={14} />}
+                {a.module_type === "Library" && <BookOpen size={14} />}
+                {a.module_type === "LMS" && <GraduationCap size={14} />}
+                {a.module_type} — Allocated
+              </div>
+              {(a.allocation_data && Object.keys(a.allocation_data).length > 0) ? (
+                <div className="mt-1 grid grid-cols-2 gap-x-4 gap-y-1 text-xs text-emerald-900">
+                  {Object.entries(a.allocation_data).map(([k, v]) => (
+                    <div key={k}><span className="font-medium capitalize">{k.replace(/_/g, " ")}:</span> {v}</div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-emerald-700 mt-1">Allocated (details not entered).</p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
       <div className="grid grid-cols-2 gap-3">
         {["Transport", "Hostel", "Library", "LMS"].map((mod) => (
-          <button key={mod} disabled={loading}
-            onClick={() => postAction("modules", { module_type: mod, allocation_data: {} }, `${mod} allocated.`)}
-            className="p-4 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium hover:bg-slate-100 disabled:opacity-60 flex items-center gap-2">
-            {mod === "Transport" && <Bus size={16} />}
-            {mod === "Hostel" && <Home size={16} />}
-            {mod === "Library" && <BookOpen size={16} />}
-            {mod === "LMS" && <GraduationCap size={16} />}
-            Allocate {mod}
-          </button>
+          <div key={mod} className="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+            <button disabled={loading}
+              onClick={() => handleAllocate(mod)}
+              className="w-full text-sm font-medium hover:bg-slate-100 disabled:opacity-60 flex items-center gap-2 pb-2">
+              {mod === "Transport" && <Bus size={16} />}
+              {mod === "Hostel" && <Home size={16} />}
+              {mod === "Library" && <BookOpen size={16} />}
+              {mod === "LMS" && <GraduationCap size={16} />}
+              Allocate {mod}
+            </button>
+            <div className="space-y-2 border-t border-slate-200 pt-2">
+              {(MODULE_FIELDS[mod] || []).map((f) => (
+                <div key={f.key}>
+                  <label className="text-xs font-semibold text-slate-500">{f.label}</label>
+                  <input
+                    value={form[`${mod}.${f.key}`] || ""}
+                    onChange={(e) => setForm((p) => ({ ...p, [`${mod}.${f.key}`]: e.target.value }))}
+                    placeholder={f.placeholder}
+                    className="w-full border border-slate-200 rounded-lg px-2 py-1.5 text-xs outline-none"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
     </div>

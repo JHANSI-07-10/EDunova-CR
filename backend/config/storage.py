@@ -21,6 +21,7 @@ settings.py; anything unmapped uses the default LMS bucket. Tune the mapping
 if your Supabase project uses different bucket names.
 """
 import logging
+import mimetypes
 
 from django.conf import settings
 from django.core.files.base import ContentFile
@@ -83,8 +84,14 @@ class SupabaseStorage(Storage):
 
         data = content.read()
         bucket = self._bucket_name(name)
+        # Supabase stores objects with the content-type they were uploaded
+        # with; without this, every upload defaults to text/plain and browsers
+        # refuse to render PDFs/images served from the public CDN URL.
+        content_type = mimetypes.guess_type(name)[0] or "application/octet-stream"
         try:
-            self._client.storage.from_(bucket).upload(name, data)
+            self._client.storage.from_(bucket).upload(
+                name, data, {"content-type": content_type}
+            )
             return name
         except Exception as exc:
             logger.warning(

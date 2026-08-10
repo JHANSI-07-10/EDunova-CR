@@ -1033,6 +1033,7 @@ def _admission_detail_payload(e):
             "house": e.house,
             "roll_number": e.student_roll_number,
         } if (e.allocated_class or e.allocated_section or e.student_roll_number) else None,
+        "module_allocations": e.module_allocations or [],
     })
     for field in DOC_FIELDS:
         f = getattr(e, field, None)
@@ -1169,6 +1170,9 @@ class AdmissionEligibilityView(AdminMixin, APIView):
             return Response({"detail": "Application not found."}, status=404)
 
         # Age check vs. typical age for target class (Class N -> age N+5).
+        # Advisory: an out-of-range age is surfaced as a warning for the admin
+        # to review — it does not hard-block eligibility (schools may admit
+        # with discretion; the final decision lives in the Decision panel).
         import re as _re
         m = _re.search(r"(\d+)", enquiry.target_class or "")
         expected_age = (int(m.group(1)) + 5) if m else 6
@@ -1176,15 +1180,17 @@ class AdmissionEligibilityView(AdminMixin, APIView):
         age_reason = "Date of birth not provided."
         if enquiry.date_of_birth:
             age = (date.today() - enquiry.date_of_birth).days / 365.25
-            if abs(age - expected_age) <= 2.5:
+            if abs(age - expected_age) <= 3.5:
                 age_reason = f"Age {age:.1f} years is within range for {enquiry.target_class} (typical {expected_age})."
             else:
                 age_reason = f"Age {age:.1f} years is outside the typical range for {enquiry.target_class} (expected ~{expected_age})."
-        age_eligible = age is not None and abs(age - expected_age) <= 2.5
+        age_eligible = age is not None and abs(age - expected_age) <= 3.5
 
-        # Academic check: percentage present and reasonable, or previous school recorded.
-        academic_reason = "No previous academic record provided."
-        academic_eligible = False
+        # Academic check: percentage present and reasonable, or previous school
+        # recorded. Advisory: a missing record (fresh applicant, or not yet
+        # entered) is a warning, not a hard failure — it is assessed at interview.
+        academic_reason = "No previous academic record provided (will be assessed at interview)."
+        academic_eligible = True
         try:
             pct = float(enquiry.percentage) if enquiry.percentage else None
         except (TypeError, ValueError):
@@ -1196,17 +1202,27 @@ class AdmissionEligibilityView(AdminMixin, APIView):
             academic_eligible = True
             academic_reason = f"Previous school {enquiry.prev_school_name} recorded."
 
-        # Documents check.
-        missing = [f for f in DOC_FIELDS if not getattr(enquiry, f, None)]
-        documents_eligible = len(missing) == 0
-        documents_reason = "All required documents uploaded." if documents_eligible else f"Missing: {', '.join(missing)}."
+        # Documents check. Advisory: only the core identity documents are
+        # expected at eligibility time; the rest are collected later in the
+        # Documents phase, so missing optional docs are warnings, not blockers.
+        CORE_DOC_FIELDS = ["doc_birth_certificate", "doc_aadhaar_card", "doc_passport_photo"]
+        missing_core = [f for f in CORE_DOC_FIELDS if not getattr(enquiry, f, None)]
+        documents_eligible = len(missing_core) == 0
+        optional_missing = [f for f in DOC_FIELDS if f not in CORE_DOC_FIELDS and not getattr(enquiry, f, None)]
+        if documents_eligible:
+            documents_reason = "Core documents uploaded."
+            if optional_missing:
+                documents_reason += f" Optional docs pending: {', '.join(optional_missing)}."
+        else:
+            documents_reason = f"Missing core docs: {', '.join(missing_core)}."
 
-        # Duplicate check on parent phone/email across active applications.
+        # Duplicate check on parent phone/email across active applications —
+        # the only hard blocker at the eligibility stage.
         duplicate = AdmissionEnquiry.objects.exclude(pk=enquiry.pk).filter(
             models.Q(parent_phone=enquiry.parent_phone) | models.Q(parent_email__iexact=enquiry.parent_email)
         ).exclude(status__in=["Rejected", "Withdrawn"]).exists()
 
-        overall = age_eligible and academic_eligible and documents_eligible
+        overall = not duplicate
         enquiry.is_eligible = overall
         enquiry.eligibility_notes = f"{age_reason} {academic_reason} {documents_reason}"
         enquiry.status = "Eligibility_Check"
@@ -1360,6 +1376,18 @@ class AdmissionWorkflowActionView(AdminMixin, APIView):
             module_type = d.get("module_type")
             if module_type not in ("Transport", "Hostel", "Library", "LMS"):
                 return Response({"detail": "Invalid module type."}, status=400)
+            # Persist the module allocation (upsert by module_type) so the
+            # Modules panel can show details per allocated module.
+            allocation_data = d.get("allocation_data") or {}
+            allocations = list(enquiry.module_allocations or [])
+            allocations = [a for a in allocations if a.get("module_type") != module_type]
+            allocations.append({
+                "module_type": module_type,
+                "allocation_data": allocation_data,
+                "allocated_at": now().isoformat(),
+            })
+            enquiry.module_allocations = allocations
+            enquiry.save(update_fields=["module_allocations"])
             _add_notification(f"{module_type} allocated", f"{module_type} module allocated for {enquiry.applicant_name}.", request.user.id)
             log_action(request.user, "admission.module_allocated", "admission", registration_number, {"module": module_type})
             return Response(serialise(_admission_detail_payload(enquiry)))

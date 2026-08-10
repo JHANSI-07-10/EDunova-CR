@@ -145,6 +145,10 @@ class AdmissionEnquiry(models.Model):
     student_user_id = models.IntegerField(null=True, blank=True)
     parent_user_id = models.IntegerField(null=True, blank=True)
 
+    # --- Optional module allocations (Transport/Hostel/Library/LMS) --------
+    # List of {"module_type", "allocation_data", "allocated_at"} dicts.
+    module_allocations = models.JSONField(default=list, blank=True)
+
     class Meta:
         ordering = ["-submitted_at"]
 
