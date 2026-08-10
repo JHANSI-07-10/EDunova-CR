@@ -1596,7 +1596,7 @@ class FileUploadView(APIView):
             )
 
         if getattr(settings, "DEBUG", False):
-            logger.info("Upload user_id=%s name=%s bytes=%s type=%s", request.user.id, name, file_size, ctype)
+            logger.info("Upload user_id=%s bytes=%s", request.user.id, file_size)
 
         bucket_name = request.data.get('bucket', 'lms-resources')
         from supabase import create_client

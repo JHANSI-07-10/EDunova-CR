@@ -35,6 +35,7 @@ from django.conf import settings
 from django.core.management import call_command
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection
+from psycopg2 import sql as pysql
 
 from portal.admin_views import EXPORT_TABLES
 from portal.views import table_exists
@@ -88,7 +89,7 @@ class Command(BaseCommand):
             for table in EXPORT_TABLES:
                 if not table_exists(table):
                     continue
-                cursor.execute(f"SELECT * FROM {table}")
+                cursor.execute(pysql.SQL("SELECT * FROM {}").format(pysql.Identifier(table)))
                 cols = [c[0] for c in cursor.description]
                 snapshot["portal_tables"][table] = [dict(zip(cols, r, strict=True)) for r in cursor.fetchall()]
 

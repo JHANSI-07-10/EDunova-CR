@@ -15,14 +15,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python deps first so the layer is cached until requirements change.
+# --only-binary :all: prevents dependency setup scripts from running inside the
+# image (all pinned requirements ship wheels for python:3.12-slim).
 COPY requirements.txt ./
-RUN pip install --upgrade pip && pip install -r requirements.txt
+RUN python -m pip install --upgrade "pip==25.0.1" \
+    && python -m pip install --only-binary :all: -r requirements.txt
 
-COPY . .
+# Copy only the application code — never build artifacts, env files or docs.
+COPY manage.py entrypoint.sh pyproject.toml runtime.txt ./
+COPY apps ./apps
+COPY config ./config
+COPY portal ./portal
+COPY templates ./templates
 
 # Run as a non-root user (security hardening).
 RUN useradd --create-home --uid 1000 appuser \
-    && chown -R appuser:appuser /app
+    && chown -R appuser:appuser /app \
+    && chmod +x /app/entrypoint.sh
 USER appuser
 
 EXPOSE 8000

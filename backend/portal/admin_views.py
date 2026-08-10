@@ -1,4 +1,6 @@
 from datetime import date, timedelta
+from urllib.parse import urlsplit
+
 from django.utils.timezone import now
 
 from django.contrib.auth import get_user_model
@@ -8,6 +10,7 @@ from django.contrib.auth.models import Group
 from django.db import IntegrityError, connection, models, transaction
 from django.utils.crypto import get_random_string
 from django.utils.dateparse import parse_datetime
+from psycopg2 import sql as pysql
 from drf_spectacular.types import OpenApiTypes
 from drf_spectacular.utils import (
     extend_schema,
@@ -1044,7 +1047,7 @@ def _admission_detail_payload(e):
         # document) are stored verbatim and must not be re-prefixed with
         # MEDIA_URL by the FileField machinery.
         name = getattr(f, "name", None) or str(f)
-        if name.startswith(("http://", "https://")):
+        if urlsplit(str(name)).scheme in ("http", "https"):
             payload[field] = name
         else:
             payload[field] = f.url
@@ -1896,11 +1899,17 @@ class SimpleTableView(AdminMixin, APIView):
             cols.append(c)
             placeholders.append("%s")
             values.append(v)
-        col_sql = ",".join(cols)
-        placeholder_sql = ",".join(placeholders)
         try:
             with connection.cursor() as cursor:
-                cursor.execute(f"INSERT INTO {table} ({col_sql}) VALUES ({placeholder_sql}) RETURNING id", values)
+                insert_stmt = pysql.SQL("INSERT INTO {} ({}) VALUES ({}) RETURNING id").format(
+                    pysql.Identifier(table),
+                    pysql.SQL(", ").join(pysql.Identifier(c) for c in cols),
+                    pysql.SQL(", ").join(
+                        pysql.Placeholder() if p == "%s" else pysql.SQL("DEFAULT")
+                        for p in placeholders
+                    ),
+                )
+                cursor.execute(insert_stmt, values)
                 new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response(

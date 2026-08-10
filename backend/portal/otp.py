@@ -1,4 +1,4 @@
-import random
+import secrets
 
 from django.conf import settings
 from django.core.cache import cache
@@ -11,7 +11,7 @@ def generate_and_send_otp(user):
     """Generates a numeric OTP, stores it in cache (5 min expiry per
     settings.OTP_EXPIRY_SECONDS) and emails it via the configured SMTP
     backend (console backend in dev — see EMAIL_BACKEND in .env)."""
-    otp = "".join(random.choices("0123456789", k=settings.OTP_LENGTH))
+    otp = "".join(secrets.choice("0123456789") for _ in range(settings.OTP_LENGTH))
     cache.set(f"{OTP_CACHE_PREFIX}{user.id}", otp, timeout=settings.OTP_EXPIRY_SECONDS)
 
     send_mail(

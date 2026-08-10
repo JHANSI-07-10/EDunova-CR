@@ -17,6 +17,7 @@ from django.urls import get_resolver
 from django.test import Client
 from django.http import HttpResponse
 from django.utils.timezone import now
+from django.views.decorators.http import require_GET
 
 
 def _clean_segment(segment):
@@ -158,6 +159,7 @@ def status_dashboard(request):
 # view with `@staff_member_required` so only logged-in admins can see it.
 
 
+@require_GET
 def backend_live_view(request):
     """Public branded landing page for the API root (https://host/).
     Shows a live badge, a real DB connectivity check, and links to the
