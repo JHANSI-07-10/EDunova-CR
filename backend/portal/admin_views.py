@@ -1836,11 +1836,23 @@ class SimpleTableView(AdminMixin, APIView):
             return Response([])
         return Response(serialise(rows(f"SELECT * FROM {self.table} ORDER BY {self.order_by}")))
 
+    def validate_create(self, payload):
+        """Optional per-view create validation hook.
+
+        Subclasses override to enforce business rules (negative quantities,
+        cross-field invariants). Return a Response to reject, or None to
+        proceed. `payload` is the raw request body (dict).
+        """
+        return None
+
     def post(self, request):
         if not table_exists(self.table):
             return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
         if not isinstance(request.data, dict):
             return Response({"detail": "A JSON object body is required."}, status=400)
+        reject = self.validate_create(request.data)
+        if reject is not None:
+            return reject
         cols, placeholders, values = [], [], []
         for c in self.columns:
             v = request.data.get(c)
@@ -2062,6 +2074,34 @@ class LibraryBookView(SimpleTableView):
     columns = ("title", "author", "isbn", "barcode_id", "quantity", "available_quantity", "book_type", "digital_file_url")
     order_by = "title"
     int_columns = ("quantity", "available_quantity")
+
+    def validate_create(self, payload):
+        """Enforce inventory invariants: non-negative quantities and
+        available_quantity cannot exceed total quantity."""
+        if not str(payload.get("title") or "").strip():
+            return Response({"title": ["Title is required."]}, status=400)
+        for field in ("quantity", "available_quantity"):
+            raw = payload.get(field)
+            if raw in (None, ""):
+                continue  # falls back to the DB DEFAULT (1)
+            try:
+                value = int(raw)
+            except (TypeError, ValueError):
+                return Response({field: [f"{field} must be an integer."]}, status=400)
+            if value < 0:
+                return Response({field: [f"{field} cannot be negative."]}, status=400)
+        qty = payload.get("quantity")
+        avail = payload.get("available_quantity")
+        if qty not in (None, "") and avail not in (None, ""):
+            try:
+                if int(avail) > int(qty):
+                    return Response(
+                        {"available_quantity": ["available_quantity cannot exceed quantity."]},
+                        status=400,
+                    )
+            except (TypeError, ValueError):
+                pass  # int coercion already reported above
+        return None
 
     @extend_schema(
         operation_id="AdminLibraryBookList",

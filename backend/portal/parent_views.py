@@ -1,3 +1,4 @@
+import re
 from uuid import uuid4
 
 from django.db import connection
@@ -1042,9 +1043,37 @@ class PtmBookingView(ParentMixin, APIView):
             return Response({"detail": "teacher_id, student_id, meeting_date and time_slot are required."}, status=400)
         from datetime import date as _date
         try:
-            _date.fromisoformat(str(meeting_date))
+            meeting = _date.fromisoformat(str(meeting_date))
         except (TypeError, ValueError):
             return Response({"detail": "meeting_date must be a valid date (YYYY-MM-DD)."}, status=400)
+        # Business rules: future date only, a known teacher, a sane slot format,
+        # and no double-booking of the same parent + teacher + slot.
+        if meeting < _date.today():
+            return Response({"detail": "meeting_date cannot be in the past."}, status=400)
+        try:
+            teacher_id = int(teacher_id)
+            student_id = int(student_id)
+        except (TypeError, ValueError):
+            return Response({"detail": "teacher_id and student_id must be integers."}, status=400)
+        if not table_exists("portal_teacher_profile") or not row(
+            "SELECT 1 FROM portal_teacher_profile WHERE user_id=%s", [teacher_id]
+        ):
+            return Response({"detail": "Teacher not found."}, status=404)
+        if not table_exists("portal_student_enrollment") or not row(
+            "SELECT 1 FROM portal_student_enrollment WHERE student_id=%s", [student_id]
+        ):
+            return Response({"detail": "Student not found."}, status=404)
+        if not re.match(r"^\d{1,2}:\d{2}(\s*-\s*\d{1,2}:\d{2})?$", str(time_slot).strip()):
+            return Response(
+                {"detail": "time_slot must use the format HH:MM or HH:MM-HH:MM."},
+                status=400,
+            )
+        existing = row(
+            "SELECT id FROM portal_ptm_booking WHERE parent_id=%s AND teacher_id=%s AND time_slot=%s AND meeting_date=%s",
+            [request.user.id, teacher_id, str(time_slot).strip(), meeting_date],
+        )
+        if existing:
+            return Response({"detail": "A meeting for this teacher and slot is already booked."}, status=400)
         with connection.cursor() as cursor:
             cursor.execute(
                 """

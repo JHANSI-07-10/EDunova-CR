@@ -16,6 +16,7 @@ production.
 import logging
 
 from django.core.exceptions import (
+    ObjectDoesNotExist,
     PermissionDenied as DjangoPermissionDenied,
     ValidationError as DjangoValidationError,
 )
@@ -75,12 +76,36 @@ def _log_unexpected(exc, request):
     )
 
 
+def _convert_db_errors(exc):
+    """Map DB-level errors DRF does not understand to clean API responses.
+
+    Returns a (Response, None) pair, or (None, None) when the exception is
+    not one we convert here.
+    """
+    if isinstance(exc, IntegrityError):
+        return Response(
+            {
+                "detail": "The record could not be saved: a referenced record is missing or a unique value already exists.",
+                "code": "integrity_error",
+            },
+            status=400,
+        )
+    if isinstance(exc, (ObjectDoesNotExist, Http404)):
+        return Response({"detail": "The requested resource was not found.", "code": "not_found"}, status=404)
+    return None
+
+
 def edunova_exception_handler(exc, context):
     """DRF EXCEPTION_HANDLER: consistent envelope + safe 500s + structured logs."""
     response = exception_handler(exc, context)
 
     if response is None:
-        # DRF could not map this exception -> unexpected 500.
+        # Exceptions DRF does not natively understand: convert the common
+        # DB-level ones (IntegrityError, DoesNotExist) to clean 400/404s;
+        # everything else is an unexpected 500 (logged, never leaked).
+        converted = _convert_db_errors(exc)
+        if converted is not None:
+            return converted
         _log_unexpected(exc, context.get("request"))
         return Response(
             {
