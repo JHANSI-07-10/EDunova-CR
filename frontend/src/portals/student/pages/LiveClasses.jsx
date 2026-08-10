@@ -3,7 +3,7 @@ import {
   ArrowLeft, PlayCircle, BookOpen
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, Badge, Toast } from "../components/Common";
+import { Card, EmptyState, Loader, Badge, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function LiveClasses() {

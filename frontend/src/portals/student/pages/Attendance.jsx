@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 import { isNonEmptyString, isValidDateRange } from "../../../utils/validation";
 

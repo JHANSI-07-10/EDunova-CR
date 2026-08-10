@@ -12,7 +12,7 @@ import {
   List,
   ChevronDown,
 } from "lucide-react";
-import { Card, EmptyState, Loader } from "../components/Common";
+import { Card, EmptyState, Loader } from "../../shared/components/Common";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 

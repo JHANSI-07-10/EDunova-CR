@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Card } from '../components/Common'
+import { Card } from "../../shared/components/Common"
 import api from '../lib/api'
 
 export default function NewsAndEvents() {

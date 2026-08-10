@@ -7,7 +7,7 @@ import {
   ChevronRight, Info, Zap, Home, MapPin, MessageSquare, CheckSquare,
   CircleDot, ArrowRight, ListChecks, Loader2,
 } from "lucide-react";
-import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const DAY_SHORT = { Monday: "Mon", Tuesday: "Tue", Wednesday: "Wed", Thursday: "Thu", Friday: "Fri", Saturday: "Sat", Sunday: "Sun" };

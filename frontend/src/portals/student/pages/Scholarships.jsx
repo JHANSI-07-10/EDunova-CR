@@ -1,6 +1,6 @@
 import { Award, CheckCircle2, ChevronRight, FileText, Info, Loader2, Send, Clock, ShieldCheck, XCircle, RefreshCw, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, Toast, Badge, SectionTitle } from "../components/Common";
+import { Card, EmptyState, Loader, Toast, Badge, SectionTitle } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const STATUS_CONFIG = {

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, Loader, Toast, Badge } from "../components/Common";
+import { Card, Loader, Toast, Badge } from "../../shared/components/Common";
 import IdCard from "../components/IdCard";
 import api from "../lib/api";
 import { isValidPhone, isNonEmptyString } from "../../../utils/validation";

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Download, FileText, Calendar, ShieldCheck, ClipboardList, Info } from "lucide-react";
-import { Card, Badge, Toast } from "../components/Common";
+import { Card, Badge, Toast } from "../../shared/components/Common";
 
 const STUDENT_DOWNLOADS = [
   {

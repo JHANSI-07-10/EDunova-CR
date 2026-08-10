@@ -1,7 +1,7 @@
 import { FileText } from "lucide-react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader } from "../components/Common";
+import { Card, EmptyState, Loader } from "../../shared/components/Common";
 import { useAuth } from "../context/AuthContext";
 
 export default function Documents() {

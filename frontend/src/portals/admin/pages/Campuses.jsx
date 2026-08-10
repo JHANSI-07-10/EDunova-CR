@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../../shared/components/Common";
 import { MapPin, Phone, Mail, Globe, Clock, Plus, Edit2, Trash2, Calendar, Check, X, ShieldAlert } from "lucide-react";
 import { isValidEmail, isValidPhone, isNonEmptyString } from "../../../utils/validation";
 

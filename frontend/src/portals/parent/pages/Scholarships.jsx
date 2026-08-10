@@ -1,6 +1,6 @@
 import { Award, CheckCircle2, ChevronRight, Download, FileText, Info, Loader2, Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, Toast, Badge, SectionTitle } from "../components/Common";
+import { Card, EmptyState, Loader, Toast, Badge, SectionTitle } from "../../shared/components/Common";
 import api from "../lib/api";
 import { useAuth } from "../context/AuthContext";
 

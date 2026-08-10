@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import { isNonEmptyString } from "../../../utils/validation";
 
 export default function MedicalRecords() {

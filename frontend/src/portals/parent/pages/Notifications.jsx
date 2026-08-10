@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader } from "../components/Common";
+import { Card, EmptyState, Loader } from "../../shared/components/Common";
 
 export default function Notifications() {
   const [items, setItems] = useState(null);

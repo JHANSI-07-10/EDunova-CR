@@ -1,7 +1,7 @@
 import { Check, CheckCheck, Clock3, HeartPulse, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const CYCLE = ["Present", "Absent", "Late", "Medical_Leave"];

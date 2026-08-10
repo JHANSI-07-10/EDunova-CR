@@ -3,7 +3,7 @@ import {
   FileText, Info, MapPin, Phone, Plus, RefreshCw, Shield, User, Users, X
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 import { isNonEmptyString, isValidDateRange } from "../../../utils/validation";
 

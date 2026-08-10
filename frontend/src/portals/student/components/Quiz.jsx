@@ -1,7 +1,7 @@
 import { Clock, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import api from "../lib/api";
-import { Loader } from "./Common";
+import { Loader } from "../../shared/components/Common";
 
 export default function Quiz({ courseId, onClose }) {
   // NOTE: prop is named courseId for call-site brevity but the value passed

@@ -84,3 +84,28 @@ export function Toast({ message, tone = "success", onClose }) {
     </div>
   );
 }
+
+export function Button({ children, onClick, type = "button", variant = "primary", size = "md", className = "" }) {
+  const baseStyle = "inline-flex items-center justify-center font-medium rounded-lg transition-colors focus:outline-none";
+  const sizeStyles = {
+    sm: "px-3 py-1.5 text-xs",
+    md: "px-4 py-2 text-sm",
+    lg: "px-5 py-2.5 text-base"
+  };
+  const variantStyles = {
+    primary: "bg-academic-blue text-white hover:bg-academic-blue/90",
+    secondary: "bg-gray-100 text-gray-700 hover:bg-gray-200",
+    outline: "border border-gray-300 text-gray-700 hover:bg-gray-50",
+    danger: "bg-red-600 text-white hover:bg-red-700"
+  };
+
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      className={`${baseStyle} ${sizeStyles[size]} ${variantStyles[variant]} ${className}`}
+    >
+      {children}
+    </button>
+  );
+}

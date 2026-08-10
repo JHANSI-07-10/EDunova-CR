@@ -1,6 +1,6 @@
 import { LifeBuoy, Mail, Phone } from "lucide-react";
 import { useState } from "react";
-import { Card, Toast } from "../components/Common";
+import { Card, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 import { isNonEmptyString } from "../../../utils/validation";
 

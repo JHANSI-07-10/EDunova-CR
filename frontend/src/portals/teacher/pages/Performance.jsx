@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../../shared/components/Common";
 import api from "../lib/api";
 import {
   Download, Send, X, ArrowRight, BookOpen, CalendarCheck, FileSpreadsheet,

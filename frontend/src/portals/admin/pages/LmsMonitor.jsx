@@ -3,7 +3,7 @@ import {
   Settings, ShieldAlert, BarChart3, Clock, User, CheckCircle, Search
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, SectionTitle, StatCard, Toast } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, StatCard, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function LmsMonitor() {

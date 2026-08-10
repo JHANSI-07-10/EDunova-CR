@@ -1,6 +1,6 @@
 import { ShieldCheck, UserCheck, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const STATUS_TONE = { Verification: "gold", Screening: "blue" };

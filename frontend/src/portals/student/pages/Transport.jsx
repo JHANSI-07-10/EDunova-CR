@@ -3,7 +3,7 @@ import {
   Navigation, Phone, RefreshCw, Shield, User
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, Toast } from "../components/Common";
+import { Card, EmptyState, Loader, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 import { isNonEmptyString } from "../../../utils/validation";
 

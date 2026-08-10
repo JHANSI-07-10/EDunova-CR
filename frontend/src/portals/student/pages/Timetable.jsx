@@ -12,7 +12,7 @@ import {
   LayoutGrid,
   List,
 } from "lucide-react";
-import { Card, EmptyState, Loader } from "../components/Common";
+import { Card, EmptyState, Loader } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../../shared/components/Common";
 
 function currentMonth() {
   const d = new Date();

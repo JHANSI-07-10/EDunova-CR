@@ -4,7 +4,7 @@ import {
   Clock, CheckCircle, PlusCircle, AlertCircle, Pencil, RotateCw, MessageSquare
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 import { isNonEmptyString, isPositiveNumber } from "../../../utils/validation";
 import CourseForum from "../../student/components/CourseForum";

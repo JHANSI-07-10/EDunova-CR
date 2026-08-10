@@ -1,7 +1,7 @@
 import { AlertTriangle, CheckCircle2, ClipboardCheck, Mail, ScrollText, Users } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function Dashboard() {

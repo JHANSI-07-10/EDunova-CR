@@ -1,6 +1,6 @@
 import { Plus, Trash2, Edit2, X, PlusCircle, CheckCircle2, Sparkles, FileUp, BarChart3, Send, BookOpen } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
-import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const ASSIGNMENT_TYPES = ["Homework", "Worksheet", "Project", "Research", "Practical_Record", "Lab_Report", "Presentation", "Essay", "Coding", "Case_Study", "Group", "Quiz"];

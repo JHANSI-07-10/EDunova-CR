@@ -1,7 +1,7 @@
 import { ClipboardCheck, Users, ChevronDown, ChevronUp, User } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Card, EmptyState, Loader } from "../components/Common";
+import { Card, EmptyState, Loader } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function Classes() {

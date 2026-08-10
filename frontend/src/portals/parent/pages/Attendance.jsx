@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard } from "../../shared/components/Common";
 import { useAuth } from "../context/AuthContext";
 import { CalendarCheck } from "lucide-react";
 

@@ -1,6 +1,6 @@
 import { CreditCard, ReceiptText, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const METHOD_LABEL = { NetBanking: "Net Banking", Card: "Card", UPI: "UPI" };

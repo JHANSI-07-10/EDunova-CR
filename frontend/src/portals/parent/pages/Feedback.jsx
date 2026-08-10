@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import api from "../lib/api";
 import { isNonEmptyString } from "../../../utils/validation";
 
-import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 
 export default function Feedback() {
   const [items, setItems] = useState(null);

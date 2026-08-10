@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import { isNonEmptyString, isValidEmail } from "../../../utils/validation";
 
 const ROLES = ["Student", "Teacher", "Parent", "Admin", "Employee"];

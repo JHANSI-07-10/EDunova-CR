@@ -1,7 +1,7 @@
 import { UserPlus, GraduationCap, Users, Wallet, CalendarClock, LibraryBig } from "lucide-react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard } from "../../shared/components/Common";
 
 export default function Dashboard() {
   const [data, setData] = useState(null);

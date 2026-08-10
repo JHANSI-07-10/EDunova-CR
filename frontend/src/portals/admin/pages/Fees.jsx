@@ -9,7 +9,7 @@ import {
 import api from "../lib/api";
 import {
   Badge, Card, EmptyState, Loader, SectionTitle, StatCard, Toast,
-} from "../components/Common";
+} from "../../shared/components/Common";
 import { isValidDateRange, isNonEmptyString } from "../../../utils/validation";
 
 // ─── helpers ───────────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import {
   Image as ImageIcon, HelpCircle, ChevronDown
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, SectionTitle, Badge } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Badge } from "../../shared/components/Common";
 import { useAuth } from "../context/AuthContext";
 import api from "../lib/api";
 

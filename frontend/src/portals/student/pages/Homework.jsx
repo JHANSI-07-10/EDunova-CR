@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Badge, Card, EmptyState, Loader } from "../components/Common";
+import { Badge, Card, EmptyState, Loader } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function Homework() {

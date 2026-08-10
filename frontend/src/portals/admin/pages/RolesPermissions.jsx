@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, SectionTitle } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle } from "../../shared/components/Common";
 
 // Access is enforced server-side per request (see portal/roles.py) — this
 // matrix documents, for the Admin's benefit, what each role can reach in the

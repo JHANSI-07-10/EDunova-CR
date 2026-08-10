@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import api from "../lib/api";
-import { Card, Loader, SectionTitle, Toast, EmptyState, Badge, Button } from "../components/Common";
+import { Card, Loader, SectionTitle, Toast, EmptyState, Badge, Button } from "../../shared/components/Common";
 import { Search, Calendar, Briefcase, FileText, CheckCircle, XCircle } from "lucide-react";
 
 export default function Recruitment() {

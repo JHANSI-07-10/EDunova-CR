@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import {
   CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from "recharts";
-import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard } from "../../shared/components/Common";
 import IdCard from "../components/IdCard";
 import api from "../lib/api";
 

@@ -6,7 +6,7 @@ import {
   RotateCw
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, Toast, Badge } from "../components/Common";
+import { Card, EmptyState, Loader, Toast, Badge } from "../../shared/components/Common";
 import api from "../lib/api";
 import Quiz from "../components/Quiz";
 import CourseForum from "../components/CourseForum";

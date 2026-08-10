@@ -1,6 +1,6 @@
 import { Download, ScrollText, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader } from "../components/Common";
+import { Card, EmptyState, Loader } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function Certificates() {

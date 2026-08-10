@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard, Toast } from "../../shared/components/Common";
 import { isNonEmptyString } from "../../../utils/validation";
 
 // ---------------------------------------------------------------------------

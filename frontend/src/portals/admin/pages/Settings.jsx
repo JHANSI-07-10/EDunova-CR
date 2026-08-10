@@ -1,7 +1,7 @@
 import { Database, Download, ExternalLink } from "lucide-react";
 import { useState } from "react";
 import api from "../lib/api";
-import { Card, SectionTitle, Toast } from "../components/Common";
+import { Card, SectionTitle, Toast } from "../../shared/components/Common";
 
 export default function Settings() {
   const [busy, setBusy] = useState(false);

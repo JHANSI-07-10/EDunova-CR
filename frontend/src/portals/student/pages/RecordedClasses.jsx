@@ -2,7 +2,7 @@ import {
   Video, PlayCircle, Clock, Bookmark, CheckCircle, Filter, Search
 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, Badge } from "../components/Common";
+import { Card, EmptyState, Loader, Badge } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function RecordedClasses() {

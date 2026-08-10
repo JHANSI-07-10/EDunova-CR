@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Card, EmptyState, Loader, Badge, StatCard } from "../components/Common";
+import { Card, EmptyState, Loader, Badge, StatCard } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function LmsDashboard() {

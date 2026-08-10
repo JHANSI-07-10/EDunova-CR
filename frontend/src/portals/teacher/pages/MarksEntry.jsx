@@ -1,6 +1,6 @@
 import { FileEdit, Send } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function MarksEntry() {

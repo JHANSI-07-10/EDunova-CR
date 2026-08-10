@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
 import { isNonEmptyString, isValidEmail, isValidPhone, isTextOnly, isExact10Digits, isGmail } from "../../../utils/validation";
-import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, Toast } from "../../shared/components/Common";
 import {
   Plus, X, UserPlus, ChevronDown, ChevronRight, Search,
   FileText, CheckCircle2, XCircle, Clock, Users, Calendar,

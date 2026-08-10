@@ -15,7 +15,7 @@ import {
   MapPin,
   Ticket,
 } from "lucide-react";
-import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle, StatCard, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const TABS = [

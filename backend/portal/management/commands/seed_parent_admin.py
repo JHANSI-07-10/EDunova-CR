@@ -1,17 +1,24 @@
+import os
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 from django.db import connection
 
+from .seed_utils import resolve_seed_password
+
 
 class Command(BaseCommand):
-    help = "Seed demo Parent and Admin portal users. Password: EduNova@123"
+    help = "Seed demo Parent and Admin portal users. Set SEED_PARENT_PASSWORD / SEED_ADMIN_PASSWORD to pin their passwords."
 
     def handle(self, *args, **options):
         User = get_user_model()
 
         parent_group, _ = Group.objects.get_or_create(name="Parent")
         admin_group, _ = Group.objects.get_or_create(name="Admin")
+
+        parent_password = resolve_seed_password("SEED_PARENT_PASSWORD", "Parent demo account")
+        admin_password = resolve_seed_password("SEED_ADMIN_PASSWORD", "Admin account")
 
         # -------------------------
         # Parent User
@@ -29,7 +36,7 @@ class Command(BaseCommand):
         parent.email = "veereshgollapu@gmail.com"
         parent.first_name = "Veeresh"
         parent.last_name = "Gollapu"
-        parent.set_password("Edunova@123")
+        parent.set_password(parent_password)
         parent.save()
         parent.groups.add(parent_group)
 
@@ -53,7 +60,7 @@ class Command(BaseCommand):
         admin.last_name = "Lakshmi"
         admin.is_staff = True
         admin.is_superuser = True
-        admin.set_password("Edunova@1234")
+        admin.set_password(admin_password)
         admin.save()
         admin.groups.add(admin_group)
 
@@ -121,11 +128,16 @@ class Command(BaseCommand):
 
         self.stdout.write("")
         self.stdout.write("======================================")
-        self.stdout.write("Parent Login")
-        self.stdout.write("Email    : veereshgollapu@gmail.com")
-        self.stdout.write("Password : Edunova@1234")
+        self.stdout.write("Login users")
+        self.stdout.write("Parent login email : veereshgollapu@gmail.com")
+        self.stdout.write("Admin  login email : jhansilakshmi1004@gmail.com")
         self.stdout.write("")
-        self.stdout.write("Admin Login")
-        self.stdout.write("Email    : jhansilakshmi1004@gmail.com")
-        self.stdout.write("Password : Edunova@1234")
+        if os.environ.get("SEED_PARENT_PASSWORD"):
+            self.stdout.write("Parent password set from SEED_PARENT_PASSWORD.")
+        else:
+            self.stdout.write(f"Parent password (generated) : {parent_password}")
+        if os.environ.get("SEED_ADMIN_PASSWORD"):
+            self.stdout.write("Admin password set from SEED_ADMIN_PASSWORD.")
+        else:
+            self.stdout.write(f"Admin password (generated) : {admin_password}")
         self.stdout.write("======================================")

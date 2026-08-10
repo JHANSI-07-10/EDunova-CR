@@ -1,6 +1,6 @@
 import { BookMarked, Search } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Badge, Card, EmptyState, Loader, SectionTitle } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, SectionTitle } from "../../shared/components/Common";
 import api from "../lib/api";
 
 export default function Library() {

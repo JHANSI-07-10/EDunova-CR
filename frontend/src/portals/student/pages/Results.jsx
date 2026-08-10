@@ -23,7 +23,7 @@ import {
   SectionTitle,
   StatCard,
   Toast,
-} from "../components/Common";
+} from "../../shared/components/Common";
 import api from "../lib/api";
 
 const TABS = [

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, SectionTitle } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle } from "../../shared/components/Common";
 
 export default function Reports() {
   const [data, setData] = useState(null);

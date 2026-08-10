@@ -26,13 +26,24 @@ test.describe("Backend API health (deployed Render)", () => {
 
   test("login endpoint rejects bad credentials (400) and accepts valid (200 + user_id)", async () => {
     const ctx = await pwRequest.newContext({ baseURL: API_HOST, timeout: 30_000 });
+    // A wrong-but-well-formed password is generated at runtime so no
+    // credential-like literal lives in the test source.
     const bad = await ctx.post("/api/auth/login/", {
-      data: { email: "nobody@nowhere.com", password: "Wrong@123" },
+      data: { email: "nobody@nowhere.com", password: `incorrect-${Date.now()}` },
     });
     expect([400, 401]).toContain(bad.status());
 
+    // Real-account assertion only runs when this e2e is supplied the admin
+    // credentials via environment (never committed to the repo).
+    test.skip(
+      !process.env.E2E_ADMIN_PASSWORD,
+      "E2E_ADMIN_PASSWORD not set — skipping valid-login assertion"
+    );
     const good = await ctx.post("/api/auth/login/", {
-      data: { email: "jhansilakshmi1004@gmail.com", password: "Edunova@1234" },
+      data: {
+        email: process.env.E2E_ADMIN_EMAIL || "jhansilakshmi1004@gmail.com",
+        password: process.env.E2E_ADMIN_PASSWORD as string,
+      },
     });
     expect(good.status()).toBe(200);
     const body = await good.json();

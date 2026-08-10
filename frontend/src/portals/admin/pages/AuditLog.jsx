@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, Badge, Toast, SectionTitle } from "../components/Common";
+import { Card, EmptyState, Loader, Badge, Toast, SectionTitle } from "../../shared/components/Common";
 import { ShieldAlert, ShieldX, Database, FileSpreadsheet, Lock } from "lucide-react";
 
 export default function AuditLog() {

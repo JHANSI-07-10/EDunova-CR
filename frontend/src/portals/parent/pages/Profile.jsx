@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, Loader, SectionTitle } from "../components/Common";
+import { Card, Loader, SectionTitle } from "../../shared/components/Common";
 
 export default function Profile() {
   const [profile, setProfile] = useState(null);

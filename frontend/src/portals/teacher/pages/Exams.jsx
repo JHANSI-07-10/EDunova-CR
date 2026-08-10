@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Toast, Badge } from "../../shared/components/Common";
 import {
   Plus, X, Calendar, BookOpen, FileText, Clipboard, RefreshCw, MapPin,
   Check, Edit2, Trash2, Clock, UserCheck, BarChart3

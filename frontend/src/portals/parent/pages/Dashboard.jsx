@@ -1,7 +1,7 @@
 import { CalendarDays, Wallet, Bell, GraduationCap } from "lucide-react";
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, SectionTitle, StatCard } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, StatCard } from "../../shared/components/Common";
 import { useAuth } from "../context/AuthContext";
 
 export default function Dashboard() {

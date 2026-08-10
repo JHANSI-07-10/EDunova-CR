@@ -1,6 +1,6 @@
 import { Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Badge, Card, EmptyState, Loader, Toast } from "../components/Common";
+import { Badge, Card, EmptyState, Loader, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 import { isNonEmptyString } from "../../../utils/validation";
 

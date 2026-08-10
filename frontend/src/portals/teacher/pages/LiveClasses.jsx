@@ -1,6 +1,6 @@
 import { Plus, Trash2, Video, Clock, Users, ExternalLink, Edit2, Calendar, X } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, EmptyState, Loader, SectionTitle, StatCard, Badge, Toast } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, StatCard, Badge, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const STATUS_TONE = {

@@ -1,6 +1,6 @@
 import { Settings, Save, Video, BookOpen, FileText, Shield, Bell, Clock } from "lucide-react";
 import { useEffect, useState } from "react";
-import { Card, SectionTitle, Toast } from "../components/Common";
+import { Card, SectionTitle, Toast } from "../../shared/components/Common";
 import api from "../lib/api";
 
 const SETTING_GROUPS = [

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../lib/api";
-import { Card, EmptyState, Loader, SectionTitle, Toast } from "../components/Common";
+import { Card, EmptyState, Loader, SectionTitle, Toast } from "../../shared/components/Common";
 
 export default function Enquiries() {
   const [messages, setMessages] = useState(null);
