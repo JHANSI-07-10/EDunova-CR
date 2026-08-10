@@ -337,8 +337,8 @@ function ApplicationDetailModal({ detail, onClose, onAction }) {
       <div className="bg-white rounded-2xl w-full max-w-4xl max-h-[90vh] shadow-2xl flex flex-col">
         <div className="flex items-center justify-between p-4 border-b border-slate-100">
           <div>
-            <h3 className="font-heading font-semibold text-lg">{detail.applicant_name}</h3>
-            <p className="text-xs text-ink-secondary">{regNo} · {detail.status}</p>
+            <h3 className="font-heading font-semibold text-lg">{currentDetail.applicant_name}</h3>
+            <p className="text-xs text-ink-secondary">{regNo} · {currentDetail.status}</p>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
         </div>
@@ -356,16 +356,16 @@ function ApplicationDetailModal({ detail, onClose, onAction }) {
           </div>
 
           <div className="p-5">
-            {activePanel === "overview" && <OverviewPanel detail={detail} />}
-            {activePanel === "counselling" && <CounsellingPanel regNo={regNo} detail={detail} postAction={postAction} loading={loading} />}
-            {activePanel === "documents" && <DocumentsPanel regNo={regNo} detail={detail} postAction={postAction} loading={loading} />}
-            {activePanel === "eligibility" && <EligibilityPanel regNo={regNo} detail={detail} postAction={postAction} loading={loading} />}
-            {activePanel === "interview" && <InterviewPanel regNo={regNo} detail={detail} postAction={postAction} loading={loading} />}
-            {activePanel === "seat" && <SeatPanel regNo={regNo} detail={detail} postAction={postAction} loading={loading} />}
-            {activePanel === "fee" && <FeePanel regNo={regNo} detail={detail} postAction={postAction} loading={loading} />}
-            {activePanel === "allocation" && <AllocationPanel regNo={regNo} detail={detail} postAction={postAction} loading={loading} />}
-            {activePanel === "modules" && <ModulesPanel regNo={regNo} detail={detail} postAction={postAction} loading={loading} />}
-            {activePanel === "notifications" && <NotificationsPanel regNo={regNo} detail={detail} />}
+            {activePanel === "overview" && <OverviewPanel detail={currentDetail} />}
+            {activePanel === "counselling" && <CounsellingPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "documents" && <DocumentsPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "eligibility" && <EligibilityPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "interview" && <InterviewPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "seat" && <SeatPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "fee" && <FeePanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "allocation" && <AllocationPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "modules" && <ModulesPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "notifications" && <NotificationsPanel regNo={regNo} detail={currentDetail} />}
           </div>
         </div>
       </div>
