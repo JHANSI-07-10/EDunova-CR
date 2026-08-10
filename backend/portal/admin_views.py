@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
 from django.contrib.auth.models import Group
-from django.db import connection, models, transaction
+from django.db import IntegrityError, connection, models, transaction
 from django.utils.crypto import get_random_string
 from django.utils.dateparse import parse_datetime
 from drf_spectacular.types import OpenApiTypes
@@ -1819,6 +1819,7 @@ class SimpleTableView(AdminMixin, APIView):
     table = None
     columns = ()          # columns accepted on create, in order
     order_by = "id"
+    int_columns = ()      # columns that must coerce to int (FKs, quantities)
 
     def get(self, request):
         if not table_exists(self.table):
@@ -1828,14 +1829,39 @@ class SimpleTableView(AdminMixin, APIView):
     def post(self, request):
         if not table_exists(self.table):
             return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
-        values = [request.data.get(c) for c in self.columns]
-        placeholders = ",".join(["%s"] * len(self.columns))
-        col_sql = ",".join(self.columns)
-        with connection.cursor() as cursor:
-            cursor.execute(f"INSERT INTO {self.table} ({col_sql}) VALUES ({placeholders}) RETURNING id", values)
-            new_id = cursor.fetchone()[0]
+        if not isinstance(request.data, dict):
+            return Response({"detail": "A JSON object body is required."}, status=400)
+        cols, placeholders, values = [], [], []
+        for c in self.columns:
+            v = request.data.get(c)
+            # Omitted/empty columns fall back to the column's DB DEFAULT (e.g.
+            # subject.type defaults to 'Theory') instead of inserting NULL and
+            # tripping a NOT NULL constraint.
+            if v in (None, ""):
+                cols.append(c)
+                placeholders.append("DEFAULT")
+                continue
+            if c in self.int_columns:
+                try:
+                    v = int(v)
+                except (TypeError, ValueError):
+                    return Response({"detail": f"Field '{c}' must be an integer."}, status=400)
+            cols.append(c)
+            placeholders.append("%s")
+            values.append(v)
+        col_sql = ",".join(cols)
+        placeholder_sql = ",".join(placeholders)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(f"INSERT INTO {self.table} ({col_sql}) VALUES ({placeholder_sql}) RETURNING id", values)
+                new_id = cursor.fetchone()[0]
+        except IntegrityError:
+            return Response(
+                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
+                status=400,
+            )
         log_action(request.user, f"{self.table}.create", self.table, new_id, dict(zip(self.columns, [str(v) for v in values])))
-        return Response({"id": new_id, "detail": "Created."})
+        return Response({"id": new_id, "detail": "Created."}, status=201)
 
 
 @extend_schema_view(
@@ -1906,6 +1932,7 @@ class VehicleView(SimpleTableView):
     table = "portal_vehicle"
     columns = ("vehicle_number", "capacity", "driver_id", "gps_device_id", "maintenance_status")
     order_by = "vehicle_number"
+    int_columns = ("capacity", "driver_id", "gps_device_id")
 
 
 @extend_schema_view(
@@ -1952,6 +1979,7 @@ class TransportAllocationView(SimpleTableView):
     table = "portal_transport_allocation"
     columns = ("student_id", "vehicle_id", "route_id", "pickup_point")
     order_by = "id"
+    int_columns = ("student_id", "vehicle_id", "route_id")
 
 
 @extend_schema_view(
@@ -1975,6 +2003,7 @@ class FeeStructureView(SimpleTableView):
     table = "portal_fee_structure"
     columns = ("class_id", "term_name", "tuition_fee", "transport_fee", "hostel_fee", "total_amount")
     order_by = "class_id"
+    int_columns = ("class_id",)
 
 
 class PaymentListView(AdminMixin, APIView):
@@ -2022,6 +2051,7 @@ class LibraryBookView(SimpleTableView):
     table = "portal_book"
     columns = ("title", "author", "isbn", "barcode_id", "quantity", "available_quantity", "book_type", "digital_file_url")
     order_by = "title"
+    int_columns = ("quantity", "available_quantity")
 
     @extend_schema(
         operation_id="AdminLibraryBookList",
@@ -2090,7 +2120,7 @@ class LibraryIssueView(AdminMixin, APIView):
                 tid = cursor.fetchone()[0]
                 cursor.execute("UPDATE portal_book SET available_quantity = available_quantity - 1 WHERE id=%s", [book_id])
         log_action(request.user, "library.issue", "book", book_id, {"borrower_id": borrower_id, "due_date": str(due)})
-        return Response({"id": tid, "due_date": due.isoformat(), "detail": "Book issued."})
+        return Response({"id": tid, "due_date": due.isoformat(), "detail": "Book issued."}, status=201)
 
 
 class LibraryReturnView(AdminMixin, APIView):
@@ -2181,7 +2211,7 @@ class NoticeBroadcastView(AdminMixin, APIView):
             )
             nid = cursor.fetchone()[0]
         log_action(request.user, "notice.broadcast", "notification", nid, {"recipient_type": d.get("recipient_type", "All")})
-        return Response({"id": nid, "detail": "Notice sent."})
+        return Response({"id": nid, "detail": "Notice sent."}, status=201)
 
 
 # ---------------------------------------------------------------------------
@@ -2418,25 +2448,36 @@ class ClassEnrollmentView(AdminMixin, APIView):
 
         if not student_id or not class_id:
             return Response({"detail": "student_id and class_id are required."}, status=400)
+        if roll_number not in (None, ""):
+            try:
+                roll_number = int(roll_number)
+            except (TypeError, ValueError):
+                return Response({"detail": "roll_number must be an integer."}, status=400)
 
-        with connection.cursor() as cursor:
-            # Check if student is already enrolled in this class for the academic year
-            cursor.execute(
-                "SELECT id FROM portal_student_enrollment WHERE student_id=%s AND class_id=%s AND academic_year=%s",
-                [student_id, class_id, academic_year]
-            )
-            if cursor.fetchone():
-                return Response({"detail": "Student already enrolled in this class for the selected academic year."}, status=400)
+        try:
+            with connection.cursor() as cursor:
+                # Check if student is already enrolled in this class for the academic year
+                cursor.execute(
+                    "SELECT id FROM portal_student_enrollment WHERE student_id=%s AND class_id=%s AND academic_year=%s",
+                    [student_id, class_id, academic_year]
+                )
+                if cursor.fetchone():
+                    return Response({"detail": "Student already enrolled in this class for the selected academic year."}, status=400)
 
-            cursor.execute(
-                "INSERT INTO portal_student_enrollment (student_id, class_id, academic_year, roll_number) "
-                "VALUES (%s,%s,%s,%s) RETURNING id",
-                [student_id, class_id, academic_year, roll_number]
+                cursor.execute(
+                    "INSERT INTO portal_student_enrollment (student_id, class_id, academic_year, roll_number) "
+                    "VALUES (%s,%s,%s,%s) RETURNING id",
+                    [student_id, class_id, academic_year, roll_number]
+                )
+                new_id = cursor.fetchone()[0]
+        except IntegrityError:
+            return Response(
+                {"detail": "Could not enroll the student: the student or class does not exist."},
+                status=400,
             )
-            new_id = cursor.fetchone()[0]
 
         log_action(request.user, "student_enrollment.create", "portal_student_enrollment", new_id, d)
-        return Response({"id": new_id, "detail": "Student enrolled successfully."})
+        return Response({"id": new_id, "detail": "Student enrolled successfully."}, status=201)
 
 
 class ClassTeacherAssignView(AdminMixin, APIView):

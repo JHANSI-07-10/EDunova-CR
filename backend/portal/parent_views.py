@@ -19,7 +19,7 @@ from .doc_schemas import (
     MONTH_PARAMETER,
     EXAM_NAME_PARAMETER,
 )
-from .views import table_exists, rows, row, serialise, current_class_for_student
+from .views import table_exists, rows, row, serialise, current_class_for_student, validate_leave_dates
 from .roles import IsParent, log_action
 
 
@@ -977,17 +977,20 @@ class LeaveRequestView(ParentMixin, APIView):
             return Response({"detail": "Not your child, or child not found."}, status=403)
         if not table_exists("portal_leave"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
+        err, start, end = validate_leave_dates(request.data)
+        if err:
+            return err
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO portal_leave (user_id, leave_type, start_date, end_date, reason, submitted_by)
                 VALUES (%s,%s,%s,%s,%s,%s) RETURNING id
                 """,
-                [child_id, request.data.get("leave_type"), request.data.get("start_date"),
-                 request.data.get("end_date"), request.data.get("reason"), request.user.id],
+                [child_id, request.data.get("leave_type"), start, end,
+                 request.data.get("reason"), request.user.id],
             )
             lid = cursor.fetchone()[0]
-        return Response({"id": lid, "detail": "Leave request submitted."})
+        return Response({"id": lid, "detail": "Leave request submitted."}, status=201)
 
 
 class PtmBookingView(ParentMixin, APIView):
@@ -1030,15 +1033,26 @@ class PtmBookingView(ParentMixin, APIView):
     def post(self, request):
         if not table_exists("portal_ptm_booking"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
-        data = request.data
+        data = request.data if isinstance(request.data, dict) else {}
+        teacher_id = data.get("teacher_id")
+        student_id = data.get("student_id")
+        meeting_date = data.get("meeting_date")
+        time_slot = data.get("time_slot")
+        if not teacher_id or not student_id or not meeting_date or not time_slot:
+            return Response({"detail": "teacher_id, student_id, meeting_date and time_slot are required."}, status=400)
+        from datetime import date as _date
+        try:
+            _date.fromisoformat(str(meeting_date))
+        except (TypeError, ValueError):
+            return Response({"detail": "meeting_date must be a valid date (YYYY-MM-DD)."}, status=400)
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO portal_ptm_booking (parent_id, teacher_id, student_id, meeting_date, time_slot, parent_notes)
                 VALUES (%s,%s,%s,%s,%s,%s) RETURNING id
                 """,
-                [request.user.id, data.get("teacher_id"), data.get("student_id"),
-                 data.get("meeting_date"), data.get("time_slot"), data.get("parent_notes", "")],
+                [request.user.id, teacher_id, student_id,
+                 meeting_date, time_slot, data.get("parent_notes", "")],
             )
             bid = cursor.fetchone()[0]
         return Response({"id": bid, "detail": "Meeting requested."})

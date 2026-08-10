@@ -6,8 +6,11 @@ export default {
     extend: {
       colors: {
         primary: "#1E3A8A",
-        secondary: "#10B981",
-        accent: "#F97316",
+        // WCAG AA contrast fixes (axe): orange-500 #F97316 and emerald-500
+        // #10B981 both fail 4.5:1 on white / with white text. orange-700 and
+        // emerald-700 pass AA for normal text and white-on-color buttons.
+        secondary: "#047857",
+        accent: "#C2410C",
         highlight: "#FBBF24",
         bg: "#F8FAFC",
         "bg-dark": "#0F172A",
@@ -17,8 +20,8 @@ export default {
         "text-secondary": "#6B7280",
         academic: {
           blue: "#1E3A8A",
-          green: "#10B981",
-          orange: "#F97316",
+          green: "#047857",
+          orange: "#C2410C",
           gold: "#FBBF24",
         },
         surface: {

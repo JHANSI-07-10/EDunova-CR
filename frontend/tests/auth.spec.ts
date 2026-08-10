@@ -46,7 +46,7 @@ test.describe("Authentication flow (deployed)", () => {
     await open(page, "/admin/login");
     const inputs = page.locator("input");
     await inputs.nth(0).fill("jhansilakshmi1004@gmail.com");
-    await inputs.nth(1).fill("Edunova@123");
+    await inputs.nth(1).fill("Edunova@1234");
     const submit = page.locator('button[type="submit"], button:has-text("Continue"), button:has-text("Verify"), button:has-text("Sign In"), button:has-text("Login"), button:has-text("Get OTP"), button:has-text("Send OTP")').first();
     await submit.click();
     // OTP step: a 6-digit code field appears.

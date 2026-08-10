@@ -641,16 +641,25 @@ class InventoryView(AdminMixin, APIView):
     def post(self, request):
         if not table_exists("portal_inventory"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
-        d = request.data
+        d = request.data if isinstance(request.data, dict) else {}
+        if not d.get("item_name"):
+            return Response({"detail": "item_name is required."}, status=400)
+        quantity = d.get("quantity", 0)
+        try:
+            quantity = int(quantity)
+        except (TypeError, ValueError):
+            return Response({"detail": "quantity must be an integer."}, status=400)
+        if quantity < 0:
+            return Response({"detail": "quantity cannot be negative."}, status=400)
         with connection.cursor() as cursor:
             cursor.execute(
                 "INSERT INTO portal_inventory (item_name, category, quantity, department) "
                 "VALUES (%s,%s,%s,%s) RETURNING id",
-                [d.get("item_name"), d.get("category", "General"), d.get("quantity", 0), d.get("department", "Administration")],
+                [d.get("item_name"), d.get("category", "General"), quantity, d.get("department", "Administration")],
             )
             new_id = cursor.fetchone()[0]
         log_action(request.user, "inventory.create", "portal_inventory", new_id, dict(d))
-        return Response({"id": new_id, "detail": "Item added."})
+        return Response({"id": new_id, "detail": "Item added."}, status=201)
 
     @extend_schema(
         operation_id="InventoryAdjust",
@@ -665,19 +674,31 @@ class InventoryView(AdminMixin, APIView):
         """Body: {id, quantity_delta} — adjusts stock up or down."""
         if not table_exists("portal_inventory"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
+        if not isinstance(request.data, dict):
+            return Response({"detail": "A JSON object body is required."}, status=400)
         item_id = request.data.get("id")
-        delta = int(request.data.get("quantity_delta", 0))
+        try:
+            delta = int(request.data.get("quantity_delta", 0))
+        except (TypeError, ValueError):
+            return Response({"detail": "quantity_delta must be an integer."}, status=400)
         with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT quantity FROM portal_inventory WHERE id=%s",
+                [item_id],
+            )
+            current = cursor.fetchone()
+            if not current:
+                return Response({"detail": "Item not found."}, status=404)
             cursor.execute(
                 "UPDATE portal_inventory SET quantity = GREATEST(quantity + %s, 0), updated_at = now() "
                 "WHERE id=%s RETURNING quantity",
                 [delta, item_id],
             )
             result = cursor.fetchone()
-        if not result:
-            return Response({"detail": "Item not found."}, status=404)
+        clamped = (current[0] + delta) < 0
         log_action(request.user, "inventory.adjust", "portal_inventory", item_id, {"delta": delta})
-        return Response({"quantity": result[0], "detail": "Stock updated."})
+        detail = "Stock updated." if not clamped else "Stock updated (adjustment clamped at zero — insufficient stock)."
+        return Response({"quantity": result[0], "detail": detail})
 
 
 # =============================================================================

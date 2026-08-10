@@ -621,6 +621,52 @@ def qdate(v):
     return v
 
 
+def validate_leave_dates(payload):
+    """Validate a leave-request payload's dates, returning (error_response, start, end).
+
+    Returns (None, start, end) on success, or (Response, None, None) with a clean
+    400 instead of letting invalid literals / inverted ranges reach Postgres and
+    surface as 500s.
+    """
+    if not isinstance(payload, dict):
+        return (
+            Response({"detail": "A JSON object body is required."}, status=status.HTTP_400_BAD_REQUEST),
+            None,
+            None,
+        )
+    start_raw = payload.get("start_date")
+    end_raw = payload.get("end_date")
+    if not start_raw or not end_raw:
+        return (
+            Response({"detail": "Missing required fields."}, status=status.HTTP_400_BAD_REQUEST),
+            None,
+            None,
+        )
+    try:
+        start = date.fromisoformat(str(start_raw))
+    except (TypeError, ValueError):
+        return (
+            Response({"detail": "start_date must be a valid date (YYYY-MM-DD)."}, status=status.HTTP_400_BAD_REQUEST),
+            None,
+            None,
+        )
+    try:
+        end = date.fromisoformat(str(end_raw))
+    except (TypeError, ValueError):
+        return (
+            Response({"detail": "end_date must be a valid date (YYYY-MM-DD)."}, status=status.HTTP_400_BAD_REQUEST),
+            None,
+            None,
+        )
+    if end < start:
+        return (
+            Response({"detail": "end_date must be on or after start_date."}, status=status.HTTP_400_BAD_REQUEST),
+            None,
+            None,
+        )
+    return None, start, end
+
+
 def serialise(obj):
     if isinstance(obj, list):
         return [serialise(i) for i in obj]
@@ -1462,14 +1508,17 @@ class StudentLeaveView(StudentOnlyMixin, APIView):
     def post(self, request):
         if not table_exists("portal_leave"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
+        err, start, end = validate_leave_dates(request.data)
+        if err:
+            return err
         with connection.cursor() as cursor:
             cursor.execute(
                 """
                 INSERT INTO portal_leave (user_id, leave_type, start_date, end_date, reason, submitted_by)
                 VALUES (%s,%s,%s,%s,%s,%s) RETURNING id
                 """,
-                [request.user.id, request.data.get("leave_type"), request.data.get("start_date"),
-                 request.data.get("end_date"), request.data.get("reason"), request.user.id],
+                [request.user.id, request.data.get("leave_type"), start, end,
+                 request.data.get("reason"), request.user.id],
             )
             lid = cursor.fetchone()[0]
         return Response({"id": lid, "detail": "Leave request submitted."})
@@ -1514,8 +1563,11 @@ class FileUploadView(APIView):
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
             "application/vnd.ms-excel",
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "application/zip", "text/plain", "text/markdown",
+            "application/zip",
         ))
+        # Objectionable / executable-ish extensions are rejected outright so a
+        # renamed script cannot slip through on a guessed content-type.
+        ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif", "pdf", "doc", "docx", "xls", "xlsx", "zip", "csv"}
 
         name = file_obj.name or ""
         file_size = file_obj.size
@@ -1523,6 +1575,12 @@ class FileUploadView(APIView):
         if file_size > MAX_SIZE:
             return Response(
                 {"detail": f"File exceeds the {getattr(settings, 'MAX_UPLOAD_SIZE_MB', 20)} MB size limit."},
+                status=400,
+            )
+        extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+        if extension not in ALLOWED_EXTENSIONS:
+            return Response(
+                {"detail": "File type not allowed. Use a PDF, document, image or spreadsheet format."},
                 status=400,
             )
         ctype = file_obj.content_type or guessed or ""

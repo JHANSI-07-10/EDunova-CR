@@ -15,7 +15,7 @@ from rest_framework import serializers
 from rest_framework.views import APIView
 from rest_framework.response import Response
 
-from .views import table_exists, row, rows, serialise, EXAM_NAME_CHOICES
+from .views import table_exists, row, rows, serialise, validate_leave_dates, EXAM_NAME_CHOICES
 from .roles import IsTeacher
 from .doc_schemas import (
     DetailErrorSerializer,
@@ -1553,10 +1553,18 @@ class MessageThreadView(TeacherMixin, APIView):
     def post(self, request):
         if not table_exists("portal_message"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
+        receiver = request.data.get("receiver") if isinstance(request.data, dict) else None
+        message_text = request.data.get("message_text") if isinstance(request.data, dict) else None
+        if not receiver or not message_text:
+            return Response({"detail": "receiver and message_text are required."}, status=400)
+        try:
+            receiver = int(receiver)
+        except (TypeError, ValueError):
+            return Response({"detail": "receiver must be a user id (integer)."}, status=400)
         with connection.cursor() as cursor:
-            cursor.execute("INSERT INTO portal_message (sender_id, receiver_id, message_text) VALUES (%s,%s,%s) RETURNING id", [request.user.id, request.data.get("receiver"), request.data.get("message_text")])
+            cursor.execute("INSERT INTO portal_message (sender_id, receiver_id, message_text) VALUES (%s,%s,%s) RETURNING id", [request.user.id, receiver, message_text])
             mid = cursor.fetchone()[0]
-        return Response({"id": mid, "detail": "Message sent."})
+        return Response({"id": mid, "detail": "Message sent."}, status=201)
 
 
 class MyContactsView(TeacherMixin, APIView):
@@ -1623,10 +1631,13 @@ class LeaveView(TeacherMixin, APIView):
     def post(self, request):
         if not table_exists("portal_leave"):
             return Response({"detail": "Portal schema has not been applied."}, status=400)
+        err, start, end = validate_leave_dates(request.data)
+        if err:
+            return err
         with connection.cursor() as cursor:
-            cursor.execute("INSERT INTO portal_leave (user_id, leave_type, start_date, end_date, reason) VALUES (%s,%s,%s,%s,%s) RETURNING id", [request.user.id, request.data.get("leave_type"), request.data.get("start_date"), request.data.get("end_date"), request.data.get("reason")])
+            cursor.execute("INSERT INTO portal_leave (user_id, leave_type, start_date, end_date, reason) VALUES (%s,%s,%s,%s,%s) RETURNING id", [request.user.id, request.data.get("leave_type"), start, end, request.data.get("reason")])
             lid = cursor.fetchone()[0]
-        return Response({"id": lid, "detail": "Leave request submitted."})
+        return Response({"id": lid, "detail": "Leave request submitted."}, status=201)
 
 
 class TeacherTimetableView(TeacherMixin, APIView):

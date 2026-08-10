@@ -5,12 +5,12 @@ test.describe("Backend API health (deployed Render)", () => {
   test("docs, schema and public endpoints respond 200", async () => {
     const ctx = await pwRequest.newContext({ baseURL: API_HOST, timeout: 30_000 });
     const checks: Array<[string, string]> = [
-      ["/docs/", "GET"],
-      ["/schema/", "GET"],
-      ["/website/stats/", "GET"],
-      ["/website/faculty/", "GET"],
-      ["/cms/settings/", "GET"],
-      ["/campuses/", "GET"],
+      ["/api/docs/", "GET"],
+      ["/api/schema/", "GET"],
+      ["/api/website/stats/", "GET"],
+      ["/api/website/faculty/", "GET"],
+      ["/api/cms/settings/", "GET"],
+      ["/api/campuses/", "GET"],
     ];
     const results: string[] = [];
     for (const [endpoint] of checks) {
@@ -32,7 +32,7 @@ test.describe("Backend API health (deployed Render)", () => {
     expect([400, 401]).toContain(bad.status());
 
     const good = await ctx.post("/api/auth/login/", {
-      data: { email: "jhansilakshmi1004@gmail.com", password: "Edunova@123" },
+      data: { email: "jhansilakshmi1004@gmail.com", password: "Edunova@1234" },
     });
     expect(good.status()).toBe(200);
     const body = await good.json();

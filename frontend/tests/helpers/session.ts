@@ -62,7 +62,10 @@ export function trackErrors(page: Page): ErrorBucket {
 
 /** Filter out benign noise (analytics, fonts, favicon). */
 export function meaningfulErrors(bucket: ErrorBucket): string[] {
-  const noise = /(googletagmanager|gtag|analytics|hotjar|clarity|favicon|sentry|doubleclick)/i;
+  // ERR_ABORTED = a request cancelled because a newer navigation/render
+  // superseded it (e.g. an <img> re-requested during a SPA route change). The
+  // asset itself serves 200; this is a test-race artifact, not a real failure.
+  const noise = /(googletagmanager|gtag|analytics|hotjar|clarity|favicon|sentry|doubleclick|ERR_ABORTED)/i;
   const all = [
     ...bucket.consoleErrors.map((e) => `CONSOLE: ${e}`),
     ...bucket.pageErrors.map((e) => `PAGE: ${e}`),
