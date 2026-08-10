@@ -14,6 +14,8 @@ SQL_FILES = [
     "portal_extension_payroll.sql",
     "portal_extension_improvements.sql",
     "portal_extension_exams.sql",
+    "portal_extension_fees.sql",
+    "portal_extension_transport.sql",
 ]
 
 TRACKING_TABLE_SQL = """

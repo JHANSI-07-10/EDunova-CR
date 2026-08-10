@@ -1,4 +1,5 @@
-from datetime import date, timedelta
+import uuid
+from datetime import date, datetime, timedelta
 from urllib.parse import urlsplit
 
 from django.utils.timezone import now
@@ -157,6 +158,8 @@ _UserItem = inline_serializer(
         "username": serializers.CharField(),
         "email": serializers.EmailField(required=False),
         "name": serializers.CharField(),
+        "first_name": serializers.CharField(required=False),
+        "last_name": serializers.CharField(required=False),
         "is_active": serializers.BooleanField(),
         "date_joined": serializers.DateTimeField(),
         "role": serializers.CharField(),
@@ -284,6 +287,8 @@ _VehicleItem = inline_serializer(
         "vehicle_number": serializers.CharField(required=False),
         "capacity": serializers.IntegerField(required=False),
         "driver_id": serializers.IntegerField(required=False),
+        "driver_name": serializers.CharField(required=False),
+        "driver_phone": serializers.CharField(required=False),
         "gps_device_id": serializers.CharField(required=False),
         "maintenance_status": serializers.CharField(required=False),
     },
@@ -307,6 +312,10 @@ _RouteItem = inline_serializer(
         "route_name": serializers.CharField(required=False),
         "start_point": serializers.CharField(required=False),
         "end_point": serializers.CharField(required=False),
+        "vehicle_id": serializers.IntegerField(required=False),
+        "vehicle_number": serializers.CharField(required=False),
+        "attendant_id": serializers.IntegerField(required=False),
+        "stop_count": serializers.IntegerField(required=False),
     },
 )
 
@@ -316,6 +325,8 @@ _RouteCreateRequest = inline_serializer(
         "route_name": serializers.CharField(),
         "start_point": serializers.CharField(required=False),
         "end_point": serializers.CharField(required=False),
+        "vehicle_id": serializers.IntegerField(required=False),
+        "attendant_id": serializers.IntegerField(required=False),
     },
 )
 
@@ -324,9 +335,13 @@ _TransportAllocationItem = inline_serializer(
     fields={
         "id": serializers.IntegerField(required=False),
         "student_id": serializers.IntegerField(required=False),
+        "student_name": serializers.CharField(required=False),
         "vehicle_id": serializers.IntegerField(required=False),
+        "vehicle_number": serializers.CharField(required=False),
         "route_id": serializers.IntegerField(required=False),
+        "route_name": serializers.CharField(required=False),
         "pickup_point": serializers.CharField(required=False),
+        "pass_number": serializers.CharField(required=False),
     },
 )
 
@@ -345,11 +360,24 @@ _FeeStructureItem = inline_serializer(
     fields={
         "id": serializers.IntegerField(required=False),
         "class_id": serializers.IntegerField(required=False),
+        "class_name": serializers.CharField(required=False),
+        "section": serializers.CharField(required=False),
         "term_name": serializers.CharField(required=False),
+        "academic_year_id": serializers.IntegerField(required=False),
+        "academic_year_name": serializers.CharField(required=False),
+        "due_date": serializers.DateField(required=False),
+        "late_fine_per_day": serializers.FloatField(required=False),
         "tuition_fee": serializers.FloatField(required=False),
+        "admission_fee": serializers.FloatField(required=False),
         "transport_fee": serializers.FloatField(required=False),
         "hostel_fee": serializers.FloatField(required=False),
+        "library_fee": serializers.FloatField(required=False),
+        "exam_fee": serializers.FloatField(required=False),
+        "misc_fee": serializers.FloatField(required=False),
+        "description": serializers.CharField(required=False),
+        "is_published": serializers.BooleanField(required=False),
         "total_amount": serializers.FloatField(required=False),
+        "amount_collected": serializers.FloatField(required=False),
     },
 )
 
@@ -358,9 +386,18 @@ _FeeStructureCreateRequest = inline_serializer(
     fields={
         "class_id": serializers.IntegerField(),
         "term_name": serializers.CharField(),
+        "academic_year_id": serializers.IntegerField(required=False),
+        "due_date": serializers.DateField(required=False),
+        "late_fine_per_day": serializers.FloatField(required=False),
         "tuition_fee": serializers.FloatField(required=False),
+        "admission_fee": serializers.FloatField(required=False),
         "transport_fee": serializers.FloatField(required=False),
         "hostel_fee": serializers.FloatField(required=False),
+        "library_fee": serializers.FloatField(required=False),
+        "exam_fee": serializers.FloatField(required=False),
+        "misc_fee": serializers.FloatField(required=False),
+        "description": serializers.CharField(required=False),
+        "is_published": serializers.BooleanField(required=False),
         "total_amount": serializers.FloatField(required=False),
     },
 )
@@ -368,13 +405,403 @@ _FeeStructureCreateRequest = inline_serializer(
 _PaymentItem = inline_serializer(
     name="AdminPaymentItem",
     fields={
-        "id": serializers.IntegerField(required=False),
+        "id": serializers.UUIDField(required=False),
         "transaction_id": serializers.CharField(required=False),
         "amount_paid": serializers.FloatField(required=False),
         "status": serializers.CharField(required=False),
+        "payment_method": serializers.CharField(required=False),
         "paid_at": serializers.DateTimeField(required=False),
         "student_name": serializers.CharField(required=False),
+        "admission_number": serializers.CharField(required=False),
+        "class_name": serializers.CharField(required=False),
+        "section": serializers.CharField(required=False),
         "term_name": serializers.CharField(required=False),
+    },
+)
+
+# --- Fees module -----------------------------------------------------------
+
+_AcademicYearItem = inline_serializer(
+    name="AdminAcademicYearItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "name": serializers.CharField(required=False),
+        "start_date": serializers.DateField(required=False),
+        "end_date": serializers.DateField(required=False),
+        "is_active": serializers.BooleanField(required=False),
+    },
+)
+
+_AcademicYearCreateRequest = inline_serializer(
+    name="AdminAcademicYearCreateRequest",
+    fields={
+        "name": serializers.CharField(),
+        "start_date": serializers.DateField(),
+        "end_date": serializers.DateField(),
+        "is_active": serializers.BooleanField(required=False),
+    },
+)
+
+_FeeCategoryItem = inline_serializer(
+    name="AdminFeeCategoryItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "name": serializers.CharField(required=False),
+        "description": serializers.CharField(required=False),
+        "sort_order": serializers.IntegerField(required=False),
+        "is_active": serializers.BooleanField(required=False),
+    },
+)
+
+_FeeCategoryCreateRequest = inline_serializer(
+    name="AdminFeeCategoryCreateRequest",
+    fields={
+        "name": serializers.CharField(),
+        "description": serializers.CharField(required=False),
+        "sort_order": serializers.IntegerField(required=False),
+        "is_active": serializers.BooleanField(required=False),
+    },
+)
+
+_FeeAssignmentItem = inline_serializer(
+    name="AdminFeeAssignmentItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "fee_structure_id": serializers.IntegerField(required=False),
+        "student_id": serializers.IntegerField(required=False),
+        "student_name": serializers.CharField(required=False),
+        "admission_number": serializers.CharField(required=False),
+        "assigned_at": serializers.DateTimeField(required=False),
+    },
+)
+
+_FeeAssignmentCreateRequest = inline_serializer(
+    name="AdminFeeAssignmentCreateRequest",
+    fields={
+        "fee_structure_id": serializers.IntegerField(),
+        "student_id": serializers.IntegerField(required=False),
+        "assign_class": serializers.BooleanField(
+            required=False, help_text="Bulk-assign every student enrolled in the structure's class."
+        ),
+    },
+)
+
+_FeeConcessionItem = inline_serializer(
+    name="AdminFeeConcessionItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "student_id": serializers.IntegerField(required=False),
+        "student_name": serializers.CharField(required=False),
+        "fee_structure_id": serializers.IntegerField(required=False),
+        "term_name": serializers.CharField(required=False),
+        "concession_type": serializers.CharField(required=False),
+        "discount_amount": serializers.FloatField(required=False),
+        "discount_percent": serializers.FloatField(required=False),
+        "reason": serializers.CharField(required=False),
+    },
+)
+
+_FeeConcessionCreateRequest = inline_serializer(
+    name="AdminFeeConcessionCreateRequest",
+    fields={
+        "student_id": serializers.IntegerField(),
+        "fee_structure_id": serializers.IntegerField(),
+        "concession_type": serializers.ChoiceField(
+            choices=["Scholarship", "Merit", "Sibling", "Staff", "Disability", "Discount", "Other"],
+            required=False,
+        ),
+        "discount_amount": serializers.FloatField(required=False),
+        "discount_percent": serializers.FloatField(required=False),
+        "reason": serializers.CharField(required=False),
+    },
+)
+
+_FeeLedgerItem = inline_serializer(
+    name="AdminFeeLedgerItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "student_id": serializers.IntegerField(required=False),
+        "student_name": serializers.CharField(required=False),
+        "admission_number": serializers.CharField(required=False),
+        "gross_amount": serializers.FloatField(required=False),
+        "concession_amount": serializers.FloatField(required=False),
+        "fine_amount": serializers.FloatField(required=False),
+        "net_payable": serializers.FloatField(required=False),
+        "amount_paid": serializers.FloatField(required=False),
+        "balance_due": serializers.FloatField(required=False),
+        "status": serializers.CharField(required=False),
+    },
+)
+
+_FeeLedgerGenerateRequest = inline_serializer(
+    name="AdminFeeLedgerGenerateRequest",
+    fields={"fee_structure_id": serializers.IntegerField()},
+)
+
+_DetailResponseSerializer = inline_serializer(
+    name="AdminDetailResponse",
+    fields={
+        "detail": serializers.CharField(required=False),
+        "id": serializers.IntegerField(required=False),
+        "count": serializers.IntegerField(required=False),
+    },
+)
+
+_FeeReportStructureItem = inline_serializer(
+    name="AdminFeeReportStructureItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "term_name": serializers.CharField(required=False),
+        "class_name": serializers.CharField(required=False),
+        "section": serializers.CharField(required=False),
+        "total_amount": serializers.FloatField(required=False),
+        "amount_collected": serializers.FloatField(required=False),
+        "due_date": serializers.DateField(required=False),
+        "is_published": serializers.BooleanField(required=False),
+    },
+)
+
+_FeeReportMonthlyItem = inline_serializer(
+    name="AdminFeeReportMonthlyItem",
+    fields={
+        "month": serializers.CharField(required=False),
+        "collected": serializers.FloatField(required=False),
+    },
+)
+
+_FeeReportPendingItem = inline_serializer(
+    name="AdminFeeReportPendingItem",
+    fields={
+        "status": serializers.CharField(required=False),
+        "total_balance": serializers.FloatField(required=False),
+        "count": serializers.IntegerField(required=False),
+    },
+)
+
+_FeeReportSummary = inline_serializer(
+    name="AdminFeeReportSummary",
+    fields={
+        "total_collected": serializers.FloatField(required=False),
+        "collected_this_month": serializers.FloatField(required=False),
+        "unique_payers": serializers.IntegerField(required=False),
+        "total_transactions": serializers.IntegerField(required=False),
+    },
+)
+
+_FeeReportsResponse = inline_serializer(
+    name="AdminFeeReportsResponse",
+    fields={
+        "summary": _FeeReportSummary(required=False),
+        "structures": serializers.ListSerializer(child=_FeeReportStructureItem(), required=False),
+        "monthly": serializers.ListSerializer(child=_FeeReportMonthlyItem(), required=False),
+        "pending": serializers.ListSerializer(child=_FeeReportPendingItem(), required=False),
+    },
+)
+
+# --- Transport module ------------------------------------------------------
+
+_TransportDriverItem = inline_serializer(
+    name="AdminTransportDriverItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "user_id": serializers.IntegerField(required=False),
+        "name": serializers.CharField(required=False),
+        "phone": serializers.CharField(required=False),
+        "license_number": serializers.CharField(required=False),
+        "vehicle_id": serializers.IntegerField(required=False),
+        "vehicle_number": serializers.CharField(required=False),
+        "is_active": serializers.BooleanField(required=False),
+    },
+)
+
+_TransportDriverCreateRequest = inline_serializer(
+    name="AdminTransportDriverCreateRequest",
+    fields={
+        "user_id": serializers.IntegerField(),
+        "license_number": serializers.CharField(required=False),
+        "phone": serializers.CharField(required=False),
+        "vehicle_id": serializers.IntegerField(required=False),
+    },
+)
+
+_TransportAttendantItem = inline_serializer(
+    name="AdminTransportAttendantItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "user_id": serializers.IntegerField(required=False),
+        "name": serializers.CharField(required=False),
+        "phone": serializers.CharField(required=False),
+        "assigned_route_id": serializers.IntegerField(required=False),
+        "route_name": serializers.CharField(required=False),
+        "is_active": serializers.BooleanField(required=False),
+    },
+)
+
+_TransportAttendantCreateRequest = inline_serializer(
+    name="AdminTransportAttendantCreateRequest",
+    fields={
+        "user_id": serializers.IntegerField(),
+        "phone": serializers.CharField(required=False),
+        "assigned_route_id": serializers.IntegerField(required=False),
+    },
+)
+
+_TransportPickupPointItem = inline_serializer(
+    name="AdminTransportPickupPointItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "route_id": serializers.IntegerField(required=False),
+        "route_name": serializers.CharField(required=False),
+        "name": serializers.CharField(required=False),
+        "sequence_order": serializers.IntegerField(required=False),
+        "pickup_time": serializers.CharField(required=False),
+        "drop_time": serializers.CharField(required=False),
+    },
+)
+
+_TransportPickupPointCreateRequest = inline_serializer(
+    name="AdminTransportPickupPointCreateRequest",
+    fields={
+        "route_id": serializers.IntegerField(),
+        "name": serializers.CharField(),
+        "sequence_order": serializers.IntegerField(required=False),
+        "pickup_time": serializers.CharField(required=False),
+        "drop_time": serializers.CharField(required=False),
+    },
+)
+
+_TransportPassItem = inline_serializer(
+    name="AdminTransportPassItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "student_id": serializers.IntegerField(required=False),
+        "student_name": serializers.CharField(required=False),
+        "pass_number": serializers.CharField(required=False),
+        "route_name": serializers.CharField(required=False),
+        "vehicle_number": serializers.CharField(required=False),
+        "pickup_point": serializers.CharField(required=False),
+        "issued_at": serializers.DateTimeField(required=False),
+    },
+)
+
+_TransportPassGenerateRequest = inline_serializer(
+    name="AdminTransportPassGenerateRequest",
+    fields={"student_id": serializers.IntegerField()},
+)
+
+_TransportTripItem = inline_serializer(
+    name="AdminTransportTripItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "vehicle_id": serializers.IntegerField(required=False),
+        "vehicle_number": serializers.CharField(required=False),
+        "route_id": serializers.IntegerField(required=False),
+        "route_name": serializers.CharField(required=False),
+        "trip_date": serializers.DateField(required=False),
+        "status": serializers.CharField(required=False),
+        "started_at": serializers.DateTimeField(required=False),
+        "ended_at": serializers.DateTimeField(required=False),
+    },
+)
+
+_TransportTripCreateRequest = inline_serializer(
+    name="AdminTransportTripCreateRequest",
+    fields={
+        "vehicle_id": serializers.IntegerField(),
+        "route_id": serializers.IntegerField(required=False),
+    },
+)
+
+_TransportTripPatchRequest = inline_serializer(
+    name="AdminTransportTripPatchRequest",
+    fields={
+        "id": serializers.IntegerField(),
+        "status": serializers.ChoiceField(
+            choices=["Scheduled", "In Progress", "Completed", "Cancelled"],
+            help_text="Scheduled -> In Progress -> Completed (or Cancelled).",
+        ),
+    },
+)
+
+_TransportAlertItem = inline_serializer(
+    name="AdminTransportAlertItem",
+    fields={
+        "id": serializers.IntegerField(required=False),
+        "type": serializers.CharField(required=False),
+        "message": serializers.CharField(required=False),
+        "vehicle_id": serializers.IntegerField(required=False),
+        "route_id": serializers.IntegerField(required=False),
+        "route_name": serializers.CharField(required=False),
+        "created_at": serializers.DateTimeField(required=False),
+        "created_by_name": serializers.CharField(required=False),
+    },
+)
+
+_TransportAlertCreateRequest = inline_serializer(
+    name="AdminTransportAlertCreateRequest",
+    fields={
+        "type": serializers.ChoiceField(
+            choices=["Bus Arrived", "Delay Alert", "Route Changed", "Emergency", "Info"],
+            required=False,
+        ),
+        "message": serializers.CharField(),
+        "vehicle_id": serializers.IntegerField(required=False),
+        "route_id": serializers.IntegerField(required=False),
+    },
+)
+
+_TransportSettingsItem = inline_serializer(
+    name="AdminTransportSettingsItem",
+    fields={
+        "contact_number": serializers.CharField(required=False),
+        "annual_transport_fee": serializers.FloatField(required=False),
+        "fee_due_date": serializers.DateField(required=False),
+        "gps_update_interval_sec": serializers.IntegerField(required=False),
+    },
+)
+
+_TransportRouteUtilisationItem = inline_serializer(
+    name="AdminTransportRouteUtilisationItem",
+    fields={
+        "route_name": serializers.CharField(required=False),
+        "start_point": serializers.CharField(required=False),
+        "end_point": serializers.CharField(required=False),
+        "vehicle_number": serializers.CharField(required=False),
+        "capacity": serializers.IntegerField(required=False),
+        "student_count": serializers.IntegerField(required=False),
+    },
+)
+
+_TransportRecentTripItem = inline_serializer(
+    name="AdminTransportRecentTripItem",
+    fields={
+        "vehicle_number": serializers.CharField(required=False),
+        "route_name": serializers.CharField(required=False),
+        "trip_date": serializers.DateField(required=False),
+        "started_at": serializers.DateTimeField(required=False),
+        "status": serializers.CharField(required=False),
+    },
+)
+
+_TransportReportsResponse = inline_serializer(
+    name="AdminTransportReportsResponse",
+    fields={
+        "total_vehicles": serializers.IntegerField(required=False),
+        "total_routes": serializers.IntegerField(required=False),
+        "allocated_students": serializers.IntegerField(required=False),
+        "active_trips": serializers.IntegerField(required=False),
+        "active_passes": serializers.IntegerField(required=False),
+        "route_utilisation": serializers.ListSerializer(child=_TransportRouteUtilisationItem(), required=False),
+        "recent_trips": serializers.ListSerializer(child=_TransportRecentTripItem(), required=False),
+    },
+)
+
+_TransportLiveMapItem = inline_serializer(
+    name="AdminTransportLiveMapItem",
+    fields={
+        "vehicle_id": serializers.IntegerField(required=False),
+        "vehicle_number": serializers.CharField(required=False),
+        "maintenance_status": serializers.CharField(required=False),
     },
 )
 
@@ -1545,12 +1972,22 @@ class UserListView(AdminMixin, APIView):
                 required=False,
                 description="Filter by role (Student, Teacher, Parent, Admin, Employee).",
             ),
+            OpenApiParameter(
+                name="type",
+                type=OpenApiTypes.STR,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Alias for 'role' (the admin Fees page uses ?type=student).",
+            ),
         ],
         responses={200: serializers.ListSerializer(child=_UserItem), **ERROR_RESPONSES},
     )
     def get(self, request):
         from django.contrib.auth.models import User
         role_filter = request.query_params.get("role")
+        if not role_filter:
+            # ?type= is the legacy alias used by the admin Fees page dropdowns.
+            role_filter = request.query_params.get("type")
 
         users = User.objects.all().prefetch_related("groups").order_by("-date_joined")
         data = []
@@ -1560,6 +1997,8 @@ class UserListView(AdminMixin, APIView):
                 "username": u.username,
                 "email": u.email,
                 "name": u.get_full_name() or u.username,
+                "first_name": u.first_name,
+                "last_name": u.last_name,
                 "is_active": u.is_active,
                 "date_joined": u.date_joined,
                 "role": get_role(u)
@@ -1843,6 +2282,11 @@ _SIMPLE_TABLE_WHITELIST = frozenset({
     "portal_fee_structure",
     "portal_book",
     "portal_hostel",
+    "portal_academic_year",
+    "portal_fee_category",
+    "portal_driver",
+    "portal_attendant",
+    "portal_pickup_point",
 })
 
 
@@ -1867,6 +2311,30 @@ def _compose_insert_statement(table, cols, placeholders):
             for p in placeholders
         )
         + pysql.SQL(") RETURNING id")
+    )
+
+
+def _compose_update_statement(table, cols):
+    """Compose an UPDATE statement (SET per-column placeholders WHERE id)."""
+    return (
+        pysql.SQL("UPDATE ")
+        + pysql.Identifier(table)
+        + pysql.SQL(" SET ")
+        + pysql.SQL(", ").join(
+            pysql.Identifier(c) + pysql.SQL(" = ") + pysql.Placeholder()
+            for c in cols
+        )
+        + pysql.SQL(" WHERE id = ") + pysql.Placeholder()
+        + pysql.SQL(" RETURNING id")
+    )
+
+
+def _compose_delete_statement(table):
+    """Compose a parameterized DELETE statement keyed by id."""
+    return (
+        pysql.SQL("DELETE FROM ")
+        + pysql.Identifier(table)
+        + pysql.SQL(" WHERE id = ") + pysql.Placeholder()
     )
 
 
@@ -1952,6 +2420,78 @@ class SimpleTableView(AdminMixin, APIView):
         )
         return Response({"id": new_id, "detail": "Created."}, status=201)
 
+    def validate_update(self, payload):
+        """Optional per-view update validation hook. Return a Response to
+        reject, or None to proceed. `payload` is the raw request body (dict)
+        already confirmed to carry an `id`."""
+        return None
+
+    def patch(self, request):
+        if not table_exists(self.table):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        if not isinstance(request.data, dict):
+            return Response({"detail": "A JSON object body is required."}, status=400)
+        record_id = request.data.get("id")
+        if record_id in (None, ""):
+            return Response({"detail": "The 'id' field is required for updates."}, status=400)
+        table = self._safe_table()
+        reject = self.validate_update(request.data)
+        if reject is not None:
+            return reject
+        cols, values = [], []
+        for c in self.columns:
+            if c not in request.data:
+                continue
+            v = request.data[c]
+            # Empty values are skipped so they never wipe NOT NULL fields; an
+            # explicit false/0 is preserved (booleans, sort orders).
+            if v in (None, ""):
+                continue
+            if c in self.int_columns:
+                try:
+                    v = int(v)
+                except (TypeError, ValueError):
+                    return Response({"detail": f"Field '{c}' must be an integer."}, status=400)
+            cols.append(c)
+            values.append(v)
+        if not cols:
+            return Response({"detail": "No updatable fields were provided."}, status=400)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    _compose_update_statement(table, cols), values + [record_id]
+                )
+                if cursor.fetchone() is None:
+                    return Response({"detail": "Not found."}, status=404)
+        except IntegrityError:
+            return Response(
+                {"detail": "Could not update the record: a referenced record is missing or a unique value already exists."},
+                status=400,
+            )
+        log_action(
+            request.user,
+            f"{self.table}.update",
+            self.table,
+            record_id,
+            dict(zip(cols, [str(v) for v in values], strict=True)),
+        )
+        return Response({"id": record_id, "detail": "Updated."})
+
+    def delete(self, request):
+        if not table_exists(self.table):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        table = self._safe_table()
+        try:
+            record_id = int(request.query_params.get("id", ""))
+        except (TypeError, ValueError):
+            return Response({"detail": "The 'id' query parameter is required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute(_compose_delete_statement(table), [record_id])
+            if cursor.rowcount == 0:
+                return Response({"detail": "Not found."}, status=404)
+        log_action(request.user, f"{self.table}.delete", self.table, record_id)
+        return Response({"detail": "Deleted."})
+
 
 @extend_schema_view(
     get=extend_schema(
@@ -2021,7 +2561,22 @@ class VehicleView(SimpleTableView):
     table = "portal_vehicle"
     columns = ("vehicle_number", "capacity", "driver_id", "gps_device_id", "maintenance_status")
     order_by = "vehicle_number"
-    int_columns = ("capacity", "driver_id", "gps_device_id")
+    int_columns = ("capacity", "driver_id")
+
+    def get(self, request):
+        if not table_exists(self.table):
+            return Response([])
+        data = rows(
+            "SELECT v.id, v.vehicle_number, v.capacity, v.driver_id, v.gps_device_id, "
+            "v.maintenance_status, "
+            "COALESCE(d.first_name || ' ' || d.last_name, d.username) AS driver_name, "
+            "pd.phone AS driver_phone "
+            "FROM portal_vehicle v "
+            "LEFT JOIN auth_user d ON d.id = v.driver_id "
+            "LEFT JOIN portal_driver pd ON pd.user_id = v.driver_id "
+            "ORDER BY v.vehicle_number"
+        )
+        return Response(serialise(data))
 
 
 @extend_schema_view(
@@ -2043,8 +2598,22 @@ class VehicleView(SimpleTableView):
 )
 class RouteView(SimpleTableView):
     table = "portal_route"
-    columns = ("route_name", "start_point", "end_point")
+    columns = ("route_name", "start_point", "end_point", "vehicle_id", "attendant_id")
     order_by = "route_name"
+    int_columns = ("vehicle_id", "attendant_id")
+
+    def get(self, request):
+        if not table_exists(self.table):
+            return Response([])
+        data = rows(
+            "SELECT r.id, r.route_name, r.start_point, r.end_point, r.vehicle_id, "
+            "r.attendant_id, v.vehicle_number, "
+            "(SELECT CAST(COUNT(*) AS INTEGER) FROM portal_pickup_point pp WHERE pp.route_id = r.id) AS stop_count "
+            "FROM portal_route r "
+            "LEFT JOIN portal_vehicle v ON v.id = r.vehicle_id "
+            "ORDER BY r.route_name"
+        )
+        return Response(serialise(data))
 
 
 @extend_schema_view(
@@ -2070,6 +2639,46 @@ class TransportAllocationView(SimpleTableView):
     order_by = "id"
     int_columns = ("student_id", "vehicle_id", "route_id")
 
+    def get(self, request):
+        if not table_exists(self.table):
+            return Response([])
+        data = rows(
+            "SELECT a.id, a.student_id, a.vehicle_id, a.route_id, a.pickup_point, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name, "
+            "v.vehicle_number, r.route_name, tp.pass_number "
+            "FROM portal_transport_allocation a "
+            "JOIN auth_user u ON u.id = a.student_id "
+            "JOIN portal_vehicle v ON v.id = a.vehicle_id "
+            "JOIN portal_route r ON r.id = a.route_id "
+            "LEFT JOIN portal_transport_pass tp ON tp.student_id = a.student_id "
+            "ORDER BY u.first_name, u.last_name"
+        )
+        return Response(serialise(data))
+
+    def delete(self, request):
+        # The admin UI removes an allocation by student_id (one per student).
+        if not table_exists(self.table):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        student_id = request.query_params.get("student_id")
+        record_id = request.query_params.get("id")
+        try:
+            if student_id:
+                value = int(student_id)
+                stmt = pysql.SQL("DELETE FROM ") + pysql.Identifier(self.table) + pysql.SQL(" WHERE student_id = ") + pysql.Placeholder()
+                where = "student_id"
+            else:
+                value = int(record_id or "")
+                stmt = pysql.SQL("DELETE FROM ") + pysql.Identifier(self.table) + pysql.SQL(" WHERE id = ") + pysql.Placeholder()
+                where = "id"
+        except (TypeError, ValueError):
+            return Response({"detail": "The 'id' or 'student_id' query parameter is required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute(stmt, [value])
+            if cursor.rowcount == 0:
+                return Response({"detail": "Not found."}, status=404)
+        log_action(request.user, "transport_allocation.delete", self.table, value)
+        return Response({"detail": "Deleted."})
+
 
 @extend_schema_view(
     get=extend_schema(
@@ -2090,9 +2699,52 @@ class TransportAllocationView(SimpleTableView):
 )
 class FeeStructureView(SimpleTableView):
     table = "portal_fee_structure"
-    columns = ("class_id", "term_name", "tuition_fee", "transport_fee", "hostel_fee", "total_amount")
+    columns = (
+        "class_id", "term_name", "academic_year_id", "due_date", "late_fine_per_day",
+        "tuition_fee", "admission_fee", "transport_fee", "hostel_fee", "library_fee",
+        "exam_fee", "misc_fee", "description", "is_published", "total_amount",
+    )
     order_by = "class_id"
-    int_columns = ("class_id",)
+    int_columns = ("class_id", "academic_year_id")
+    _fee_components = (
+        "tuition_fee", "admission_fee", "transport_fee", "hostel_fee",
+        "library_fee", "exam_fee", "misc_fee",
+    )
+
+    def validate_create(self, payload):
+        # The UI computes the total client-side but sends only the components;
+        # derive the total server-side so it can never drift from them.
+        if "total_amount" not in payload or payload.get("total_amount") in (None, ""):
+            total = 0.0
+            for c in self._fee_components:
+                try:
+                    total += float(payload.get(c) or 0)
+                except (TypeError, ValueError):
+                    return Response({"detail": f"Field '{c}' must be a number."}, status=400)
+            payload["total_amount"] = total
+        for c in self._fee_components:
+            if payload.get(c) not in (None, ""):
+                try:
+                    float(payload[c])
+                except (TypeError, ValueError):
+                    return Response({"detail": f"Field '{c}' must be a number."}, status=400)
+        if payload.get("due_date") and payload["due_date"] < str(date.today()):
+            return Response({"detail": "The due date cannot be in the past."}, status=400)
+        return None
+
+    def get(self, request):
+        if not table_exists(self.table):
+            return Response([])
+        data = rows(
+            "SELECT fs.*, c.name || '-' || c.section AS class_name, c.section, ay.name AS academic_year_name, "
+            "COALESCE((SELECT SUM(p.amount_paid) FROM portal_payment p "
+            "          WHERE p.fee_structure_id = fs.id AND p.status = 'Success'), 0) AS amount_collected "
+            "FROM portal_fee_structure fs "
+            "JOIN portal_class c ON c.id = fs.class_id "
+            "LEFT JOIN portal_academic_year ay ON ay.id = fs.academic_year_id "
+            "ORDER BY fs.class_id, fs.term_name"
+        )
+        return Response(serialise(data))
 
 
 class PaymentListView(AdminMixin, APIView):
@@ -2108,8 +2760,13 @@ class PaymentListView(AdminMixin, APIView):
             return Response([])
         data = rows(
             """
-            SELECT p.id, p.transaction_id, p.amount_paid, p.status, p.paid_at,
+            SELECT p.id, p.transaction_id, p.amount_paid, p.status, p.paid_at, p.payment_method,
                    COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name,
+                   (SELECT sp.admission_number FROM portal_student_profile sp WHERE sp.user_id = p.student_id) AS admission_number,
+                   (SELECT c.name FROM portal_student_enrollment e JOIN portal_class c ON c.id = e.class_id
+                    WHERE e.student_id = p.student_id ORDER BY e.id DESC LIMIT 1) AS class_name,
+                   (SELECT c.section FROM portal_student_enrollment e JOIN portal_class c ON c.id = e.class_id
+                    WHERE e.student_id = p.student_id ORDER BY e.id DESC LIMIT 1) AS section,
                    fs.term_name
             FROM portal_payment p
             JOIN auth_user u ON u.id = p.student_id
@@ -2820,4 +3477,1083 @@ class ContactMessagesView(AdminMixin, APIView):
         submission.save(update_fields=["is_resolved"])
         log_action(request.user, "contact.update", "ContactSubmission", message_id, {"is_resolved": submission.is_resolved})
         return Response({"detail": "Contact submission updated."})
+
+
+# ---------------------------------------------------------------------------
+# Fees module — academic years, categories, assignments, concessions, ledger
+# (computed on read) and reports (computed on read). All amounts are passed
+# as bound parameters; identifiers never appear in SQL text.
+# ---------------------------------------------------------------------------
+
+def _date_of(value):
+    """Normalise a DB row value (date, datetime or ISO string) to a date."""
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value)[:10])
+    except ValueError:
+        return None
+
+
+def _deactivate_other_academic_years(record_id):
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "UPDATE portal_academic_year SET is_active = false WHERE id <> %s", [record_id]
+        )
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminAcademicYearList",
+        summary="List academic years",
+        description="Returns all academic years, newest first.",
+        tags=["Finance"],
+        responses={200: serializers.ListSerializer(child=_AcademicYearItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminAcademicYearCreate",
+        summary="Create an academic year",
+        description="Creates an academic year; when is_active is set the other years are deactivated.",
+        tags=["Finance"],
+        request=_AcademicYearCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
+class AcademicYearView(SimpleTableView):
+    table = "portal_academic_year"
+    columns = ("name", "start_date", "end_date", "is_active")
+    order_by = "start_date DESC"
+
+    def validate_create(self, payload):
+        if not payload.get("name"):
+            return Response({"detail": "The 'name' field is required."}, status=400)
+        start = _date_of(payload.get("start_date"))
+        end = _date_of(payload.get("end_date"))
+        if start is None or end is None:
+            return Response({"detail": "Both 'start_date' and 'end_date' are required."}, status=400)
+        if end <= start:
+            return Response({"detail": "The end date must be after the start date."}, status=400)
+        return None
+
+    def post(self, request):
+        response = super().post(request)
+        if response.status_code == 201 and request.data.get("is_active"):
+            _deactivate_other_academic_years(response.data["id"])
+        return response
+
+    def patch(self, request):
+        response = super().patch(request)
+        if response.status_code == 200 and request.data.get("is_active"):
+            _deactivate_other_academic_years(request.data["id"])
+        return response
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminFeeCategoryList",
+        summary="List fee categories",
+        description="Returns all fee categories ordered by sort_order.",
+        tags=["Finance"],
+        responses={200: serializers.ListSerializer(child=_FeeCategoryItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminFeeCategoryCreate",
+        summary="Create a fee category",
+        description="Creates a fee category with an optional sort order.",
+        tags=["Finance"],
+        request=_FeeCategoryCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
+class FeeCategoryView(SimpleTableView):
+    table = "portal_fee_category"
+    columns = ("name", "description", "sort_order", "is_active")
+    order_by = "sort_order, name"
+    int_columns = ("sort_order",)
+
+
+class FeeAssignmentView(AdminMixin, APIView):
+    """Assigns fee structures to individual students or to every student
+    enrolled in the structure's class (bulk)."""
+
+    @extend_schema(
+        operation_id="AdminFeeAssignmentList",
+        summary="List fee structure assignments",
+        description="Returns the students assigned to a fee structure (required query param fee_structure_id).",
+        tags=["Finance"],
+        parameters=[
+            OpenApiParameter(
+                name="fee_structure_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=True,
+            ),
+        ],
+        responses={200: serializers.ListSerializer(child=_FeeAssignmentItem), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_fee_assignment"):
+            return Response([])
+        structure_id = request.query_params.get("fee_structure_id")
+        if structure_id in (None, ""):
+            return Response({"detail": "The 'fee_structure_id' query parameter is required."}, status=400)
+        data = rows(
+            "SELECT a.id, a.fee_structure_id, a.student_id, a.assigned_at, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name, "
+            "sp.admission_number "
+            "FROM portal_fee_assignment a "
+            "JOIN auth_user u ON u.id = a.student_id "
+            "LEFT JOIN portal_student_profile sp ON sp.user_id = a.student_id "
+            "WHERE a.fee_structure_id = %s ORDER BY u.first_name, u.last_name",
+            [structure_id],
+        )
+        return Response(serialise(data))
+
+    @extend_schema(
+        operation_id="AdminFeeAssignmentCreate",
+        summary="Assign a fee structure to students",
+        description="Assigns a fee structure to one student (student_id) or to the whole class (assign_class=true).",
+        tags=["Finance"],
+        request=_FeeAssignmentCreateRequest,
+        responses={200: _DetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        if not table_exists("portal_fee_assignment"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        if not isinstance(request.data, dict):
+            return Response({"detail": "A JSON object body is required."}, status=400)
+        structure_id = request.data.get("fee_structure_id")
+        if structure_id in (None, ""):
+            return Response({"detail": "The 'fee_structure_id' field is required."}, status=400)
+        if request.data.get("assign_class"):
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_fee_assignment (fee_structure_id, student_id) "
+                    "SELECT %s, e.student_id FROM portal_student_enrollment e "
+                    "JOIN portal_fee_structure fs ON fs.class_id = e.class_id AND fs.id = %s "
+                    "WHERE NOT EXISTS (SELECT 1 FROM portal_fee_assignment a "
+                    "WHERE a.fee_structure_id = %s AND a.student_id = e.student_id)",
+                    [structure_id, structure_id, structure_id],
+                )
+                count = cursor.rowcount
+            log_action(request.user, "fee.assignment.bulk", "portal_fee_assignment", structure_id, {"count": count})
+            return Response({"detail": f"Assigned {count} student(s).", "count": count})
+        student_id = request.data.get("student_id")
+        if student_id in (None, ""):
+            return Response({"detail": "Provide 'student_id' or set 'assign_class' to true."}, status=400)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_fee_assignment (fee_structure_id, student_id) "
+                    "VALUES (%s, %s) RETURNING id",
+                    [structure_id, student_id],
+                )
+                new_id = cursor.fetchone()[0]
+        except IntegrityError:
+            return Response(
+                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
+                status=400,
+            )
+        log_action(request.user, "fee.assignment.create", "portal_fee_assignment", new_id, {"fee_structure_id": structure_id, "student_id": student_id})
+        return Response({"id": new_id, "detail": "Assigned."}, status=201)
+
+    @extend_schema(
+        operation_id="AdminFeeAssignmentDelete",
+        summary="Remove a fee structure assignment",
+        tags=["Finance"],
+        parameters=[
+            OpenApiParameter(name="id", type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=True),
+        ],
+        responses={200: DetailErrorSerializer, 404: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
+    def delete(self, request):
+        try:
+            record_id = int(request.query_params.get("id", ""))
+        except (TypeError, ValueError):
+            return Response({"detail": "The 'id' query parameter is required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM portal_fee_assignment WHERE id = %s", [record_id])
+            if cursor.rowcount == 0:
+                return Response({"detail": "Not found."}, status=404)
+        log_action(request.user, "fee.assignment.delete", "portal_fee_assignment", record_id)
+        return Response({"detail": "Removed."})
+
+
+class FeeConcessionView(AdminMixin, APIView):
+    CONCESSION_TYPES = ("Scholarship", "Merit", "Sibling", "Staff", "Disability", "Discount", "Other")
+
+    @extend_schema(
+        operation_id="AdminFeeConcessionList",
+        summary="List fee concessions",
+        description="Returns all concessions joined with the student and fee term.",
+        tags=["Finance"],
+        responses={200: serializers.ListSerializer(child=_FeeConcessionItem), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_fee_concession"):
+            return Response([])
+        data = rows(
+            "SELECT fc.id, fc.student_id, fc.fee_structure_id, fc.concession_type, "
+            "fc.discount_amount, fc.discount_percent, fc.reason, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name, "
+            "fs.term_name "
+            "FROM portal_fee_concession fc "
+            "JOIN auth_user u ON u.id = fc.student_id "
+            "JOIN portal_fee_structure fs ON fs.id = fc.fee_structure_id "
+            "ORDER BY fc.id DESC"
+        )
+        return Response(serialise(data))
+
+    @extend_schema(
+        operation_id="AdminFeeConcessionCreate",
+        summary="Apply a concession",
+        description="Applies a flat or percentage discount to a student for a fee structure.",
+        tags=["Finance"],
+        request=_FeeConcessionCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        if not table_exists("portal_fee_concession"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        payload = request.data if isinstance(request.data, dict) else {}
+        student_id = payload.get("student_id")
+        structure_id = payload.get("fee_structure_id")
+        if student_id in (None, "") or structure_id in (None, ""):
+            return Response({"detail": "Both 'student_id' and 'fee_structure_id' are required."}, status=400)
+        try:
+            amount = float(payload.get("discount_amount") or 0)
+            percent = float(payload.get("discount_percent") or 0)
+        except (TypeError, ValueError):
+            return Response({"detail": "Discount amounts must be numbers."}, status=400)
+        if amount < 0 or percent < 0 or percent > 100:
+            return Response({"detail": "Discount amount must be non-negative and percent between 0 and 100."}, status=400)
+        if amount == 0 and percent == 0:
+            return Response({"detail": "Enter a discount amount or a percentage."}, status=400)
+        concession_type = payload.get("concession_type") or "Scholarship"
+        if concession_type not in self.CONCESSION_TYPES:
+            return Response({"detail": f"Unknown concession type '{concession_type}'."}, status=400)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_fee_concession "
+                    "(student_id, fee_structure_id, concession_type, discount_amount, discount_percent, reason) "
+                    "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                    [student_id, structure_id, concession_type, amount, percent, payload.get("reason") or ""],
+                )
+                new_id = cursor.fetchone()[0]
+        except IntegrityError:
+            return Response(
+                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
+                status=400,
+            )
+        log_action(request.user, "fee.concession.create", "portal_fee_concession", new_id, {
+            "student_id": student_id, "fee_structure_id": structure_id, "concession_type": concession_type,
+        })
+        return Response({"id": new_id, "detail": "Concession applied."}, status=201)
+
+    @extend_schema(
+        operation_id="AdminFeeConcessionDelete",
+        summary="Remove a concession",
+        tags=["Finance"],
+        parameters=[
+            OpenApiParameter(name="id", type=OpenApiTypes.INT, location=OpenApiParameter.QUERY, required=True),
+        ],
+        responses={200: DetailErrorSerializer, 404: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
+    def delete(self, request):
+        try:
+            record_id = int(request.query_params.get("id", ""))
+        except (TypeError, ValueError):
+            return Response({"detail": "The 'id' query parameter is required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM portal_fee_concession WHERE id = %s", [record_id])
+            if cursor.rowcount == 0:
+                return Response({"detail": "Not found."}, status=404)
+        log_action(request.user, "fee.concession.delete", "portal_fee_concession", record_id)
+        return Response({"detail": "Removed."})
+
+
+def _ledger_rows_for_structure(structure_id):
+    """Compute the per-student ledger for a fee structure on the fly.
+
+    Gross comes from the structure's total; concessions reduce it; fines
+    accrue past the due date; payments (status='Success') reduce the balance.
+    Everything is computed in Python so the query stays vendor-portable.
+    """
+    fs = row(
+        "SELECT id, total_amount, due_date, late_fine_per_day FROM portal_fee_structure WHERE id = %s",
+        [structure_id],
+    )
+    if fs is None:
+        return None
+    gross = float(fs.get("total_amount") or 0)
+    due_date = _date_of(fs.get("due_date"))
+    late_fine_per_day = float(fs.get("late_fine_per_day") or 0)
+    today = date.today()
+
+    assignments = rows(
+        "SELECT a.id, a.student_id, a.fee_structure_id, "
+        "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name, "
+        "sp.admission_number "
+        "FROM portal_fee_assignment a "
+        "JOIN auth_user u ON u.id = a.student_id "
+        "LEFT JOIN portal_student_profile sp ON sp.user_id = a.student_id "
+        "WHERE a.fee_structure_id = %s ORDER BY u.first_name, u.last_name",
+        [structure_id],
+    )
+    concessions = rows(
+        "SELECT student_id, discount_amount, discount_percent FROM portal_fee_concession "
+        "WHERE fee_structure_id = %s",
+        [structure_id],
+    ) if table_exists("portal_fee_concession") else []
+    payments = rows(
+        "SELECT student_id, amount_paid FROM portal_payment "
+        "WHERE fee_structure_id = %s AND status = 'Success'",
+        [structure_id],
+    ) if table_exists("portal_payment") else []
+
+    concession_by_student = {}
+    for c in concessions:
+        sid = c["student_id"]
+        concession_by_student[sid] = concession_by_student.get(sid, 0) + (
+            float(c["discount_amount"] or 0)
+            or gross * float(c["discount_percent"] or 0) / 100.0
+        )
+    paid_by_student = {}
+    for p in payments:
+        sid = p["student_id"]
+        paid_by_student[sid] = paid_by_student.get(sid, 0) + float(p["amount_paid"] or 0)
+
+    ledger = []
+    for a in assignments:
+        sid = a["student_id"]
+        concession_amount = round(concession_by_student.get(sid, 0), 2)
+        net_payable = round(gross - concession_amount, 2)
+        amount_paid = round(paid_by_student.get(sid, 0), 2)
+        overdue_days = (today - due_date).days if due_date and due_date < today else 0
+        fine_amount = round(overdue_days * late_fine_per_day, 2) if overdue_days > 0 and amount_paid < net_payable else 0
+        balance_due = round(max(0.0, net_payable + fine_amount - amount_paid), 2)
+        if amount_paid > 0 and balance_due <= 0:
+            status = "Paid"
+        elif amount_paid > 0:
+            status = "Partial"
+        elif due_date and due_date < today:
+            status = "Overdue"
+        else:
+            status = "Unpaid"
+        ledger.append({
+            "id": a["id"],
+            "student_id": sid,
+            "student_name": a["student_name"],
+            "admission_number": a.get("admission_number"),
+            "gross_amount": gross,
+            "concession_amount": concession_amount,
+            "fine_amount": fine_amount,
+            "net_payable": net_payable,
+            "amount_paid": amount_paid,
+            "balance_due": balance_due,
+            "status": status,
+        })
+    return ledger
+
+
+class FeeLedgerView(AdminMixin, APIView):
+    """Per-student ledger for a fee structure, computed on read so payments
+    and concessions are always reflected."""
+
+    @extend_schema(
+        operation_id="AdminFeeLedgerList",
+        summary="View the student ledger",
+        description="Returns the computed ledger for a fee structure (query param fee_structure_id).",
+        tags=["Finance"],
+        parameters=[
+            OpenApiParameter(
+                name="fee_structure_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=True,
+            ),
+        ],
+        responses={200: serializers.ListSerializer(child=_FeeLedgerItem), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_fee_assignment"):
+            return Response([])
+        structure_id = request.query_params.get("fee_structure_id")
+        if structure_id in (None, ""):
+            return Response({"detail": "The 'fee_structure_id' query parameter is required."}, status=400)
+        ledger = _ledger_rows_for_structure(structure_id)
+        if ledger is None:
+            return Response({"detail": "Fee structure not found."}, status=404)
+        return Response(serialise(ledger))
+
+    @extend_schema(
+        operation_id="AdminFeeLedgerGenerate",
+        summary="Generate the student ledger",
+        description="Validates the fee structure and refreshes the computed ledger.",
+        tags=["Finance"],
+        request=_FeeLedgerGenerateRequest,
+        responses={200: _DetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        if not table_exists("portal_fee_assignment"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        structure_id = request.data.get("fee_structure_id") if isinstance(request.data, dict) else None
+        if structure_id in (None, ""):
+            return Response({"detail": "The 'fee_structure_id' field is required."}, status=400)
+        if not table_exists("portal_fee_structure"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        if row("SELECT id FROM portal_fee_structure WHERE id = %s", [structure_id]) is None:
+            return Response({"detail": "Fee structure not found."}, status=404)
+        log_action(request.user, "fee.ledger.generate", "portal_fee_structure", structure_id)
+        return Response({"detail": "Ledger generated."})
+
+
+class FeeReportsView(AdminMixin, APIView):
+    """Fee collection reports: summary stats, per-structure collection,
+    monthly collection and outstanding balances, all computed on read."""
+
+    @extend_schema(
+        operation_id="AdminFeeReports",
+        summary="Fee collection reports",
+        description="Returns collection summary, per-structure, monthly (last 12 months) and outstanding stats.",
+        tags=["Finance"],
+        parameters=[
+            OpenApiParameter(
+                name="academic_year_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Restrict structures and payments to an academic year.",
+            ),
+        ],
+        responses={200: _FeeReportsResponse, **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        ay_id = request.query_params.get("academic_year_id")
+        ay = None
+        if ay_id:
+            ay = row("SELECT start_date, end_date FROM portal_academic_year WHERE id = %s", [ay_id])
+        structures = []
+        pending = []
+        monthly = []
+        summary = {"total_collected": 0, "collected_this_month": 0, "unique_payers": 0, "total_transactions": 0}
+
+        if table_exists("portal_fee_structure") and table_exists("portal_class"):
+            where = " WHERE fs.academic_year_id = %s" if ay_id else ""
+            params = [ay_id] if ay_id else []
+            structures = rows(
+                "SELECT fs.id, fs.term_name, fs.total_amount, fs.due_date, fs.is_published, "
+                "c.name || '-' || c.section AS class_name, c.section, "
+                "COALESCE((SELECT SUM(p.amount_paid) FROM portal_payment p "
+                "          WHERE p.fee_structure_id = fs.id AND p.status = 'Success'), 0) AS amount_collected "
+                "FROM portal_fee_structure fs JOIN portal_class c ON c.id = fs.class_id"
+                + where
+                + " ORDER BY fs.id",
+                params,
+            )
+
+        if table_exists("portal_payment"):
+            payments = rows(
+                "SELECT student_id, amount_paid, paid_at FROM portal_payment WHERE status = 'Success'"
+            )
+            if ay and (ay.get("start_date") or ay.get("end_date")):
+                start = _date_of(ay.get("start_date"))
+                end = _date_of(ay.get("end_date"))
+            else:
+                start = end = None
+            total = 0.0
+            this_month = 0.0
+            payers = set()
+            buckets = {}
+            tx_count = 0
+            today = date.today()
+            for p in payments:
+                paid_at = _date_of(p.get("paid_at"))
+                if start and paid_at and (paid_at < start or paid_at > end):
+                    continue
+                amount = float(p["amount_paid"] or 0)
+                total += amount
+                tx_count += 1
+                payers.add(p["student_id"])
+                if paid_at and paid_at.year == today.year and paid_at.month == today.month:
+                    this_month += amount
+                month_key = paid_at.strftime("%Y-%m") if paid_at else None
+                if month_key:
+                    buckets[month_key] = buckets.get(month_key, 0) + amount
+            summary = {
+                "total_collected": round(total, 2),
+                "collected_this_month": round(this_month, 2),
+                "unique_payers": len(payers),
+                "total_transactions": tx_count,
+            }
+            for offset in range(11, -1, -1):
+                anchor = today - timedelta(days=offset * 30)
+                key = anchor.strftime("%Y-%m")
+                monthly.append({"month": key, "collected": round(buckets.get(key, 0.0), 2)})
+
+        if table_exists("portal_fee_assignment") and table_exists("portal_fee_structure"):
+            if ay_id:
+                structures_for_pending = [s["id"] for s in structures]
+            else:
+                structures_for_pending = [r["id"] for r in rows("SELECT id FROM portal_fee_structure")]
+            buckets = {}
+            for structure_id in structures_for_pending:
+                ledger = _ledger_rows_for_structure(structure_id) or []
+                for entry in ledger:
+                    bucket = buckets.setdefault(entry["status"], {"total_balance": 0.0, "count": 0})
+                    bucket["total_balance"] += entry["balance_due"]
+                    bucket["count"] += 1
+            pending = [
+                {"status": status, "total_balance": round(b["total_balance"], 2), "count": b["count"]}
+                for status, b in buckets.items()
+            ]
+            pending.sort(key=lambda p: p["total_balance"], reverse=True)
+
+        return Response(serialise({
+            "summary": summary,
+            "structures": structures,
+            "monthly": monthly,
+            "pending": pending,
+        }))
+
+
+# ---------------------------------------------------------------------------
+# Transport module — drivers, attendants, pickup points, passes, trips,
+# alerts, settings, live map and reports.
+# ---------------------------------------------------------------------------
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminTransportDriverList",
+        summary="List transport drivers",
+        description="Returns all drivers joined with their user name and assigned vehicle.",
+        tags=["Transport"],
+        responses={200: serializers.ListSerializer(child=_TransportDriverItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminTransportDriverCreate",
+        summary="Register a driver",
+        description="Registers a driver (auth user id) with license and phone details.",
+        tags=["Transport"],
+        request=_TransportDriverCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
+class TransportDriverView(SimpleTableView):
+    table = "portal_driver"
+    columns = ("user_id", "license_number", "phone", "vehicle_id")
+    order_by = "id"
+    int_columns = ("user_id", "vehicle_id")
+
+    def get(self, request):
+        if not table_exists(self.table):
+            return Response([])
+        data = rows(
+            "SELECT d.id, d.user_id, d.license_number, d.phone, d.vehicle_id, d.is_active, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS name, "
+            "v.vehicle_number "
+            "FROM portal_driver d "
+            "JOIN auth_user u ON u.id = d.user_id "
+            "LEFT JOIN portal_vehicle v ON v.id = d.vehicle_id "
+            "ORDER BY u.first_name, u.last_name"
+        )
+        return Response(serialise(data))
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminTransportAttendantList",
+        summary="List transport attendants",
+        description="Returns all attendants joined with their user name and assigned route.",
+        tags=["Transport"],
+        responses={200: serializers.ListSerializer(child=_TransportAttendantItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminTransportAttendantCreate",
+        summary="Register an attendant",
+        description="Registers an attendant (auth user id) with phone and an optional route.",
+        tags=["Transport"],
+        request=_TransportAttendantCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
+class TransportAttendantView(SimpleTableView):
+    table = "portal_attendant"
+    columns = ("user_id", "phone", "assigned_route_id")
+    order_by = "id"
+    int_columns = ("user_id", "assigned_route_id")
+
+    def get(self, request):
+        if not table_exists(self.table):
+            return Response([])
+        data = rows(
+            "SELECT a.id, a.user_id, a.phone, a.assigned_route_id, a.is_active, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS name, "
+            "r.route_name "
+            "FROM portal_attendant a "
+            "JOIN auth_user u ON u.id = a.user_id "
+            "LEFT JOIN portal_route r ON r.id = a.assigned_route_id "
+            "ORDER BY u.first_name, u.last_name"
+        )
+        return Response(serialise(data))
+
+
+@extend_schema_view(
+    get=extend_schema(
+        operation_id="AdminTransportPickupPointList",
+        summary="List pickup points",
+        description="Returns pickup/drop stops, optionally filtered by route_id, ordered by sequence.",
+        tags=["Transport"],
+        parameters=[
+            OpenApiParameter(
+                name="route_id",
+                type=OpenApiTypes.INT,
+                location=OpenApiParameter.QUERY,
+                required=False,
+            ),
+        ],
+        responses={200: serializers.ListSerializer(child=_TransportPickupPointItem), **ERROR_RESPONSES},
+    ),
+    post=extend_schema(
+        operation_id="AdminTransportPickupPointCreate",
+        summary="Add a pickup point",
+        description="Adds a stop to a route with sequence order and optional times.",
+        tags=["Transport"],
+        request=_TransportPickupPointCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    ),
+)
+class TransportPickupPointView(SimpleTableView):
+    table = "portal_pickup_point"
+    columns = ("route_id", "name", "sequence_order", "pickup_time", "drop_time")
+    order_by = "sequence_order, id"
+    int_columns = ("route_id", "sequence_order")
+
+    def get(self, request):
+        if not table_exists(self.table):
+            return Response([])
+        route_id = request.query_params.get("route_id")
+        if route_id:
+            data = rows(
+                "SELECT pp.id, pp.route_id, pp.name, pp.sequence_order, pp.pickup_time, pp.drop_time, "
+                "r.route_name "
+                "FROM portal_pickup_point pp "
+                "JOIN portal_route r ON r.id = pp.route_id "
+                "WHERE pp.route_id = %s ORDER BY pp.sequence_order, pp.id",
+                [route_id],
+            )
+        else:
+            data = rows(
+                "SELECT pp.id, pp.route_id, pp.name, pp.sequence_order, pp.pickup_time, pp.drop_time, "
+                "r.route_name "
+                "FROM portal_pickup_point pp "
+                "JOIN portal_route r ON r.id = pp.route_id "
+                "ORDER BY pp.route_id, pp.sequence_order, pp.id"
+            )
+        return Response(serialise(data))
+
+
+class TransportPassView(AdminMixin, APIView):
+    """Issues transport passes for allocated students (one per student)."""
+
+    @extend_schema(
+        operation_id="AdminTransportPassList",
+        summary="List transport passes",
+        description="Returns all issued passes joined with the student and allocation.",
+        tags=["Transport"],
+        responses={200: serializers.ListSerializer(child=_TransportPassItem), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_transport_pass"):
+            return Response([])
+        data = rows(
+            "SELECT tp.id, tp.student_id, tp.pass_number, tp.issued_at, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name, "
+            "r.route_name, v.vehicle_number, a.pickup_point "
+            "FROM portal_transport_pass tp "
+            "JOIN auth_user u ON u.id = tp.student_id "
+            "LEFT JOIN portal_transport_allocation a ON a.student_id = tp.student_id "
+            "LEFT JOIN portal_route r ON r.id = a.route_id "
+            "LEFT JOIN portal_vehicle v ON v.id = a.vehicle_id "
+            "ORDER BY tp.id DESC"
+        )
+        return Response(serialise(data))
+
+    @extend_schema(
+        operation_id="AdminTransportPassGenerate",
+        summary="Generate a transport pass",
+        description="Issues a pass for a student; existing passes are returned unchanged.",
+        tags=["Transport"],
+        request=_TransportPassGenerateRequest,
+        responses={200: _TransportPassItem, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        if not table_exists("portal_transport_pass"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        payload = request.data if isinstance(request.data, dict) else {}
+        student_id = payload.get("student_id")
+        if student_id in (None, ""):
+            return Response({"detail": "The 'student_id' field is required."}, status=400)
+        existing = row(
+            "SELECT tp.pass_number, tp.student_id, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name, "
+            "r.route_name, v.vehicle_number, a.pickup_point "
+            "FROM portal_transport_pass tp "
+            "JOIN auth_user u ON u.id = tp.student_id "
+            "LEFT JOIN portal_transport_allocation a ON a.student_id = tp.student_id "
+            "LEFT JOIN portal_route r ON r.id = a.route_id "
+            "LEFT JOIN portal_vehicle v ON v.id = a.vehicle_id "
+            "WHERE tp.student_id = %s",
+            [student_id],
+        )
+        if existing:
+            return Response(serialise(existing))
+        pass_number = f"EP-{date.today().year}-{uuid.uuid4().hex[:8].upper()}"
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_transport_pass (student_id, pass_number) VALUES (%s, %s) RETURNING id",
+                    [student_id, pass_number],
+                )
+                new_id = cursor.fetchone()[0]
+        except IntegrityError:
+            return Response(
+                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
+                status=400,
+            )
+        log_action(request.user, "transport.pass.generate", "portal_transport_pass", new_id, {"student_id": student_id, "pass_number": pass_number})
+        return Response(serialise(row(
+            "SELECT tp.pass_number, tp.student_id, "
+            "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name, "
+            "r.route_name, v.vehicle_number, a.pickup_point "
+            "FROM portal_transport_pass tp "
+            "JOIN auth_user u ON u.id = tp.student_id "
+            "LEFT JOIN portal_transport_allocation a ON a.student_id = tp.student_id "
+            "LEFT JOIN portal_route r ON r.id = a.route_id "
+            "LEFT JOIN portal_vehicle v ON v.id = a.vehicle_id "
+            "WHERE tp.student_id = %s",
+            [student_id],
+        )), status=201)
+
+
+_TRIP_STATUS_FLOW = {
+    "Scheduled": ("In Progress", "Cancelled"),
+    "In Progress": ("Completed", "Cancelled"),
+}
+
+
+class TransportTripView(AdminMixin, APIView):
+    """Daily trip logs with Scheduled -> In Progress -> Completed lifecycle."""
+
+    @extend_schema(
+        operation_id="AdminTransportTripList",
+        summary="List trips for a date",
+        description="Returns the trips logged for a date (default: today).",
+        tags=["Transport"],
+        parameters=[
+            OpenApiParameter(
+                name="date",
+                type=OpenApiTypes.DATE,
+                location=OpenApiParameter.QUERY,
+                required=False,
+                description="Trip date (YYYY-MM-DD); defaults to today.",
+            ),
+        ],
+        responses={200: serializers.ListSerializer(child=_TransportTripItem), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_transport_trip"):
+            return Response([])
+        trip_date = request.query_params.get("date") or date.today().isoformat()
+        data = rows(
+            "SELECT t.id, t.vehicle_id, t.route_id, t.trip_date, t.status, t.started_at, t.ended_at, "
+            "v.vehicle_number, r.route_name "
+            "FROM portal_transport_trip t "
+            "JOIN portal_vehicle v ON v.id = t.vehicle_id "
+            "LEFT JOIN portal_route r ON r.id = t.route_id "
+            "WHERE t.trip_date = %s ORDER BY t.id DESC",
+            [trip_date],
+        )
+        return Response(serialise(data))
+
+    @extend_schema(
+        operation_id="AdminTransportTripCreate",
+        summary="Schedule a trip",
+        description="Creates a scheduled trip for a vehicle (and optionally a route).",
+        tags=["Transport"],
+        request=_TransportTripCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        if not table_exists("portal_transport_trip"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        payload = request.data if isinstance(request.data, dict) else {}
+        vehicle_id = payload.get("vehicle_id")
+        if vehicle_id in (None, ""):
+            return Response({"detail": "The 'vehicle_id' field is required."}, status=400)
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    "INSERT INTO portal_transport_trip (vehicle_id, route_id, status) "
+                    "VALUES (%s, %s, 'Scheduled') RETURNING id",
+                    [vehicle_id, payload.get("route_id")],
+                )
+                new_id = cursor.fetchone()[0]
+        except IntegrityError:
+            return Response(
+                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
+                status=400,
+            )
+        log_action(request.user, "transport.trip.create", "portal_transport_trip", new_id, {"vehicle_id": vehicle_id})
+        return Response({"id": new_id, "detail": "Trip scheduled."}, status=201)
+
+    @extend_schema(
+        operation_id="AdminTransportTripUpdate",
+        summary="Update a trip status",
+        description="Moves a trip through Scheduled -> In Progress -> Completed (or Cancelled).",
+        tags=["Transport"],
+        request=_TransportTripPatchRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def patch(self, request):
+        if not table_exists("portal_transport_trip"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        payload = request.data if isinstance(request.data, dict) else {}
+        trip_id = payload.get("id")
+        new_status = payload.get("status")
+        if trip_id in (None, ""):
+            return Response({"detail": "The 'id' field is required."}, status=400)
+        current = row("SELECT status FROM portal_transport_trip WHERE id = %s", [trip_id])
+        if current is None:
+            return Response({"detail": "Not found."}, status=404)
+        allowed = _TRIP_STATUS_FLOW.get(current["status"], ())
+        if new_status not in allowed:
+            return Response(
+                {"detail": f"Invalid transition from '{current['status']}' to '{new_status}'."},
+                status=400,
+            )
+        cols, values = ["status"], [new_status]
+        if new_status == "In Progress":
+            cols.append("started_at")
+            values.append(now())
+        elif new_status == "Completed":
+            cols.append("ended_at")
+            values.append(now())
+        with connection.cursor() as cursor:
+            cursor.execute(_compose_update_statement(self.table, cols), values + [trip_id])
+        log_action(request.user, "transport.trip.update", "portal_transport_trip", trip_id, {"status": new_status})
+        return Response({"id": trip_id, "detail": f"Trip marked {new_status}."})
+
+
+class TransportAlertView(AdminMixin, APIView):
+    ALERT_TYPES = ("Bus Arrived", "Delay Alert", "Route Changed", "Emergency", "Info")
+
+    @extend_schema(
+        operation_id="AdminTransportAlertList",
+        summary="List transport alerts",
+        description="Returns recent broadcast alerts, newest first.",
+        tags=["Transport"],
+        responses={200: serializers.ListSerializer(child=_TransportAlertItem), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_transport_alert"):
+            return Response([])
+        data = rows(
+            "SELECT al.id, al.type, al.message, al.vehicle_id, al.route_id, al.created_at, "
+            "r.route_name, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS created_by_name "
+            "FROM portal_transport_alert al "
+            "LEFT JOIN portal_route r ON r.id = al.route_id "
+            "LEFT JOIN auth_user u ON u.id = al.created_by "
+            "ORDER BY al.created_at DESC LIMIT 100"
+        )
+        return Response(serialise(data))
+
+    @extend_schema(
+        operation_id="AdminTransportAlertCreate",
+        summary="Broadcast a transport alert",
+        description="Broadcasts an alert to students and parents on a route/vehicle (optional).",
+        tags=["Transport"],
+        request=_TransportAlertCreateRequest,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        if not table_exists("portal_transport_alert"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        payload = request.data if isinstance(request.data, dict) else {}
+        message = payload.get("message")
+        if not message or not str(message).strip():
+            return Response({"detail": "The 'message' field is required."}, status=400)
+        alert_type = payload.get("type") or "Info"
+        if alert_type not in self.ALERT_TYPES:
+            return Response({"detail": f"Unknown alert type '{alert_type}'."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "INSERT INTO portal_transport_alert (type, message, vehicle_id, route_id, created_by) "
+                "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                [alert_type, str(message).strip(), payload.get("vehicle_id"), payload.get("route_id"), request.user.id],
+            )
+            new_id = cursor.fetchone()[0]
+        log_action(request.user, "transport.alert", "portal_transport_alert", new_id, {"type": alert_type})
+        return Response({"id": new_id, "detail": "Alert broadcast sent."}, status=201)
+
+
+class TransportSettingsView(AdminMixin, APIView):
+    """Single-row transport configuration (desk contact, fees, GPS interval)."""
+
+    @extend_schema(
+        operation_id="AdminTransportSettingsGet",
+        summary="Get transport settings",
+        description="Returns the transport configuration row (or defaults).",
+        tags=["Transport"],
+        responses={200: _TransportSettingsItem, **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_transport_settings"):
+            return Response({})
+        settings = row("SELECT * FROM portal_transport_settings WHERE id = 1")
+        if settings is None:
+            return Response({})
+        return Response(serialise(settings))
+
+    @extend_schema(
+        operation_id="AdminTransportSettingsSave",
+        summary="Save transport settings",
+        description="Upserts the single transport configuration row.",
+        tags=["Transport"],
+        request=_TransportSettingsItem,
+        responses={200: _TransportSettingsItem, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        if not table_exists("portal_transport_settings"):
+            return Response({"detail": "Table not found. Apply the schema extension SQL first."}, status=400)
+        payload = request.data if isinstance(request.data, dict) else {}
+        interval = payload.get("gps_update_interval_sec")
+        if interval not in (None, ""):
+            try:
+                interval = int(interval)
+            except (TypeError, ValueError):
+                return Response({"detail": "'gps_update_interval_sec' must be an integer."}, status=400)
+            if interval < 1:
+                return Response({"detail": "'gps_update_interval_sec' must be at least 1."}, status=400)
+        fee = payload.get("annual_transport_fee")
+        if fee not in (None, ""):
+            try:
+                if float(fee) < 0:
+                    return Response({"detail": "'annual_transport_fee' cannot be negative."}, status=400)
+            except (TypeError, ValueError):
+                return Response({"detail": "'annual_transport_fee' must be a number."}, status=400)
+        cols = [c for c in ("contact_number", "annual_transport_fee", "fee_due_date", "gps_update_interval_sec") if c in payload]
+        values = [payload[c] for c in cols]
+        with connection.cursor() as cursor:
+            cursor.execute(
+                _compose_upsert_settings(cols, values)
+            )
+        log_action(request.user, "transport.settings.update", "portal_transport_settings", 1, dict(zip(cols, values, strict=False)))
+        return Response(serialise(row("SELECT * FROM portal_transport_settings WHERE id = 1")))
+
+
+def _compose_upsert_settings(cols, values):
+    """Upsert the single-row transport settings table (id = 1)."""
+    if not cols:
+        return pysql.SQL("SELECT 1")
+    stmt = (
+        pysql.SQL("INSERT INTO portal_transport_settings (id, ")
+        + pysql.SQL(", ").join(pysql.Identifier(c) for c in cols)
+        + pysql.SQL(") VALUES (1, ")
+        + pysql.SQL(", ").join(pysql.Placeholder() for _ in cols)
+        + pysql.SQL(") ON CONFLICT (id) DO UPDATE SET ")
+        + pysql.SQL(", ").join(
+            pysql.Identifier(c) + pysql.SQL(" = EXCLUDED.") + pysql.Identifier(c)
+            for c in cols
+        )
+    )
+    return (stmt, values)
+
+
+class TransportReportsView(AdminMixin, APIView):
+    """Fleet/route utilisation overview for the transport dashboard."""
+
+    @extend_schema(
+        operation_id="AdminTransportReports",
+        summary="Transport overview reports",
+        description="Returns vehicle/route/student counts, route utilisation and recent trips.",
+        tags=["Transport"],
+        responses={200: _TransportReportsResponse, **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        def count(table):
+            if not table_exists(table):
+                return 0
+            r = row(pysql.SQL("SELECT COUNT(*) AS c FROM {}").format(pysql.Identifier(table)))
+            return int(r["c"]) if r else 0
+
+        total_vehicles = count("portal_vehicle")
+        total_routes = count("portal_route")
+        allocated_students = count("portal_transport_allocation")
+        active_passes = count("portal_transport_pass")
+        active_trips = 0
+        if table_exists("portal_transport_trip"):
+            r = row(
+                "SELECT COUNT(*) AS c FROM portal_transport_trip "
+                "WHERE trip_date = %s AND status = 'In Progress'",
+                [date.today().isoformat()],
+            )
+            active_trips = int(r["c"]) if r else 0
+
+        route_utilisation = []
+        if table_exists("portal_route"):
+            route_utilisation = rows(
+                "SELECT r.route_name, r.start_point, r.end_point, v.vehicle_number, v.capacity, "
+                "(SELECT CAST(COUNT(*) AS INTEGER) FROM portal_transport_allocation a "
+                " WHERE a.route_id = r.id) AS student_count "
+                "FROM portal_route r "
+                "LEFT JOIN portal_vehicle v ON v.id = r.vehicle_id "
+                "ORDER BY r.route_name"
+            )
+
+        recent_trips = []
+        if table_exists("portal_transport_trip"):
+            recent_trips = rows(
+                "SELECT t.trip_date, t.started_at, t.status, "
+                "v.vehicle_number, r.route_name "
+                "FROM portal_transport_trip t "
+                "JOIN portal_vehicle v ON v.id = t.vehicle_id "
+                "LEFT JOIN portal_route r ON r.id = t.route_id "
+                "ORDER BY t.id DESC LIMIT 10"
+            )
+
+        return Response(serialise({
+            "total_vehicles": total_vehicles,
+            "total_routes": total_routes,
+            "allocated_students": allocated_students,
+            "active_trips": active_trips,
+            "active_passes": active_passes,
+            "route_utilisation": route_utilisation,
+            "recent_trips": recent_trips,
+        }))
+
+
+class TransportLiveMapView(AdminMixin, APIView):
+    """Live fleet snapshot (vehicles and their maintenance state)."""
+
+    @extend_schema(
+        operation_id="AdminTransportLiveMap",
+        summary="Live fleet map",
+        description="Returns the current vehicle fleet for the live map overlay.",
+        tags=["Transport"],
+        responses={200: serializers.ListSerializer(child=_TransportLiveMapItem), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_vehicle"):
+            return Response([])
+        data = rows(
+            "SELECT id AS vehicle_id, vehicle_number, maintenance_status "
+            "FROM portal_vehicle ORDER BY vehicle_number"
+        )
+        return Response(serialise(data))
 
