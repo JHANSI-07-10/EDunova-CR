@@ -40,7 +40,7 @@ Status legend: `[ ]` pending · `[x]` done · `[!]` blocked
 - [ ] **(env)** Rotate the Supabase DB password + regenerate the service-role
       key if any past delivery shipped them (SETUP.md §0).
 - [x] Demo accounts use the owner's real gmail addresses (admin
-      `jhansilakshmi1004@gmail.com`, teacher `ravitejamandugula57@gmail.com`,
+      `jhansilakshmi1004@gmail.com`, teacher `sameerbasha.0809@gmail.com`,
       student `tarannumarshiya489@gmail.com`, parent `veereshgollapu@gmail.com`;
       password `Edunova@123`) — the seed scripts (`seed_portal_demo`,
       `seed_parent_admin`) are fixed to never overwrite them back to

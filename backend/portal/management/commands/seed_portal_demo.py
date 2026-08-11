@@ -1,4 +1,3 @@
-import os
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
@@ -6,27 +5,25 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 from django.db import connection
 
-from .seed_utils import resolve_seed_password
-
 
 class Command(BaseCommand):
-    help = "Seed demo Student and Teacher portal users/data. Set SEED_TEACHER_PASSWORD / SEED_STUDENT_PASSWORD to pin their passwords."
+    help = "Seed demo Student and Teacher portal users/data. All passwords are Edunova@123."
 
     def handle(self, *args, **options):
         User = get_user_model()
         student_group, _ = Group.objects.get_or_create(name="Student")
         teacher_group, _ = Group.objects.get_or_create(name="Teacher")
 
-        teacher_password = resolve_seed_password("SEED_TEACHER_PASSWORD", "Teacher demo account")
-        student_password = resolve_seed_password("SEED_STUDENT_PASSWORD", "Student demo account")
+        teacher_password = "Edunova@123"
+        student_password = "Edunova@123"
 
         teacher, created = User.objects.get_or_create(
             username="teacher.demo",
-            defaults={"email": "ravitejamandugula57@gmail.com", "first_name": "Raviteja", "last_name": "Mandugula", "is_active": True},
+            defaults={"email": "sameerbasha.0809@gmail.com", "first_name": "Sameer", "last_name": "Basha", "is_active": True},
         )
-        teacher.email = "ravitejamandugula57@gmail.com"
-        teacher.first_name = "Raviteja"
-        teacher.last_name = "Mandugula"
+        teacher.email = "sameerbasha.0809@gmail.com"
+        teacher.first_name = "Sameer"
+        teacher.last_name = "Basha"
         teacher.set_password(teacher_password)
         teacher.save()
         teacher.groups.add(teacher_group)
@@ -137,12 +134,6 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("Demo portal data seeded."))
         self.stdout.write("Student login email : tarannumarshiya489@gmail.com")
-        self.stdout.write("Teacher login email : ravitejamandugula57@gmail.com")
-        if os.environ.get("SEED_STUDENT_PASSWORD"):
-            self.stdout.write("Student password set from SEED_STUDENT_PASSWORD.")
-        else:
-            self.stdout.write(f"Student password (generated) : {student_password}")
-        if os.environ.get("SEED_TEACHER_PASSWORD"):
-            self.stdout.write("Teacher password set from SEED_TEACHER_PASSWORD.")
-        else:
-            self.stdout.write(f"Teacher password (generated) : {teacher_password}")
+        self.stdout.write("Teacher login email : sameerbasha.0809@gmail.com")
+        self.stdout.write("Student password    : Edunova@123")
+        self.stdout.write("Teacher password    : Edunova@123")
