@@ -358,9 +358,11 @@ else:
 SECURITY_CSP = config("SECURITY_CSP", default="default")
 _CSP_DEFAULT = (
     "default-src 'self'; "
-    "script-src 'self' 'unsafe-inline'; "
-    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
-    "font-src 'self' https://fonts.gstatic.com data:; "
+    # swagger-ui (drf-spectacular) ships its JS/CSS from the jsdelivr CDN,
+    # so /api/docs/ needs the CDN allowed for scripts, styles and fonts.
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net; "
+    "font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; "
     "img-src 'self' data: blob: https:; "
     "connect-src 'self'; "
     "frame-src 'self' https://maps.google.com https://www.youtube.com; "
