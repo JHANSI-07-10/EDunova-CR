@@ -5778,6 +5778,360 @@ Creates a parent-teacher meeting booking request and returns the new booking id.
 
 ---
 
+### GET `/api/admin-portal/academic-years/`
+
+- **Operation ID:** `AdminAcademicYearList`
+- **Summary:** List academic years
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Returns all academic years, newest first.
+
+**Responses**
+
+- **200**: `array<AdminAcademicYearItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/academic-years/`
+
+- **Operation ID:** `AdminAcademicYearCreate`
+- **Summary:** Create an academic year
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Creates an academic year; when is_active is set the other years are deactivated.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminAcademicYearCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes |  |
+| `start_date` | string | yes |  |
+| `end_date` | string | yes |  |
+| `is_active` | boolean | no |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/fee-assignments/`
+
+- **Operation ID:** `AdminFeeAssignmentList`
+- **Summary:** List fee structure assignments
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Returns the students assigned to a fee structure (required query param fee_structure_id).
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `fee_structure_id` | query | integer | yes |  |
+
+**Responses**
+
+- **200**: `array<AdminFeeAssignmentItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/fee-assignments/`
+
+- **Operation ID:** `AdminFeeAssignmentCreate`
+- **Summary:** Assign a fee structure to students
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Assigns a fee structure to one student (student_id) or to the whole class (assign_class=true).
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminFeeAssignmentCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `fee_structure_id` | integer | yes |  |
+| `student_id` | integer | no |  |
+| `assign_class` | boolean | no | Bulk-assign every student enrolled in the structure's class. |
+
+**Responses**
+
+- **200**: `AdminDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### DELETE `/api/admin-portal/fee-assignments/`
+
+- **Operation ID:** `AdminFeeAssignmentDelete`
+- **Summary:** Remove a fee structure assignment
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Assigns fee structures to individual students or to every student
+enrolled in the structure's class (bulk).
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `id` | query | integer | yes |  |
+
+**Responses**
+
+- **200**: `DetailErrorResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/fee-categories/`
+
+- **Operation ID:** `AdminFeeCategoryList`
+- **Summary:** List fee categories
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Returns all fee categories ordered by sort_order.
+
+**Responses**
+
+- **200**: `array<AdminFeeCategoryItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/fee-categories/`
+
+- **Operation ID:** `AdminFeeCategoryCreate`
+- **Summary:** Create a fee category
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Creates a fee category with an optional sort order.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminFeeCategoryCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes |  |
+| `description` | string | no |  |
+| `sort_order` | integer | no |  |
+| `is_active` | boolean | no |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/fee-concessions/`
+
+- **Operation ID:** `AdminFeeConcessionList`
+- **Summary:** List fee concessions
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Returns all concessions joined with the student and fee term.
+
+**Responses**
+
+- **200**: `array<AdminFeeConcessionItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/fee-concessions/`
+
+- **Operation ID:** `AdminFeeConcessionCreate`
+- **Summary:** Apply a concession
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Applies a flat or percentage discount to a student for a fee structure.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminFeeConcessionCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `student_id` | integer | yes |  |
+| `fee_structure_id` | integer | yes |  |
+| `concession_type` | ConcessionTypeEnum | no |  |
+| `discount_amount` | number | no |  |
+| `discount_percent` | number | no |  |
+| `reason` | string | no |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### DELETE `/api/admin-portal/fee-concessions/`
+
+- **Operation ID:** `AdminFeeConcessionDelete`
+- **Summary:** Remove a concession
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+-
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `id` | query | integer | yes |  |
+
+**Responses**
+
+- **200**: `DetailErrorResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/fee-ledger/`
+
+- **Operation ID:** `AdminFeeLedgerList`
+- **Summary:** View the student ledger
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Returns the computed ledger for a fee structure (query param fee_structure_id).
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `fee_structure_id` | query | integer | yes |  |
+
+**Responses**
+
+- **200**: `array<AdminFeeLedgerItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/fee-ledger/`
+
+- **Operation ID:** `AdminFeeLedgerGenerate`
+- **Summary:** Generate the student ledger
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Validates the fee structure and refreshes the computed ledger.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminFeeLedgerGenerateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `fee_structure_id` | integer | yes |  |
+
+**Responses**
+
+- **200**: `AdminDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/fee-reports/`
+
+- **Operation ID:** `AdminFeeReports`
+- **Summary:** Fee collection reports
+- **Authentication:** Bearer JWT required
+- **Tags:** Finance
+
+Returns collection summary, per-structure, monthly (last 12 months) and outstanding stats.
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `academic_year_id` | query | integer | no | Restrict structures and payments to an academic year. |
+
+**Responses**
+
+- **200**: `AdminFeeReportsResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
 ## Payroll
 
 ### GET `/api/admin-portal/payroll/`
@@ -7442,6 +7796,460 @@ Creates a new transport vehicle record.
 | `gps_device_id` | string | min 1 | no |  |
 | `maintenance_status` | string | min 1 | no |  |
 | `vehicle_number` | string | min 1 | yes |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/attendants/`
+
+- **Operation ID:** `AdminTransportAttendantList`
+- **Summary:** List transport attendants
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns all attendants joined with their user name and assigned route.
+
+**Responses**
+
+- **200**: `array<AdminTransportAttendantItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/transport/attendants/`
+
+- **Operation ID:** `AdminTransportAttendantCreate`
+- **Summary:** Register an attendant
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Registers an attendant (auth user id) with phone and an optional route.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminTransportAttendantCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `user_id` | integer | yes |  |
+| `phone` | string | no |  |
+| `assigned_route_id` | integer | no |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/drivers/`
+
+- **Operation ID:** `AdminTransportDriverList`
+- **Summary:** List transport drivers
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns all drivers joined with their user name and assigned vehicle.
+
+**Responses**
+
+- **200**: `array<AdminTransportDriverItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/transport/drivers/`
+
+- **Operation ID:** `AdminTransportDriverCreate`
+- **Summary:** Register a driver
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Registers a driver (auth user id) with license and phone details.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminTransportDriverCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `user_id` | integer | yes |  |
+| `license_number` | string | no |  |
+| `phone` | string | no |  |
+| `vehicle_id` | integer | no |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/live-map/`
+
+- **Operation ID:** `AdminTransportLiveMap`
+- **Summary:** Live fleet map
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns the current vehicle fleet for the live map overlay.
+
+**Responses**
+
+- **200**: `array<AdminTransportLiveMapItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/notifications/`
+
+- **Operation ID:** `AdminTransportAlertList`
+- **Summary:** List transport alerts
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns recent broadcast alerts, newest first.
+
+**Responses**
+
+- **200**: `array<AdminTransportAlertItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/transport/notifications/`
+
+- **Operation ID:** `AdminTransportAlertCreate`
+- **Summary:** Broadcast a transport alert
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Broadcasts an alert to students and parents on a route/vehicle (optional).
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminTransportAlertCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `type` | TypeEnum | no |  |
+| `message` | string | yes |  |
+| `vehicle_id` | integer | no |  |
+| `route_id` | integer | no |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/passes/`
+
+- **Operation ID:** `AdminTransportPassList`
+- **Summary:** List transport passes
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns all issued passes joined with the student and allocation.
+
+**Responses**
+
+- **200**: `array<AdminTransportPassItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/transport/passes/`
+
+- **Operation ID:** `AdminTransportPassGenerate`
+- **Summary:** Generate a transport pass
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Issues a pass for a student; existing passes are returned unchanged.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminTransportPassGenerateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `student_id` | integer | yes |  |
+
+**Responses**
+
+- **200**: `AdminTransportPassItem`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/pickup-points/`
+
+- **Operation ID:** `AdminTransportPickupPointList`
+- **Summary:** List pickup points
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns pickup/drop stops, optionally filtered by route_id, ordered by sequence.
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `route_id` | query | integer | no |  |
+
+**Responses**
+
+- **200**: `array<AdminTransportPickupPointItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/transport/pickup-points/`
+
+- **Operation ID:** `AdminTransportPickupPointCreate`
+- **Summary:** Add a pickup point
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Adds a stop to a route with sequence order and optional times.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminTransportPickupPointCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `route_id` | integer | yes |  |
+| `name` | string | yes |  |
+| `sequence_order` | integer | no |  |
+| `pickup_time` | string | no |  |
+| `drop_time` | string | no |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/reports/`
+
+- **Operation ID:** `AdminTransportReports`
+- **Summary:** Transport overview reports
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns vehicle/route/student counts, route utilisation and recent trips.
+
+**Responses**
+
+- **200**: `AdminTransportReportsResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/settings/`
+
+- **Operation ID:** `AdminTransportSettingsGet`
+- **Summary:** Get transport settings
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns the transport configuration row (or defaults).
+
+**Responses**
+
+- **200**: `AdminTransportSettingsItem`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/transport/settings/`
+
+- **Operation ID:** `AdminTransportSettingsSave`
+- **Summary:** Save transport settings
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Upserts the single transport configuration row.
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminTransportSettingsItemRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `contact_number` | string | no |  |
+| `annual_transport_fee` | number | no |  |
+| `fee_due_date` | string | no |  |
+| `gps_update_interval_sec` | integer | no |  |
+
+**Responses**
+
+- **200**: `AdminTransportSettingsItem`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### GET `/api/admin-portal/transport/trips/`
+
+- **Operation ID:** `AdminTransportTripList`
+- **Summary:** List trips for a date
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Returns the trips logged for a date (default: today).
+
+**Parameters**
+
+| Parameter | In | Type | Required | Description |
+|---|---|---|---|---|
+| `date` | query | string | no | Trip date (YYYY-MM-DD); defaults to today. |
+
+**Responses**
+
+- **200**: `array<AdminTransportTripItem>`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### POST `/api/admin-portal/transport/trips/`
+
+- **Operation ID:** `AdminTransportTripCreate`
+- **Summary:** Schedule a trip
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Creates a scheduled trip for a vehicle (and optionally a route).
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`AdminTransportTripCreateRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `vehicle_id` | integer | yes |  |
+| `route_id` | integer | no |  |
+
+**Responses**
+
+- **200**: `IdDetailResponse`
+- **400**: `ValidationErrorResponse`
+- **401**: `DetailErrorResponse`
+- **403**: `DetailErrorResponse`
+- **404**: `DetailErrorResponse`
+- **500**: `DetailErrorResponse`
+
+---
+
+### PATCH `/api/admin-portal/transport/trips/`
+
+- **Operation ID:** `AdminTransportTripUpdate`
+- **Summary:** Update a trip status
+- **Authentication:** Bearer JWT required
+- **Tags:** Transport
+
+Moves a trip through Scheduled -> In Progress -> Completed (or Cancelled).
+
+**Request body**
+
+**Content-Type:** `application/json` · **Required:** yes
+
+`PatchedAdminTransportTripPatchRequestRequest`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `id` | integer | no |  |
+| `status` | string | no | Scheduled -> In Progress -> Completed (or Cancelled).
+
+* `Scheduled` - Scheduled
+* `In Progress` - In Progress
+* `Completed` - Completed
+* `Cancelled` - Cancelled |
 
 **Responses**
 
