@@ -2399,11 +2399,12 @@ class SimpleTableView(AdminMixin, APIView):
             placeholders.append("%s")
             values.append(v)
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    _compose_insert_statement(table, cols, placeholders), values
-                )
-                new_id = cursor.fetchone()[0]
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        _compose_insert_statement(table, cols, placeholders), values
+                    )
+                    new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response(
                 {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
@@ -2457,12 +2458,13 @@ class SimpleTableView(AdminMixin, APIView):
         if not cols:
             return Response({"detail": "No updatable fields were provided."}, status=400)
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    _compose_update_statement(table, cols), values + [record_id]
-                )
-                if cursor.fetchone() is None:
-                    return Response({"detail": "Not found."}, status=404)
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        _compose_update_statement(table, cols), values + [record_id]
+                    )
+                    if cursor.fetchone() is None:
+                        return Response({"detail": "Not found."}, status=404)
         except IntegrityError:
             return Response(
                 {"detail": "Could not update the record: a referenced record is missing or a unique value already exists."},
@@ -3234,21 +3236,22 @@ class ClassEnrollmentView(AdminMixin, APIView):
                 return Response({"detail": "roll_number must be an integer."}, status=400)
 
         try:
-            with connection.cursor() as cursor:
-                # Check if student is already enrolled in this class for the academic year
-                cursor.execute(
-                    "SELECT id FROM portal_student_enrollment WHERE student_id=%s AND class_id=%s AND academic_year=%s",
-                    [student_id, class_id, academic_year]
-                )
-                if cursor.fetchone():
-                    return Response({"detail": "Student already enrolled in this class for the selected academic year."}, status=400)
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    # Check if student is already enrolled in this class for the academic year
+                    cursor.execute(
+                        "SELECT id FROM portal_student_enrollment WHERE student_id=%s AND class_id=%s AND academic_year=%s",
+                        [student_id, class_id, academic_year]
+                    )
+                    if cursor.fetchone():
+                        return Response({"detail": "Student already enrolled in this class for the selected academic year."}, status=400)
 
-                cursor.execute(
-                    "INSERT INTO portal_student_enrollment (student_id, class_id, academic_year, roll_number) "
-                    "VALUES (%s,%s,%s,%s) RETURNING id",
-                    [student_id, class_id, academic_year, roll_number]
-                )
-                new_id = cursor.fetchone()[0]
+                    cursor.execute(
+                        "INSERT INTO portal_student_enrollment (student_id, class_id, academic_year, roll_number) "
+                        "VALUES (%s,%s,%s,%s) RETURNING id",
+                        [student_id, class_id, academic_year, roll_number]
+                    )
+                    new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response(
                 {"detail": "Could not enroll the student: the student or class does not exist."},
@@ -3657,13 +3660,14 @@ class FeeAssignmentView(AdminMixin, APIView):
         if student_id in (None, ""):
             return Response({"detail": "Provide 'student_id' or set 'assign_class' to true."}, status=400)
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO portal_fee_assignment (fee_structure_id, student_id) "
-                    "VALUES (%s, %s) RETURNING id",
-                    [structure_id, student_id],
-                )
-                new_id = cursor.fetchone()[0]
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO portal_fee_assignment (fee_structure_id, student_id) "
+                        "VALUES (%s, %s) RETURNING id",
+                        [structure_id, student_id],
+                    )
+                    new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response({"detail": _FK_OR_UNIQUE_DETAIL}, status=400)
         log_action(
@@ -3754,14 +3758,15 @@ class FeeConcessionView(AdminMixin, APIView):
         if concession_type not in self.CONCESSION_TYPES:
             return Response({"detail": f"Unknown concession type '{concession_type}'."}, status=400)
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO portal_fee_concession "
-                    "(student_id, fee_structure_id, concession_type, discount_amount, discount_percent, reason) "
-                    "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                    [student_id, structure_id, concession_type, amount, percent, payload.get("reason") or ""],
-                )
-                new_id = cursor.fetchone()[0]
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO portal_fee_concession "
+                        "(student_id, fee_structure_id, concession_type, discount_amount, discount_percent, reason) "
+                        "VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                        [student_id, structure_id, concession_type, amount, percent, payload.get("reason") or ""],
+                    )
+                    new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response({"detail": _FK_OR_UNIQUE_DETAIL}, status=400)
         log_action(request.user, "fee.concession.create", "portal_fee_concession", new_id, {
@@ -4233,12 +4238,13 @@ class TransportPassView(AdminMixin, APIView):
             return Response(serialise(existing))
         pass_number = f"EP-{date.today().year}-{uuid.uuid4().hex[:8].upper()}"
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO portal_transport_pass (student_id, pass_number) VALUES (%s, %s) RETURNING id",
-                    [student_id, pass_number],
-                )
-                new_id = cursor.fetchone()[0]
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO portal_transport_pass (student_id, pass_number) VALUES (%s, %s) RETURNING id",
+                        [student_id, pass_number],
+                    )
+                    new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response({"detail": _FK_OR_UNIQUE_DETAIL}, status=400)
         log_action(
@@ -4318,13 +4324,14 @@ class TransportTripView(AdminMixin, APIView):
         if vehicle_id in (None, ""):
             return Response({"detail": "The 'vehicle_id' field is required."}, status=400)
         try:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    "INSERT INTO portal_transport_trip (vehicle_id, route_id, status) "
-                    "VALUES (%s, %s, 'Scheduled') RETURNING id",
-                    [vehicle_id, payload.get("route_id")],
-                )
-                new_id = cursor.fetchone()[0]
+            with transaction.atomic():
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO portal_transport_trip (vehicle_id, route_id, status) "
+                        "VALUES (%s, %s, 'Scheduled') RETURNING id",
+                        [vehicle_id, payload.get("route_id")],
+                    )
+                    new_id = cursor.fetchone()[0]
         except IntegrityError:
             return Response({"detail": _FK_OR_UNIQUE_DETAIL}, status=400)
         log_action(request.user, "transport.trip.create", "portal_transport_trip", new_id, {"vehicle_id": vehicle_id})
