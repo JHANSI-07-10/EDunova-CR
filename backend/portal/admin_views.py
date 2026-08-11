@@ -591,10 +591,10 @@ _FeeReportSummary = inline_serializer(
 _FeeReportsResponse = inline_serializer(
     name="AdminFeeReportsResponse",
     fields={
-        "summary": _FeeReportSummary(required=False),
-        "structures": serializers.ListSerializer(child=_FeeReportStructureItem(), required=False),
-        "monthly": serializers.ListSerializer(child=_FeeReportMonthlyItem(), required=False),
-        "pending": serializers.ListSerializer(child=_FeeReportPendingItem(), required=False),
+        "summary": _FeeReportSummary,
+        "structures": serializers.ListSerializer(child=_FeeReportStructureItem, required=False),
+        "monthly": serializers.ListSerializer(child=_FeeReportMonthlyItem, required=False),
+        "pending": serializers.ListSerializer(child=_FeeReportPendingItem, required=False),
     },
 )
 
@@ -791,8 +791,8 @@ _TransportReportsResponse = inline_serializer(
         "allocated_students": serializers.IntegerField(required=False),
         "active_trips": serializers.IntegerField(required=False),
         "active_passes": serializers.IntegerField(required=False),
-        "route_utilisation": serializers.ListSerializer(child=_TransportRouteUtilisationItem(), required=False),
-        "recent_trips": serializers.ListSerializer(child=_TransportRecentTripItem(), required=False),
+        "route_utilisation": serializers.ListSerializer(child=_TransportRouteUtilisationItem, required=False),
+        "recent_trips": serializers.ListSerializer(child=_TransportRecentTripItem, required=False),
     },
 )
 
@@ -2664,12 +2664,16 @@ class TransportAllocationView(SimpleTableView):
         try:
             if student_id:
                 value = int(student_id)
-                stmt = pysql.SQL("DELETE FROM ") + pysql.Identifier(self.table) + pysql.SQL(" WHERE student_id = ") + pysql.Placeholder()
-                where = "student_id"
+                stmt = (
+                    pysql.SQL("DELETE FROM ") + pysql.Identifier(self.table)
+                    + pysql.SQL(" WHERE student_id = ") + pysql.Placeholder()
+                )
             else:
                 value = int(record_id or "")
-                stmt = pysql.SQL("DELETE FROM ") + pysql.Identifier(self.table) + pysql.SQL(" WHERE id = ") + pysql.Placeholder()
-                where = "id"
+                stmt = (
+                    pysql.SQL("DELETE FROM ") + pysql.Identifier(self.table)
+                    + pysql.SQL(" WHERE id = ") + pysql.Placeholder()
+                )
         except (TypeError, ValueError):
             return Response({"detail": "The 'id' or 'student_id' query parameter is required."}, status=400)
         with connection.cursor() as cursor:
@@ -2762,7 +2766,8 @@ class PaymentListView(AdminMixin, APIView):
             """
             SELECT p.id, p.transaction_id, p.amount_paid, p.status, p.paid_at, p.payment_method,
                    COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name,
-                   (SELECT sp.admission_number FROM portal_student_profile sp WHERE sp.user_id = p.student_id) AS admission_number,
+                   (SELECT sp.admission_number FROM portal_student_profile sp
+                    WHERE sp.user_id = p.student_id) AS admission_number,
                    (SELECT c.name FROM portal_student_enrollment e JOIN portal_class c ON c.id = e.class_id
                     WHERE e.student_id = p.student_id ORDER BY e.id DESC LIMIT 1) AS class_name,
                    (SELECT c.section FROM portal_student_enrollment e JOIN portal_class c ON c.id = e.class_id
@@ -3485,6 +3490,12 @@ class ContactMessagesView(AdminMixin, APIView):
 # as bound parameters; identifiers never appear in SQL text.
 # ---------------------------------------------------------------------------
 
+_FK_OR_UNIQUE_DETAIL = (
+    "Could not create the record: a referenced record is missing or "
+    "a unique value already exists."
+)
+
+
 def _date_of(value):
     """Normalise a DB row value (date, datetime or ISO string) to a date."""
     if value is None:
@@ -3654,11 +3665,14 @@ class FeeAssignmentView(AdminMixin, APIView):
                 )
                 new_id = cursor.fetchone()[0]
         except IntegrityError:
-            return Response(
-                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
-                status=400,
-            )
-        log_action(request.user, "fee.assignment.create", "portal_fee_assignment", new_id, {"fee_structure_id": structure_id, "student_id": student_id})
+            return Response({"detail": _FK_OR_UNIQUE_DETAIL}, status=400)
+        log_action(
+            request.user,
+            "fee.assignment.create",
+            "portal_fee_assignment",
+            new_id,
+            {"fee_structure_id": structure_id, "student_id": student_id},
+        )
         return Response({"id": new_id, "detail": "Assigned."}, status=201)
 
     @extend_schema(
@@ -3730,7 +3744,10 @@ class FeeConcessionView(AdminMixin, APIView):
         except (TypeError, ValueError):
             return Response({"detail": "Discount amounts must be numbers."}, status=400)
         if amount < 0 or percent < 0 or percent > 100:
-            return Response({"detail": "Discount amount must be non-negative and percent between 0 and 100."}, status=400)
+            return Response(
+                {"detail": "Discount amount must be non-negative and percent between 0 and 100."},
+                status=400,
+            )
         if amount == 0 and percent == 0:
             return Response({"detail": "Enter a discount amount or a percentage."}, status=400)
         concession_type = payload.get("concession_type") or "Scholarship"
@@ -3746,10 +3763,7 @@ class FeeConcessionView(AdminMixin, APIView):
                 )
                 new_id = cursor.fetchone()[0]
         except IntegrityError:
-            return Response(
-                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
-                status=400,
-            )
+            return Response({"detail": _FK_OR_UNIQUE_DETAIL}, status=400)
         log_action(request.user, "fee.concession.create", "portal_fee_concession", new_id, {
             "student_id": student_id, "fee_structure_id": structure_id, "concession_type": concession_type,
         })
@@ -3835,7 +3849,11 @@ def _ledger_rows_for_structure(structure_id):
         net_payable = round(gross - concession_amount, 2)
         amount_paid = round(paid_by_student.get(sid, 0), 2)
         overdue_days = (today - due_date).days if due_date and due_date < today else 0
-        fine_amount = round(overdue_days * late_fine_per_day, 2) if overdue_days > 0 and amount_paid < net_payable else 0
+        fine_amount = (
+            round(overdue_days * late_fine_per_day, 2)
+            if overdue_days > 0 and amount_paid < net_payable
+            else 0
+        )
         balance_due = round(max(0.0, net_payable + fine_amount - amount_paid), 2)
         if amount_paid > 0 and balance_due <= 0:
             status = "Paid"
@@ -4222,11 +4240,14 @@ class TransportPassView(AdminMixin, APIView):
                 )
                 new_id = cursor.fetchone()[0]
         except IntegrityError:
-            return Response(
-                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
-                status=400,
-            )
-        log_action(request.user, "transport.pass.generate", "portal_transport_pass", new_id, {"student_id": student_id, "pass_number": pass_number})
+            return Response({"detail": _FK_OR_UNIQUE_DETAIL}, status=400)
+        log_action(
+            request.user,
+            "transport.pass.generate",
+            "portal_transport_pass",
+            new_id,
+            {"student_id": student_id, "pass_number": pass_number},
+        )
         return Response(serialise(row(
             "SELECT tp.pass_number, tp.student_id, "
             "COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name, "
@@ -4305,10 +4326,7 @@ class TransportTripView(AdminMixin, APIView):
                 )
                 new_id = cursor.fetchone()[0]
         except IntegrityError:
-            return Response(
-                {"detail": "Could not create the record: a referenced record is missing or a unique value already exists."},
-                status=400,
-            )
+            return Response({"detail": _FK_OR_UNIQUE_DETAIL}, status=400)
         log_action(request.user, "transport.trip.create", "portal_transport_trip", new_id, {"vehicle_id": vehicle_id})
         return Response({"id": new_id, "detail": "Trip scheduled."}, status=201)
 
@@ -4345,7 +4363,9 @@ class TransportTripView(AdminMixin, APIView):
             cols.append("ended_at")
             values.append(now())
         with connection.cursor() as cursor:
-            cursor.execute(_compose_update_statement(self.table, cols), values + [trip_id])
+            cursor.execute(
+                _compose_update_statement("portal_transport_trip", cols), values + [trip_id]
+            )
         log_action(request.user, "transport.trip.update", "portal_transport_trip", trip_id, {"status": new_status})
         return Response({"id": trip_id, "detail": f"Trip marked {new_status}."})
 
@@ -4447,14 +4467,24 @@ class TransportSettingsView(AdminMixin, APIView):
                     return Response({"detail": "'annual_transport_fee' cannot be negative."}, status=400)
             except (TypeError, ValueError):
                 return Response({"detail": "'annual_transport_fee' must be a number."}, status=400)
-        cols = [c for c in ("contact_number", "annual_transport_fee", "fee_due_date", "gps_update_interval_sec") if c in payload]
+        cols = [
+            c
+            for c in ("contact_number", "annual_transport_fee", "fee_due_date", "gps_update_interval_sec")
+            if c in payload
+        ]
         values = [payload[c] for c in cols]
         if not cols:
             return Response({"detail": "No settings fields were provided."}, status=400)
         stmt = _compose_upsert_settings(cols)
         with connection.cursor() as cursor:
             cursor.execute(stmt, values)
-        log_action(request.user, "transport.settings.update", "portal_transport_settings", 1, dict(zip(cols, values, strict=False)))
+        log_action(
+            request.user,
+            "transport.settings.update",
+            "portal_transport_settings",
+            1,
+            dict(zip(cols, values, strict=False)),
+        )
         return Response(serialise(row("SELECT * FROM portal_transport_settings WHERE id = 1")))
 
 
