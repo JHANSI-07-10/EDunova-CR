@@ -12,8 +12,11 @@ from django.test import TestCase, override_settings
 
 # Tests run with DEBUG=False, so use a real (locmem) email backend — the
 # console backend would make login_step1 return 503 instead of sending.
+# DEV_STATIC_OTP defaults to True in settings, so the email-flow tests below
+# explicitly turn it off to exercise the real emailed-OTP path.
 TEST_EMAIL_BACKEND = override_settings(
-    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend"
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+    DEV_STATIC_OTP=False,
 )
 
 User = get_user_model()
@@ -78,6 +81,7 @@ class LoginStep1Tests(TestCase):
         self.assertEqual(resp.json()["detail"], "Unable to send verification email.")
 
 
+@override_settings(DEV_STATIC_OTP=False)
 class EmailMisconfigTests(TestCase):
     """Without the locmem override, the console backend + DEBUG=False must
     make login refuse with 503 instead of pretending the OTP was emailed."""
@@ -194,3 +198,40 @@ class ResendOtpTests(TestCase):
     def test_resend_smtp_failure_returns_500(self, mock_send):
         resp = self.client.post(RESEND_URL, {"user_id": self.user.id}, content_type="application/json")
         self.assertEqual(resp.status_code, 500)
+
+
+@override_settings(DEV_STATIC_OTP=True, EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+class StaticOtpTests(TestCase):
+    """With DEV_STATIC_OTP=True the public code 123456 logs in without email,
+    independent of DEBUG — the demo-site behavior."""
+
+    def setUp(self):
+        cache.clear()
+        self.user = _make_user()
+
+    def tearDown(self):
+        cache.clear()
+
+    def test_login_returns_static_otp_without_email(self):
+        resp = self.client.post(LOGIN_URL, {"email": "test@edunova.edu", "password": "TestPass@99"}, content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["user_id"], self.user.id)
+        self.assertIs(data["email_sent"], False)
+        self.assertEqual(data["detail"], "Static OTP active.")
+
+    def test_static_otp_verifies_with_123456(self):
+        self.client.post(LOGIN_URL, {"email": "test@edunova.edu", "password": "TestPass@99"}, content_type="application/json")
+        resp = self.client.post(VERIFY_URL, {"user_id": self.user.id, "otp": "123456"}, content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIn("access", resp.json())
+
+    def test_wrong_otp_still_rejected(self):
+        self.client.post(LOGIN_URL, {"email": "test@edunova.edu", "password": "TestPass@99"}, content_type="application/json")
+        resp = self.client.post(VERIFY_URL, {"user_id": self.user.id, "otp": "000000"}, content_type="application/json")
+        self.assertEqual(resp.status_code, 400)
+
+    def test_resend_returns_static_otp(self):
+        resp = self.client.post(RESEND_URL, {"user_id": self.user.id}, content_type="application/json")
+        self.assertEqual(resp.status_code, 200)
+        self.assertIs(resp.json()["email_sent"], False)

@@ -36,13 +36,13 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
-# SECURITY: separate, explicit opt-in — never tied to DEBUG. A rushed deploy
-# with DEBUG=True left on would otherwise make every account reachable via a
-# publicly-known static OTP ("123456"). Defaults to False; keep it False
-# everywhere except your own local machine.
+# Static OTP ("123456") toggle. Enabled by default so the demo/staging site
+# works without an email service; set DEV_STATIC_OTP=False on any host that
+# handles real users. This is independent of DEBUG on purpose — the login
+# flow honors it whenever the variable is true (see portal/auth_views.py).
 # Same robust casting as DEBUG: decouple's cast=bool (strtobool) crashes on
 # non-boolean env values like "release" (a real production incident).
-DEV_STATIC_OTP = config("DEV_STATIC_OTP", default=False, cast=_cast_debug)
+DEV_STATIC_OTP = config("DEV_STATIC_OTP", default=True, cast=_cast_debug)
 
 INSTALLED_APPS = [
     "django.contrib.admin",

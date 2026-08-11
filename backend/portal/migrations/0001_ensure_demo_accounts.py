@@ -61,6 +61,15 @@ ACCOUNTS = [
 ]
 
 
+def _portal_table_exists(cursor, table_name):
+    cursor.execute(
+        "SELECT EXISTS (SELECT 1 FROM information_schema.tables "
+        "WHERE table_schema = 'public' AND table_name = %s)",
+        [table_name],
+    )
+    return cursor.fetchone()[0]
+
+
 def ensure_demo_accounts(apps, schema_editor):
     User = apps.get_model("auth", "User")
     Group = apps.get_model("auth", "Group")
@@ -93,7 +102,12 @@ def ensure_demo_accounts(apps, schema_editor):
         user.groups.add(group)
         rows.append((acc, user.id))
 
+    # The portal_* profile tables are raw SQL applied directly in Supabase
+    # (portal/models.py) — they may not exist in a freshly created test
+    # database, so skip the upserts there and keep only the auth_user rows.
     with connection.cursor() as c:
+        if not _portal_table_exists(c, "portal_user_profile"):
+            return
         c.executemany(
             """
             INSERT INTO portal_user_profile (user_id, user_type, phone_number)
