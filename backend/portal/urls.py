@@ -3,7 +3,8 @@ from django.urls import path
 from . import (
     auth_views, teacher_views, views, parent_views, admin_views, facilities_views,
     exam_extras_views, lms_extras_views, notification_views,
-    recruitment_views, academic_views, student_exam_views,
+    recruitment_views, academic_views, student_exam_views, scholarship_views,
+    exam_workflow_views,
 )
 
 urlpatterns = [
@@ -43,8 +44,10 @@ urlpatterns = [
     path("student/medical-records/", facilities_views.StudentMedicalView.as_view()),
     path("student/report-card/", exam_extras_views.StudentReportCardView.as_view()),
     path("student/exams/revaluation/", student_exam_views.StudentRevaluationView.as_view()),
+    path("student/exams/attempt/", exam_extras_views.StudentExamAttemptView.as_view()),
     path("student/supplementary/", student_exam_views.StudentSupplementaryView.as_view()),
     path("student/academic-certificates/", student_exam_views.StudentAcademicCertificatesView.as_view()),
+    path("student/ai-tutor/", lms_extras_views.StudentAITutorView.as_view()),
     path("lms/forum-topics/", lms_extras_views.ForumTopicListView.as_view()),
     path("lms/forum-topics/<int:topic_id>/", lms_extras_views.ForumTopicDetailView.as_view()),
     path("lms/forum-topics/<int:topic_id>/reply/", lms_extras_views.ForumPostView.as_view()),
@@ -66,6 +69,9 @@ urlpatterns = [
     path("teacher/assignments/<int:assignment_id>/submissions/<int:submission_id>/", teacher_views.AssignmentSubmissionsView.as_view()),
     path("teacher/question-bank/", teacher_views.QuestionBankView.as_view()),
     path("teacher/question-bank/<int:question_id>/", teacher_views.QuestionBankView.as_view()),
+    path("teacher/question-papers/", teacher_views.QuestionPaperView.as_view()),
+    path("teacher/invigilation-duty/", teacher_views.InvigilationDutyView.as_view()),
+    path("teacher/revaluation/", exam_extras_views.RevaluationRequestView.as_view()),
     path("teacher/exams/", teacher_views.TeacherExamView.as_view()),
     path("teacher/marks-entry/", teacher_views.MarksEntryView.as_view()),
     path("teacher/performance/", teacher_views.PerformanceAnalyticsView.as_view()),
@@ -80,6 +86,7 @@ urlpatterns = [
     path("teacher/lms/chapters/", teacher_views.TeacherLmsChaptersView.as_view()),
     path("teacher/lms/lessons/", teacher_views.TeacherLmsLessonsView.as_view()),
     path("teacher/lms/resources/", teacher_views.TeacherLmsResourcesView.as_view()),
+    path("teacher/lms/ai-usage/", lms_extras_views.TeacherAIUsageView.as_view()),
 
     # Parent portal
     path("parent/profile/", parent_views.ParentProfileView.as_view()),
@@ -103,6 +110,22 @@ urlpatterns = [
     path("parent/report-card/", parent_views.ParentReportCardView.as_view()),
     path("parent/exams/revaluation/", parent_views.ParentRevaluationView.as_view()),
     path("parent/exams/certificates/", parent_views.ParentCertificatesView.as_view()),
+
+    # Scholarships (student apply / admin decide / parent view)
+    path("student/scholarships/", scholarship_views.ScholarshipStudentApplicationView.as_view()),
+    path("student/scholarships/renew/", scholarship_views.ScholarshipRenewalView.as_view()),
+    path("parent/scholarships/", scholarship_views.ScholarshipParentView.as_view()),
+    path("admin-portal/scholarships/", scholarship_views.ScholarshipAdminActionView.as_view()),
+    path("admin-portal/scholarships/renew/", scholarship_views.ScholarshipRenewalView.as_view()),
+
+    # Campuses (public directory/booking + admin CRUD)
+    path("campuses/", views.PublicCampusView.as_view()),
+    path("campuses/visit/", views.PublicCampusVisitView.as_view()),
+    path("campuses/nearest/", views.NearestCampusView.as_view()),
+    path("admin-portal/campuses/", admin_views.AdminCampusView.as_view()),
+    path("admin-portal/campuses/<int:campus_id>/", admin_views.AdminCampusDetailView.as_view()),
+    path("admin-portal/campuses/visits/", admin_views.AdminCampusVisitsView.as_view()),
+    path("admin-portal/campuses/visits/<int:visit_id>/status/", admin_views.AdminCampusVisitsView.as_view()),
 
     # Admin portal
     path("admin-portal/dashboard/", admin_views.AdminDashboardView.as_view()),
@@ -174,12 +197,18 @@ urlpatterns = [
     path("admin-portal/contact-messages/<int:message_id>/", admin_views.ContactMessagesView.as_view()),
     path("admin-portal/backup/export/", admin_views.BackupExportView.as_view()),
     path("admin-portal/lms/analytics/", admin_views.AdminLmsAnalyticsView.as_view()),
+    path("admin-portal/lms/ai-usage/", lms_extras_views.AdminAIUsageView.as_view()),
 
     # Hostel module
     path("admin-portal/hostels/", facilities_views.HostelView.as_view()),
     path("admin-portal/rooms/", facilities_views.RoomView.as_view()),
     path("admin-portal/hostel-allocations/", facilities_views.HostelAllocationView.as_view()),
     path("admin-portal/hostel-allocations/<int:allocation_id>/vacate/", facilities_views.HostelVacateView.as_view()),
+    path("hostels/applications/", facilities_views.HostelApplicationView.as_view()),
+    path("hostels/leaves/", facilities_views.HostelLeaveView.as_view()),
+    path("hostels/complaints/", facilities_views.HostelComplaintView.as_view()),
+    path("hostels/fees/", facilities_views.HostelFeeView.as_view()),
+    path("hostels/reports/", facilities_views.HostelReportsView.as_view()),
 
     # Inventory module
     path("admin-portal/inventory/", facilities_views.InventoryView.as_view()),
@@ -195,8 +224,28 @@ urlpatterns = [
     # Medical Records
     path("admin-portal/medical-logs/", facilities_views.MedicalLogView.as_view()),
 
-    # Exam extras: rank lists + report cards
+    # Exam extras: rank lists + report cards + admin exam management
     path("admin-portal/rank-list/", exam_extras_views.RankListView.as_view()),
     path("admin-portal/rank-list/overall/", exam_extras_views.OverallRankListView.as_view()),
     path("admin-portal/report-card/", exam_extras_views.ReportCardView.as_view()),
+    path("admin-portal/exams/", exam_extras_views.AdminExamActionView.as_view()),
+    path("admin-portal/exams/<int:exam_id>/action/", exam_extras_views.AdminExamActionView.as_view()),
+    path("admin-portal/exams/seating/", exam_extras_views.TimetableSeatingConflictView.as_view()),
+    path("admin-portal/exams/revaluation/", exam_extras_views.RevaluationRequestView.as_view()),
+    path("admin-portal/exams/supplementary/", exam_extras_views.SupplementaryRegistrationView.as_view()),
+    path("admin-portal/exams/certificates/", exam_extras_views.AcademicCertificateView.as_view()),
+
+    # Exam workflow (Examinations planning + Exam Results)
+    path("admin-portal/exam-workflow/analytics/", exam_workflow_views.ExamWorkflowAnalyticsView.as_view()),
+    path("admin-portal/exam-workflow/types/", exam_workflow_views.ExamWorkflowTypesView.as_view()),
+    path("admin-portal/exam-workflow/subjects/", exam_workflow_views.ExamWorkflowSubjectsView.as_view()),
+    path("admin-portal/exam-workflow/seating/", exam_workflow_views.ExamWorkflowSeatingView.as_view()),
+    path("admin-portal/exam-workflow/invigilators/", exam_workflow_views.ExamWorkflowInvigilatorsView.as_view()),
+    path("admin-portal/exam-workflow/hall-tickets/generate/", exam_workflow_views.ExamWorkflowHallTicketsView.as_view()),
+    path("admin-portal/exam-workflow/verify-marks/", exam_workflow_views.ExamWorkflowVerifyMarksView.as_view()),
+    path("admin-portal/exam-workflow/grade-config/", exam_workflow_views.ExamWorkflowGradeConfigView.as_view()),
+    path("admin-portal/exam-workflow/process-results/", exam_workflow_views.ExamWorkflowProcessResultsView.as_view()),
+    path("admin-portal/exam-workflow/notifications/", exam_workflow_views.ExamWorkflowNotificationsView.as_view()),
+    path("admin-portal/exam-workflow/notifications/send/", exam_workflow_views.ExamWorkflowNotificationSendView.as_view()),
+    path("admin-portal/exam-workflow/reports/", exam_workflow_views.ExamWorkflowReportsView.as_view()),
 ]

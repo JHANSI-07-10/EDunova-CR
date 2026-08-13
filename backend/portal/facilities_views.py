@@ -7,6 +7,7 @@ role resolved server-side via portal.roles, every admin write logged via
 log_action(). Kept in its own file so the five new modules are easy to find
 and don't bloat admin_views.py further.
 """
+import re
 from datetime import date
 
 from django.db import connection, transaction
@@ -24,7 +25,7 @@ from .doc_schemas import (
     STUDENT_ID_PARAMETER,
 )
 from .parent_views import ParentMixin, _assert_own_child
-from .roles import log_action
+from .roles import get_role, log_action
 from .views import StudentOnlyMixin, row, rows, serialise, table_exists
 
 # =============================================================================
@@ -419,12 +420,70 @@ class RoomView(AdminMixin, APIView):
         d = request.data
         with connection.cursor() as cursor:
             cursor.execute(
-                "INSERT INTO portal_room (hostel_id, room_number, capacity) VALUES (%s,%s,%s) RETURNING id",
-                [d.get("hostel_id"), d.get("room_number"), d.get("capacity", 1)],
+                "INSERT INTO portal_room (hostel_id, room_number, capacity, floor, facilities) VALUES (%s,%s,%s,%s,%s) RETURNING id",
+                [d.get("hostel_id"), d.get("room_number"), d.get("capacity", 1), d.get("floor"), d.get("facilities")],
             )
             new_id = cursor.fetchone()[0]
         log_action(request.user, "hostel.room.create", "portal_room", new_id, dict(d))
         return Response({"id": new_id, "detail": "Room added."})
+
+    @extend_schema(
+        operation_id="RoomUpdate",
+        summary="Update a room",
+        description="Edit room details (hostel, number, floor, capacity, facilities).",
+        tags=["Hostel"],
+        request=OpenApiTypes.OBJECT,
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def patch(self, request):
+        """Body: {id, hostel_id?, room_number?, floor?, capacity?, facilities?}."""
+        if not table_exists("portal_room"):
+            return Response({"detail": "Portal schema has not been applied."}, status=400)
+        d = request.data
+        record_id = d.get("id")
+        if record_id in (None, ""):
+            return Response({"detail": "The 'id' field is required for updates."}, status=400)
+        fields = {}
+        for col in ("hostel_id", "room_number", "floor", "capacity", "facilities"):
+            if col in d and d[col] not in (None, ""):
+                fields[col] = d[col]
+        if not fields:
+            return Response({"detail": "No updatable fields were provided."}, status=400)
+        cols = list(fields)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                f"UPDATE portal_room SET {', '.join(f'{c}=%s' for c in cols)} WHERE id=%s RETURNING id",
+                [fields[c] for c in cols] + [record_id],
+            )
+            if cursor.fetchone() is None:
+                return Response({"detail": "Room not found."}, status=404)
+        log_action(request.user, "hostel.room.update", "portal_room", record_id, dict(fields))
+        return Response({"id": record_id, "detail": "Room updated."})
+
+    @extend_schema(
+        operation_id="RoomDelete",
+        summary="Delete a room",
+        description="Remove a room. Refuses if students are currently allocated to it.",
+        tags=["Hostel"],
+        parameters=[_HOSTEL_ID_PARAMETER],
+        responses={200: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def delete(self, request):
+        if not table_exists("portal_room"):
+            return Response({"detail": "Portal schema has not been applied."}, status=400)
+        try:
+            record_id = int(request.query_params.get("id", ""))
+        except (TypeError, ValueError):
+            return Response({"detail": "The 'id' query parameter is required."}, status=400)
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT id FROM portal_hostel_allocation WHERE room_id=%s AND vacated_date IS NULL", [record_id])
+            if cursor.fetchone():
+                return Response({"detail": "Cannot delete: students are currently allocated to this room."}, status=400)
+            cursor.execute("DELETE FROM portal_room WHERE id=%s", [record_id])
+            if cursor.rowcount == 0:
+                return Response({"detail": "Room not found."}, status=404)
+        log_action(request.user, "hostel.room.delete", "portal_room", record_id)
+        return Response({"detail": "Room deleted."})
 
 
 class HostelAllocationView(AdminMixin, APIView):
@@ -930,6 +989,11 @@ class PayrollView(AdminMixin, APIView):
         if not table_exists("portal_payroll_record") or not table_exists("portal_employee"):
             return Response([])
         month = request.query_params.get("month") or date.today().replace(day=1).isoformat()
+        # The HTML <input type="month"> control submits "YYYY-MM"; the
+        # pay_month column is a date, so normalize to the first of the month.
+        # (An invalid value would otherwise crash the INSERT with a DataError.)
+        if re.fullmatch(r"\d{4}-\d{2}", month):
+            month = f"{month}-01"
 
         # Auto-generate a Pending payslip for every active employee who doesn't
         # already have one this month, so Admin never has to "create" payroll
@@ -997,3 +1061,355 @@ class PayrollView(AdminMixin, APIView):
                 )
         log_action(request.user, "payroll.update", "portal_payroll_record", record_id, dict(d))
         return Response({"detail": "Payslip updated."})
+
+
+class HostelApplicationView(APIView):
+    """
+    GET - Admin lists all. Student lists own applications.
+    POST - Student submits a new application.
+    PATCH - Admin reviews and approves/rejects application.
+    """
+    def get(self, request):
+        if not table_exists("portal_hostel_application"):
+            return Response([])
+        
+        role = get_role(request.user)
+        if role == "Admin":
+            return Response(serialise(rows(
+                """
+                SELECT a.*, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name,
+                       h.name AS hostel_name
+                FROM portal_hostel_application a
+                JOIN auth_user u ON u.id = a.student_id
+                JOIN portal_hostel h ON h.id = a.hostel_id
+                ORDER BY a.created_at DESC
+                """
+            )))
+        else:
+            return Response(serialise(rows(
+                """
+                SELECT a.*, h.name AS hostel_name
+                FROM portal_hostel_application a
+                JOIN portal_hostel h ON h.id = a.hostel_id
+                WHERE a.student_id = %s
+                ORDER BY a.created_at DESC
+                """,
+                [request.user.id]
+            )))
+
+    def post(self, request):
+        if not table_exists("portal_hostel_application"):
+            return Response({"detail": "Schema not applied."}, status=400)
+        d = request.data
+        hid = d.get("hostel_id")
+        rtype = d.get("preferred_room_type", "2-Sharing")
+        reason = d.get("reason", "")
+        if not hid:
+            return Response({"detail": "hostel_id is required."}, status=400)
+        
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_hostel_application (student_id, hostel_id, preferred_room_type, reason, status) "
+                "VALUES (%s,%s,%s,%s,'Pending') RETURNING id",
+                [request.user.id, hid, rtype, reason]
+            )
+            new_id = cur.fetchone()[0]
+        
+        return Response({"id": new_id, "detail": "Hostel application submitted."}, status=201)
+
+    def patch(self, request):
+        role = get_role(request.user)
+        if role != "Admin":
+            return Response({"detail": "Permission denied."}, status=403)
+        
+        d = request.data
+        app_id = d.get("id")
+        status_val = d.get("status")
+        notes = d.get("review_notes", "")
+        if not app_id or status_val not in ["Approved", "Rejected"]:
+            return Response({"detail": "id and status ('Approved' or 'Rejected') are required."}, status=400)
+        
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_hostel_application SET status=%s, review_notes=%s, reviewed_by=%s WHERE id=%s",
+                [status_val, notes, request.user.id, app_id]
+            )
+        
+        log_action(request.user, "hostel.application.review", "portal_hostel_application", app_id, {"status": status_val})
+        return Response({"detail": f"Application marked as {status_val}."})
+
+
+# ---------------------------------------------------------------------------
+# New Hostel Leaves (Student, Parent, Admin)
+# ---------------------------------------------------------------------------
+class HostelLeaveView(APIView):
+    """
+    GET - Admin lists all, Student lists own, Parent lists child's leaves
+    POST - Student submits a leave request, Parent approves leave request
+    PATCH - Admin approves/rejects leave request
+    """
+    def get(self, request):
+        if not table_exists("portal_hostel_leave"):
+            return Response([])
+        
+        role = get_role(request.user)
+        child_id = request.query_params.get("child_id")
+        
+        if role == "Admin":
+            return Response(serialise(rows(
+                """
+                SELECT l.*, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name
+                FROM portal_hostel_leave l
+                JOIN auth_user u ON u.id = l.student_id
+                ORDER BY l.created_at DESC
+                """
+            )))
+        elif role == "Parent" and child_id:
+            if not _assert_own_child(request.user.id, child_id):
+                return Response({"detail": "Forbidden"}, status=403)
+            return Response(serialise(rows(
+                "SELECT * FROM portal_hostel_leave WHERE student_id=%s ORDER BY created_at DESC",
+                [child_id]
+            )))
+        else:
+            return Response(serialise(rows(
+                "SELECT * FROM portal_hostel_leave WHERE student_id=%s ORDER BY created_at DESC",
+                [request.user.id]
+            )))
+
+    def post(self, request):
+        if not table_exists("portal_hostel_leave"):
+            return Response({"detail": "Schema not applied."}, status=400)
+        
+        role = get_role(request.user)
+        d = request.data
+        
+        if role == "Parent":
+            leave_id = d.get("id")
+            approved = bool(d.get("parent_approved"))
+            if not leave_id:
+                return Response({"detail": "id is required."}, status=400)
+            with connection.cursor() as cur:
+                cur.execute(
+                    "UPDATE portal_hostel_leave SET parent_approved=%s WHERE id=%s",
+                    [approved, leave_id]
+                )
+            return Response({"detail": "Parent decision recorded."})
+        else:
+            start = d.get("start_date")
+            end = d.get("end_date")
+            reason = d.get("reason", "")
+            if not start or not end or not reason:
+                return Response({"detail": "start_date, end_date, and reason are required."}, status=400)
+            
+            with connection.cursor() as cur:
+                cur.execute(
+                    "INSERT INTO portal_hostel_leave (student_id, start_date, end_date, reason) "
+                    "VALUES (%s,%s,%s,%s) RETURNING id",
+                    [request.user.id, start, end, reason]
+                )
+                new_id = cur.fetchone()[0]
+            return Response({"id": new_id, "detail": "Leave request submitted."}, status=201)
+
+    def patch(self, request):
+        role = get_role(request.user)
+        if role != "Admin":
+            return Response({"detail": "Forbidden"}, status=403)
+        d = request.data
+        lid = d.get("id")
+        status_val = d.get("status")
+        if not lid or status_val not in ["Approved", "Rejected"]:
+            return Response({"detail": "id and status required."}, status=400)
+        
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_hostel_leave SET status=%s WHERE id=%s",
+                [status_val, lid]
+            )
+        log_action(request.user, "hostel.leave.review", "portal_hostel_leave", lid, {"status": status_val})
+        return Response({"detail": f"Leave status updated to {status_val}."})
+
+
+# ---------------------------------------------------------------------------
+# New Hostel Complaint Registry (Student, Parent, Admin)
+# ---------------------------------------------------------------------------
+class HostelComplaintView(APIView):
+    """
+    GET - Admin lists all, Student lists own, Parent lists child's complaints
+    POST - Student submits a complaint
+    PATCH - Admin resolves/updates complaint
+    """
+    def get(self, request):
+        if not table_exists("portal_hostel_complaint"):
+            return Response([])
+        
+        role = get_role(request.user)
+        child_id = request.query_params.get("child_id")
+        
+        if role == "Admin":
+            return Response(serialise(rows(
+                """
+                SELECT c.*, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name
+                FROM portal_hostel_complaint c
+                JOIN auth_user u ON u.id = c.student_id
+                ORDER BY c.created_at DESC
+                """
+            )))
+        elif role == "Parent" and child_id:
+            if not _assert_own_child(request.user.id, child_id):
+                return Response({"detail": "Forbidden"}, status=403)
+            return Response(serialise(rows(
+                "SELECT * FROM portal_hostel_complaint WHERE student_id=%s ORDER BY created_at DESC",
+                [child_id]
+            )))
+        else:
+            return Response(serialise(rows(
+                "SELECT * FROM portal_hostel_complaint WHERE student_id=%s ORDER BY created_at DESC",
+                [request.user.id]
+            )))
+
+    def post(self, request):
+        if not table_exists("portal_hostel_complaint"):
+            return Response({"detail": "Schema not applied."}, status=400)
+        d = request.data
+        cat = d.get("category", "Maintenance")
+        title = d.get("title", "")
+        desc = d.get("description", "")
+        if not title or not desc:
+            return Response({"detail": "title and description are required."}, status=400)
+        
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_hostel_complaint (student_id, category, title, description) "
+                "VALUES (%s,%s,%s,%s) RETURNING id",
+                [request.user.id, cat, title, desc]
+            )
+            new_id = cur.fetchone()[0]
+        return Response({"id": new_id, "detail": "Complaint registered."}, status=201)
+
+    def patch(self, request):
+        role = get_role(request.user)
+        if role != "Admin":
+            return Response({"detail": "Forbidden"}, status=403)
+        d = request.data
+        cid = d.get("id")
+        status_val = d.get("status")
+        notes = d.get("admin_notes", "")
+        if not cid or status_val not in ["Open", "In Progress", "Resolved"]:
+            return Response({"detail": "id and status required."}, status=400)
+        
+        with connection.cursor() as cur:
+            cur.execute(
+                "UPDATE portal_hostel_complaint SET status=%s, admin_notes=%s WHERE id=%s",
+                [status_val, notes, cid]
+            )
+        log_action(request.user, "hostel.complaint.update", "portal_hostel_complaint", cid, {"status": status_val})
+        return Response({"detail": "Complaint updated."})
+
+
+# ---------------------------------------------------------------------------
+# New Hostel Fee View
+# ---------------------------------------------------------------------------
+class HostelFeeView(AdminMixin, APIView):
+    """
+    GET ?student_id=
+    POST {student_id, amount, academic_year?, due_date?}
+    PATCH {student_id, amount_paid, status}
+    """
+    def get(self, request):
+        if not table_exists("portal_hostel_fee"):
+            return Response([])
+        sid = request.query_params.get("student_id")
+        if sid:
+            return Response(serialise(row("SELECT * FROM portal_hostel_fee WHERE student_id=%s ORDER BY academic_year DESC LIMIT 1", [sid])))
+        return Response(serialise(rows(
+            """
+            SELECT hf.*, COALESCE(u.first_name || ' ' || u.last_name, u.username) AS student_name
+            FROM portal_hostel_fee hf JOIN auth_user u ON u.id = hf.student_id
+            ORDER BY hf.status, student_name
+            """
+        )))
+
+    def post(self, request):
+        if not table_exists("portal_hostel_fee"):
+            return Response({"detail": "Schema not applied."}, status=400)
+        d = request.data
+        sid = d.get("student_id")
+        if not sid:
+            return Response({"detail": "student_id is required."}, status=400)
+        yr = d.get("academic_year") or str(date.today().year)
+        with connection.cursor() as cur:
+            cur.execute(
+                "INSERT INTO portal_hostel_fee (student_id, academic_year, amount, due_date) "
+                "VALUES (%s,%s,%s,%s) ON CONFLICT (student_id, academic_year) DO UPDATE SET "
+                "amount=EXCLUDED.amount, due_date=EXCLUDED.due_date RETURNING id",
+                [sid, yr, d.get("amount", 0), d.get("due_date") or None]
+            )
+            new_id = cur.fetchone()[0]
+        log_action(request.user, "hostel.fee.set", "portal_hostel_fee", new_id, dict(d))
+        return Response({"id": new_id, "detail": "Hostel fee set."}, status=201)
+
+    def patch(self, request):
+        if not table_exists("portal_hostel_fee"):
+            return Response({"detail": "Schema not applied."}, status=400)
+        d = request.data
+        sid = d.get("student_id")
+        if not sid:
+            return Response({"detail": "student_id is required."}, status=400)
+        yr = d.get("academic_year") or str(date.today().year)
+        amount_paid = d.get("amount_paid", 0)
+        status_val = d.get("status", "Pending")
+        paid_at_sql = "now()" if status_val == "Paid" else "NULL"
+        with connection.cursor() as cur:
+            cur.execute(
+                f"UPDATE portal_hostel_fee SET amount_paid=%s, status=%s, paid_at={paid_at_sql} "
+                "WHERE student_id=%s AND academic_year=%s",
+                [amount_paid, status_val, sid, yr]
+            )
+        log_action(request.user, "hostel.fee.payment", "portal_hostel_fee", sid, dict(d))
+        return Response({"detail": "Fee payment recorded."})
+
+
+# ---------------------------------------------------------------------------
+# New Hostel Reports & Analytics
+# ---------------------------------------------------------------------------
+class HostelReportsView(AdminMixin, APIView):
+    def get(self, request):
+        def safe_count(sql, params=None):
+            r = row(sql, params or [])
+            return r[list(r.keys())[0]] if r else 0
+
+        total_hostels = safe_count("SELECT COUNT(*)::int AS c FROM portal_hostel") if table_exists("portal_hostel") else 0
+        total_rooms = safe_count("SELECT COUNT(*)::int AS c FROM portal_room") if table_exists("portal_room") else 0
+        total_beds = safe_count("SELECT COALESCE(SUM(capacity),0)::int AS c FROM portal_room") if table_exists("portal_room") else 0
+        occupied_beds = safe_count("SELECT COALESCE(SUM(occupied_beds),0)::int AS c FROM portal_room") if table_exists("portal_room") else 0
+        pending_apps = safe_count("SELECT COUNT(*)::int AS c FROM portal_hostel_application WHERE status='Pending'") if table_exists("portal_hostel_application") else 0
+        active_leaves = safe_count("SELECT COUNT(*)::int AS c FROM portal_hostel_leave WHERE status='Pending'") if table_exists("portal_hostel_leave") else 0
+        open_complaints = safe_count("SELECT COUNT(*)::int AS c FROM portal_hostel_complaint WHERE status IN ('Open', 'In Progress')") if table_exists("portal_hostel_complaint") else 0
+
+        hostel_occupancy = []
+        if table_exists("portal_hostel") and table_exists("portal_room"):
+            hostel_occupancy = serialise(rows(
+                """
+                SELECT h.name AS hostel_name, h.type,
+                       COALESCE(SUM(r.capacity), 0)::int AS total_capacity,
+                       COALESCE(SUM(r.occupied_beds), 0)::int AS total_occupied
+                FROM portal_hostel h
+                LEFT JOIN portal_room r ON r.hostel_id = h.id
+                GROUP BY h.id, h.name, h.type
+                ORDER BY h.name
+                """
+            ))
+
+        return Response(serialise({
+            "total_hostels": total_hostels,
+            "total_rooms": total_rooms,
+            "total_beds": total_beds,
+            "occupied_beds": occupied_beds,
+            "pending_applications": pending_apps,
+            "active_leaves": active_leaves,
+            "open_complaints": open_complaints,
+            "hostel_occupancy": hostel_occupancy
+        }))
+
+

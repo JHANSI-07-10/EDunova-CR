@@ -33,7 +33,7 @@ from .doc_schemas import (
     MultiRouteAutoSchema,
     ERROR_RESPONSES,
 )
-from .roles import IsAdmin, get_role, log_action
+from .roles import IsAdmin, ROLE_ORDER, log_action
 from .views import row, rows, serialise, table_exists
 
 User = get_user_model()
@@ -1816,6 +1816,57 @@ class AdmissionWorkflowActionView(AdminMixin, APIView):
             log_action(request.user, "admission.allocation", "admission", registration_number)
             return Response(serialise(_admission_detail_payload(enquiry)))
 
+        if panel == "documents":
+            # POST multipart/form-data: doc_type (one of DOC_FIELDS) + file.
+            # Stores the uploaded document on the AdmissionEnquiry FileField so
+            # it shows up in the Documents panel and the eligibility check.
+            doc_type = d.get("doc_type")
+            if doc_type not in DOC_FIELDS:
+                return Response({"detail": "Invalid document type."}, status=400)
+            upload = request.FILES.get("file")
+            if not upload:
+                return Response({"detail": "No file uploaded."}, status=400)
+
+            import mimetypes
+            from django.conf import settings as _settings
+
+            MAX_SIZE = getattr(_settings, "MAX_UPLOAD_SIZE_MB", 20) * 1024 * 1024
+            ALLOWED_TYPES = getattr(_settings, "ALLOWED_UPLOAD_TYPES", (
+                "image/jpeg", "image/png", "image/webp", "image/gif",
+                "application/pdf", "application/msword",
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                "application/vnd.ms-excel",
+                "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                "application/zip",
+            ))
+            ALLOWED_EXTENSIONS = {"jpg", "jpeg", "png", "webp", "gif", "pdf", "doc", "docx", "xls", "xlsx", "zip", "csv"}
+
+            name = upload.name or ""
+            if upload.size > MAX_SIZE:
+                return Response(
+                    {"detail": f"File exceeds the {getattr(_settings, 'MAX_UPLOAD_SIZE_MB', 20)} MB size limit."},
+                    status=400,
+                )
+            extension = name.rsplit(".", 1)[-1].lower() if "." in name else ""
+            if extension not in ALLOWED_EXTENSIONS:
+                return Response(
+                    {"detail": "File type not allowed. Use a PDF, document, image or spreadsheet format."},
+                    status=400,
+                )
+            guessed, _ = mimetypes.guess_type(name)
+            ctype = upload.content_type or guessed or ""
+            if ctype.split(";")[0].strip().lower() not in ALLOWED_TYPES:
+                return Response(
+                    {"detail": "File type not allowed. Use a common document, PDF or image format."},
+                    status=400,
+                )
+
+            setattr(enquiry, doc_type, upload)
+            enquiry.save(update_fields=[doc_type])
+            _add_notification("Document uploaded", f"{doc_type.replace('_', ' ')} uploaded for {enquiry.applicant_name}.", request.user.id)
+            log_action(request.user, "admission.document_uploaded", "admission", registration_number, {"doc_type": doc_type})
+            return Response(serialise(_admission_detail_payload(enquiry)))
+
         if panel == "modules":
             module_type = d.get("module_type")
             if module_type not in ("Transport", "Hostel", "Library", "LMS"):
@@ -1983,15 +2034,51 @@ class UserListView(AdminMixin, APIView):
         responses={200: serializers.ListSerializer(child=_UserItem), **ERROR_RESPONSES},
     )
     def get(self, request):
-        from django.contrib.auth.models import User
+        from django.contrib.auth.models import Group, User
         role_filter = request.query_params.get("role")
         if not role_filter:
             # ?type= is the legacy alias used by the admin Fees page dropdowns.
             role_filter = request.query_params.get("type")
 
-        users = User.objects.all().prefetch_related("groups").order_by("-date_joined")
+        users = list(User.objects.all().order_by("-date_joined"))
+
+        # Resolve roles in bulk. Calling get_role() per user would run ~3
+        # queries each (schema check + profile lookup + groups lookup, and
+        # values_list bypasses the prefetch cache), which over a remote
+        # database takes ~17s for a few hundred users — every dropdown fed by
+        # this endpoint (Faculty Profiles, Exams, Fees, Users, ...) appeared
+        # empty because the request never completed in time. Two queries cover
+        # everyone instead, mirroring get_role()'s fallback chain exactly.
+        profile_types = {}
+        try:
+            if table_exists("portal_user_profile"):
+                profile_types = {
+                    r["user_id"]: r["user_type"]
+                    for r in rows("SELECT user_id, user_type FROM portal_user_profile")
+                }
+        except Exception:
+            pass
+        group_names_by_user = {}
+        for user_id, name in (
+            Group.objects.filter(user__in=users).values_list("user__id", "name")
+        ):
+            group_names_by_user.setdefault(user_id, []).append(name)
+
         data = []
         for u in users:
+            if u.is_superuser:
+                role = "Admin"
+            else:
+                role = profile_types.get(u.id)
+                if not role:
+                    gnames = group_names_by_user.get(u.id, [])
+                    role = next((r for r in ROLE_ORDER if r in gnames), None)
+                if not role:
+                    # SECURITY: only a genuine superuser auto-qualifies as
+                    # Admin here — never merely is_staff (same rule as
+                    # roles.get_role). Non-superusers without a profile or
+                    # group fall back to Student.
+                    role = "Admin" if u.is_superuser else "Student"
             data.append({
                 "id": u.id,
                 "username": u.username,
@@ -2001,7 +2088,7 @@ class UserListView(AdminMixin, APIView):
                 "last_name": u.last_name,
                 "is_active": u.is_active,
                 "date_joined": u.date_joined,
-                "role": get_role(u)
+                "role": role,
             })
 
         if role_filter:
@@ -3027,7 +3114,11 @@ class LeaveApprovalListView(AdminMixin, APIView):
         ],
         responses={200: serializers.ListSerializer(child=_LeaveItem), **ERROR_RESPONSES},
     )
-    def get(self, request):
+    def get(self, request, **kwargs):
+        # Mounted on both /leaves/ and /leaves/<leave_id>/decide/; a GET on
+        # the decide route (POST-only) must be a clean 405, not a crash.
+        if kwargs.get("leave_id") is not None:
+            return Response({"detail": "Method not allowed."}, status=405)
         if not table_exists("portal_leave"):
             return Response([])
         status_filter = request.query_params.get("status", "Pending")
@@ -3453,7 +3544,12 @@ class ContactMessagesView(AdminMixin, APIView):
         tags=["Contact"],
         responses={200: serializers.ListSerializer(child=_ContactMessageItem), **ERROR_RESPONSES},
     )
-    def get(self, request):
+    def get(self, request, **kwargs):
+        # Mounted on both /contact-messages/ and /contact-messages/<id>/; a
+        # GET on the detail route (PATCH-only) must be a clean 405, not a
+        # TypeError crash.
+        if kwargs.get("message_id") is not None:
+            return Response({"detail": "Method not allowed."}, status=405)
         submissions = ContactSubmission.objects.all().order_by("-submitted_at")
         return Response(
             [
@@ -4591,4 +4687,195 @@ class TransportLiveMapView(AdminMixin, APIView):
             "FROM portal_vehicle ORDER BY vehicle_number"
         )
         return Response(serialise(data))
+
+
+# ---------------------------------------------------------------------------
+# Campus Locations (admin CRUD + visit management)
+# ---------------------------------------------------------------------------
+class AdminCampusView(APIView):
+    permission_classes = [IsAdmin]
+
+    @extend_schema(
+        operation_id="AdminCampusList",
+        summary="List campus locations",
+        tags=["Campus"],
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_campus_location"):
+            return Response([])
+        campuses = rows(
+            """
+            SELECT id, name, address, city, state, country, postal_code, latitude, longitude,
+                   phone, email, website, office_hours, facilities, programs, image_url,
+                   student_count, faculty_count, status, created_at, updated_at
+            FROM portal_campus_location
+            ORDER BY id ASC
+            """
+        )
+        return Response(serialise(campuses))
+
+    @extend_schema(
+        operation_id="AdminCampusCreate",
+        summary="Create a campus location",
+        tags=["Campus"],
+        request=OpenApiTypes.OBJECT,
+        responses={201: IdDetailResponseSerializer, **ERROR_RESPONSES},
+    )
+    def post(self, request):
+        from rest_framework import status as http_status
+
+        name = (request.data.get("name") or "").strip()
+        address = (request.data.get("address") or "").strip()
+        city = (request.data.get("city") or "").strip()
+        state = (request.data.get("state") or "").strip()
+        country = (request.data.get("country") or "India").strip()
+        postal_code = (request.data.get("postal_code") or "").strip()
+        latitude = request.data.get("latitude")
+        longitude = request.data.get("longitude")
+        phone = (request.data.get("phone") or "").strip()
+        email = (request.data.get("email") or "").strip()
+        website = (request.data.get("website") or "").strip()
+        office_hours = (request.data.get("office_hours") or "").strip()
+        facilities = request.data.get("facilities") or []
+        programs = request.data.get("programs") or []
+        image_url = (request.data.get("image_url") or "").strip()
+        status_val = (request.data.get("status") or "Active").strip()
+        student_count = request.data.get("student_count") or 0
+        faculty_count = request.data.get("faculty_count") or 0
+
+        if not (name and address and city and state and postal_code and latitude is not None and longitude is not None and phone and email and office_hours):
+            return Response({"detail": "All required fields must be provided."}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO portal_campus_location
+                    (name, address, city, state, country, postal_code, latitude, longitude,
+                     phone, email, website, office_hours, facilities, programs, image_url,
+                     student_count, faculty_count, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id
+                """,
+                [name, address, city, state, country, postal_code, latitude, longitude,
+                 phone, email, website, office_hours, facilities, programs, image_url,
+                 student_count, faculty_count, status_val]
+            )
+            campus_id = cursor.fetchone()[0]
+
+        log_action(request.user, "campus.create", "portal_campus_location", campus_id, {"name": name})
+        return Response({"id": campus_id, "detail": "Campus location created successfully."}, status=http_status.HTTP_201_CREATED)
+
+
+class AdminCampusDetailView(APIView):
+    permission_classes = [IsAdmin]
+
+    @extend_schema(
+        operation_id="AdminCampusUpdate",
+        summary="Update a campus location",
+        tags=["Campus"],
+        request=OpenApiTypes.OBJECT,
+        responses={200: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
+    def put(self, request, campus_id):
+        from rest_framework import status as http_status
+
+        name = (request.data.get("name") or "").strip()
+        address = (request.data.get("address") or "").strip()
+        city = (request.data.get("city") or "").strip()
+        state = (request.data.get("state") or "").strip()
+        country = (request.data.get("country") or "India").strip()
+        postal_code = (request.data.get("postal_code") or "").strip()
+        latitude = request.data.get("latitude")
+        longitude = request.data.get("longitude")
+        phone = (request.data.get("phone") or "").strip()
+        email = (request.data.get("email") or "").strip()
+        website = (request.data.get("website") or "").strip()
+        office_hours = (request.data.get("office_hours") or "").strip()
+        facilities = request.data.get("facilities") or []
+        programs = request.data.get("programs") or []
+        image_url = (request.data.get("image_url") or "").strip()
+        status_val = (request.data.get("status") or "Active").strip()
+        student_count = request.data.get("student_count") or 0
+        faculty_count = request.data.get("faculty_count") or 0
+
+        if not (name and address and city and state and postal_code and latitude is not None and longitude is not None and phone and email and office_hours):
+            return Response({"detail": "All required fields must be provided."}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE portal_campus_location
+                SET name=%s, address=%s, city=%s, state=%s, country=%s, postal_code=%s,
+                    latitude=%s, longitude=%s, phone=%s, email=%s, website=%s, office_hours=%s,
+                    facilities=%s, programs=%s, image_url=%s, student_count=%s, faculty_count=%s,
+                    status=%s, updated_at=now()
+                WHERE id=%s
+                """,
+                [name, address, city, state, country, postal_code, latitude, longitude,
+                 phone, email, website, office_hours, facilities, programs, image_url,
+                 student_count, faculty_count, status_val, campus_id]
+            )
+
+        log_action(request.user, "campus.update", "portal_campus_location", campus_id, {"name": name})
+        return Response({"detail": "Campus location updated successfully."})
+
+    @extend_schema(
+        operation_id="AdminCampusDelete",
+        summary="Delete a campus location",
+        tags=["Campus"],
+        responses={200: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
+    def delete(self, request, campus_id):
+        with connection.cursor() as cursor:
+            cursor.execute("DELETE FROM portal_campus_location WHERE id=%s", [campus_id])
+        log_action(request.user, "campus.delete", "portal_campus_location", campus_id, {"id": campus_id})
+        return Response({"detail": "Campus location deleted successfully."})
+
+
+class AdminCampusVisitsView(APIView):
+    permission_classes = [IsAdmin]
+
+    @extend_schema(
+        operation_id="AdminCampusVisitList",
+        summary="List campus visit bookings",
+        tags=["Campus"],
+        responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
+    )
+    def get(self, request):
+        if not table_exists("portal_campus_visit"):
+            return Response([])
+        visits = rows(
+            """
+            SELECT v.id, v.campus_id, c.name as campus_name, v.visitor_name, v.visitor_email,
+                   v.visitor_phone, v.visit_date, v.visit_time, v.purpose, v.status, v.created_at
+            FROM portal_campus_visit v
+            LEFT JOIN portal_campus_location c ON c.id = v.campus_id
+            ORDER BY v.visit_date DESC, v.id DESC
+            """
+        )
+        return Response(serialise(visits))
+
+    @extend_schema(
+        operation_id="AdminCampusVisitStatus",
+        summary="Update a campus visit status",
+        tags=["Campus"],
+        request=OpenApiTypes.OBJECT,
+        responses={200: DetailErrorSerializer, **ERROR_RESPONSES},
+    )
+    def put(self, request, visit_id):
+        from rest_framework import status as http_status
+
+        status_val = request.data.get("status")
+        if status_val not in ["Pending", "Confirmed", "Completed", "Cancelled"]:
+            return Response({"detail": "Invalid status value."}, status=http_status.HTTP_400_BAD_REQUEST)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE portal_campus_visit SET status=%s, updated_at=now() WHERE id=%s",
+                [status_val, visit_id]
+            )
+
+        log_action(request.user, "campus_visit.status_update", "portal_campus_visit", visit_id, {"status": status_val})
+        return Response({"detail": "Campus visit status updated successfully."})
 

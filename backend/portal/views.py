@@ -1,11 +1,12 @@
 from datetime import date, datetime
 from uuid import uuid4
 import logging
+import math
 
 from django.db import connection
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework import serializers, status
 
@@ -1744,3 +1745,105 @@ class StudentAIChatView(StudentOnlyMixin, APIView):
             f"• *'What are my recent grades?'*"
         )
         return Response({"reply": reply})
+
+
+# ---------------------------------------------------------------------------
+# Public campus directory + visit booking (Contact page / campus finder)
+# ---------------------------------------------------------------------------
+class PublicCampusView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        if not table_exists("portal_campus_location"):
+            return Response([])
+        campus_list = rows("SELECT * FROM portal_campus_location WHERE status = 'Active' ORDER BY id ASC")
+        return Response(serialise(campus_list))
+
+
+class PublicCampusVisitView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        if not table_exists("portal_campus_visit"):
+            return Response({"detail": "Campus visit service unavailable."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        campus_id = request.data.get("campus_id")
+        visitor_name = (request.data.get("visitor_name") or "").strip()
+        visitor_email = (request.data.get("visitor_email") or "").strip()
+        visitor_phone = (request.data.get("visitor_phone") or "").strip()
+        visit_date = request.data.get("visit_date")
+        visit_time = (request.data.get("visit_time") or "").strip()
+        purpose = (request.data.get("purpose") or "").strip()
+
+        if not (campus_id and visitor_name and visitor_email and visitor_phone and visit_date and visit_time):
+            return Response({"detail": "All required fields must be provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO portal_campus_visit
+                    (campus_id, visitor_name, visitor_email, visitor_phone, visit_date, visit_time, purpose, status)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, 'Pending')
+                RETURNING id
+                """,
+                [campus_id, visitor_name, visitor_email, visitor_phone, visit_date, visit_time, purpose]
+            )
+            visit_id = cursor.fetchone()[0]
+
+        from .roles import log_action
+        log_action(
+            actor=None,
+            action="BOOK_CAMPUS_VISIT",
+            target_type="portal_campus_visit",
+            target_id=visit_id,
+            details={"visitor_name": visitor_name, "campus_id": campus_id, "visit_date": str(visit_date)},
+        )
+
+        return Response({"id": visit_id, "detail": "Campus visit booked successfully. Admissions will contact you shortly."}, status=status.HTTP_201_CREATED)
+
+
+class NearestCampusView(APIView):
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        if not table_exists("portal_campus_location"):
+            return Response({"detail": "Campus service unavailable."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        try:
+            visitor_lat = float(request.query_params.get("lat"))
+            visitor_lng = float(request.query_params.get("lng"))
+        except (TypeError, ValueError):
+            return Response({"detail": "Valid lat and lng query coordinates required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        campuses = rows(
+            "SELECT id, name, address, city, state, latitude, longitude, phone, email, status "
+            "FROM portal_campus_location WHERE status = 'Active'"
+        )
+        if not campuses:
+            return Response({"detail": "No active campuses found."}, status=status.HTTP_404_NOT_FOUND)
+
+        def haversine(lat1, lon1, lat2, lon2):
+            r = 6371.0
+            dlat = math.radians(lat2 - lat1)
+            dlon = math.radians(lon2 - lon1)
+            a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2) ** 2
+            return r * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+        nearest = None
+        min_dist = float("inf")
+        for c in campuses:
+            dist = haversine(visitor_lat, visitor_lng, float(c["latitude"]), float(c["longitude"]))
+            if dist < min_dist:
+                min_dist = dist
+                nearest = c
+
+        est_travel_time_mins = math.ceil((min_dist / 30.0) * 60.0)
+        return Response({
+            "nearest_campus": nearest["name"],
+            "campus_id": nearest["id"],
+            "distance_km": round(min_dist, 1),
+            "estimated_travel_time_mins": est_travel_time_mins,
+            "address": nearest["address"],
+            "city": nearest["city"],
+            "state": nearest["state"],
+            "phone": nearest["phone"],
+            "email": nearest["email"],
+        })

@@ -52,7 +52,12 @@ class AcademicCrudView(APIView):
         tags=["Academic"],
         responses={200: serializers.ListSerializer(child=serializers.JSONField()), **ERROR_RESPONSES},
     )
-    def get(self, request):
+    def get(self, request, **kwargs):
+        # Mounted on both the list route and the <int:pk> detail route; a GET
+        # against the detail route (which only supports PATCH/DELETE) must be
+        # a clean 405, not a TypeError crash.
+        if kwargs.get("pk") is not None:
+            return Response({"detail": "Method not allowed."}, status=405)
         objs = self.model.objects.all()
         return Response([_payload(o, self.model) for o in objs])
 
