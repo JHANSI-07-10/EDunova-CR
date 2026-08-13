@@ -17,7 +17,7 @@ from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .admin_views import AdminMixin, SimpleTableView
+from .admin_views import AdminMixin, SimpleTableView, _compose_update_statement
 from .doc_schemas import (
     DetailErrorSerializer,
     ERROR_RESPONSES,
@@ -452,7 +452,7 @@ class RoomView(AdminMixin, APIView):
         cols = list(fields)
         with connection.cursor() as cursor:
             cursor.execute(
-                f"UPDATE portal_room SET {', '.join(f'{c}=%s' for c in cols)} WHERE id=%s RETURNING id",
+                _compose_update_statement("portal_room", cols),
                 [fields[c] for c in cols] + [record_id],
             )
             if cursor.fetchone() is None:
@@ -1359,13 +1359,21 @@ class HostelFeeView(AdminMixin, APIView):
         yr = d.get("academic_year") or str(date.today().year)
         amount_paid = d.get("amount_paid", 0)
         status_val = d.get("status", "Pending")
-        paid_at_sql = "now()" if status_val == "Paid" else "NULL"
         with connection.cursor() as cur:
-            cur.execute(
-                f"UPDATE portal_hostel_fee SET amount_paid=%s, status=%s, paid_at={paid_at_sql} "
-                "WHERE student_id=%s AND academic_year=%s",
-                [amount_paid, status_val, sid, yr]
-            )
+            # Two fixed statements (no string interpolation): paid_at is either
+            # the DB clock for a Paid payment or left NULL otherwise.
+            if status_val == "Paid":
+                cur.execute(
+                    "UPDATE portal_hostel_fee SET amount_paid=%s, status=%s, paid_at=now() "
+                    "WHERE student_id=%s AND academic_year=%s",
+                    [amount_paid, status_val, sid, yr]
+                )
+            else:
+                cur.execute(
+                    "UPDATE portal_hostel_fee SET amount_paid=%s, status=%s, paid_at=NULL "
+                    "WHERE student_id=%s AND academic_year=%s",
+                    [amount_paid, status_val, sid, yr]
+                )
         log_action(request.user, "hostel.fee.payment", "portal_hostel_fee", sid, dict(d))
         return Response({"detail": "Fee payment recorded."})
 

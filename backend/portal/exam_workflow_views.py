@@ -25,7 +25,7 @@ from rest_framework import serializers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .admin_views import AdminMixin
+from .admin_views import AdminMixin, _compose_update_statement
 from .doc_schemas import DetailErrorSerializer, ERROR_RESPONSES
 from .roles import log_action
 from .views import row, rows, serialise, table_exists
@@ -96,7 +96,7 @@ class ExamWorkflowTypesView(AdminMixin, APIView):
         cols = list(fields)
         with connection.cursor() as cursor:
             cursor.execute(
-                f"UPDATE portal_exam_type SET {', '.join(f'{c}=%s' for c in cols)} WHERE id=%s",
+                _compose_update_statement("portal_exam_type", cols),
                 [fields[c] for c in cols] + [rid],
             )
         log_action(request.user, "exam.type.update", "portal_exam_type", rid, dict(fields))
@@ -187,7 +187,7 @@ class ExamWorkflowSubjectsView(AdminMixin, APIView):
         cols = list(fields)
         with connection.cursor() as cursor:
             cursor.execute(
-                f"UPDATE portal_exam_subject SET {', '.join(f'{c}=%s' for c in cols)} WHERE id=%s",
+                _compose_update_statement("portal_exam_subject", cols),
                 [fields[c] for c in cols] + [rid],
             )
         log_action(request.user, "exam.subject.update", "portal_exam_subject", rid, dict(fields))
@@ -341,7 +341,7 @@ class ExamWorkflowInvigilatorsView(AdminMixin, APIView):
         cols = list(fields)
         with connection.cursor() as cursor:
             cursor.execute(
-                f"UPDATE portal_invigilator_allocation SET {', '.join(f'{c}=%s' for c in cols)} WHERE id=%s",
+                _compose_update_statement("portal_invigilator_allocation", cols),
                 [fields[c] for c in cols] + [rid],
             )
         log_action(request.user, "exam.invigilator.update", "portal_invigilator_allocation", rid, dict(fields))
@@ -526,7 +526,7 @@ class ExamWorkflowGradeConfigView(AdminMixin, APIView):
         cols = list(fields)
         with connection.cursor() as cursor:
             cursor.execute(
-                f"UPDATE portal_grade_config SET {', '.join(f'{c}=%s' for c in cols)} WHERE id=%s",
+                _compose_update_statement("portal_grade_config", cols),
                 [fields[c] for c in cols] + [rid],
             )
         log_action(request.user, "exam.grade_config.update", "portal_grade_config", rid, dict(fields))
