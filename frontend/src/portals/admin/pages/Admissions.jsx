@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import api from "../lib/api";
 import { isNonEmptyString, isValidEmail, isValidPhone, isTextOnly, isExact10Digits, isGmail } from "../../../utils/validation";
 import { Badge, Card, EmptyState, Loader, Toast } from "../../shared/components/Common";
@@ -319,6 +319,23 @@ function ApplicationDetailModal({ detail, onClose, onAction }) {
     } finally { setLoading(false); }
   }
 
+  // Document uploads are multipart/form-data, so they bypass postAction's
+  // JSON payload. The endpoint returns the updated application record, which
+  // refreshes this modal's local copy so the new file shows immediately.
+  async function uploadDocument(docType, file) {
+    setLoading(true);
+    try {
+      const fd = new FormData();
+      fd.append("doc_type", docType);
+      fd.append("file", file);
+      const { data } = await api.post(`/admin-portal/admissions/${regNo}/documents/`, fd);
+      if (data && data.registration_number) setLocalDetail(data);
+      onAction?.("Document uploaded.", true);
+    } catch (e) {
+      onAction?.(e?.response?.data?.detail || "Upload failed.", true);
+    } finally { setLoading(false); }
+  }
+
   const panels = [
     { id: "overview", label: "Overview", icon: Eye },
     { id: "counselling", label: "Counselling", icon: Users },
@@ -358,7 +375,7 @@ function ApplicationDetailModal({ detail, onClose, onAction }) {
           <div className="p-5">
             {activePanel === "overview" && <OverviewPanel detail={currentDetail} />}
             {activePanel === "counselling" && <CounsellingPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
-            {activePanel === "documents" && <DocumentsPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
+            {activePanel === "documents" && <DocumentsPanel regNo={regNo} detail={currentDetail} postAction={postAction} uploadDocument={uploadDocument} loading={loading} />}
             {activePanel === "eligibility" && <EligibilityPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
             {activePanel === "interview" && <InterviewPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
             {activePanel === "seat" && <SeatPanel regNo={regNo} detail={currentDetail} postAction={postAction} loading={loading} />}
@@ -432,7 +449,7 @@ function CounsellingPanel({ regNo, detail, postAction, loading }) {
   );
 }
 
-function DocumentsPanel({ regNo, detail, postAction, loading }) {
+function DocumentsPanel({ regNo, detail, postAction, uploadDocument, loading }) {
   const docFields = [
     { key: 'doc_birth_certificate', label: 'Birth Certificate' },
     { key: 'doc_aadhaar_card', label: 'Aadhaar Card' },
@@ -442,34 +459,56 @@ function DocumentsPanel({ regNo, detail, postAction, loading }) {
     { key: 'doc_previous_marks', label: 'Previous Marks Card' },
     { key: 'doc_transfer_certificate', label: 'Transfer Certificate' },
   ];
-  
-  const uploadedDocs = docFields.filter(d => detail[d.key]);
+  const fileRefs = useRef({});
+
+  function handleFileChange(key, e) {
+    const file = e.target.files?.[0];
+    // Reset the input so picking the same file again still fires onChange.
+    e.target.value = "";
+    if (file) uploadDocument(key, file);
+  }
 
   return (
     <div className="space-y-4">
       <h4 className="font-semibold text-sm">Phase 5: Submitted Documents</h4>
-      {uploadedDocs.length === 0 ? (
-        <p className="text-sm text-ink-secondary">No documents uploaded yet.</p>
-      ) : (
-        <div className="space-y-2">
-          {uploadedDocs.map((d) => (
-            <div key={d.key} className="flex items-center justify-between p-3 bg-slate-50 rounded-xl">
-              <div className="flex items-center gap-2">
-                <FileText size={16} className="text-academic-blue" />
-                <div>
-                  <p className="text-xs font-semibold">{d.label}</p>
-                </div>
+      <p className="text-xs text-ink-secondary">Upload or replace each required document (PDF, image, Word, Excel or ZIP, max 20 MB).</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+        {docFields.map((d) => {
+          const uploaded = !!detail[d.key];
+          return (
+            <div key={d.key} className="flex items-center justify-between gap-2 p-3 bg-slate-50 rounded-xl">
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText size={16} className={uploaded ? "text-emerald-500 shrink-0" : "text-slate-400 shrink-0"} />
+                <p className="text-xs font-semibold truncate">{d.label}</p>
+                {uploaded && <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />}
               </div>
-              <div className="flex items-center gap-2">
-                <a href={detail[d.key]} target="_blank" rel="noopener noreferrer"
-                  className="text-xs flex items-center gap-1 bg-academic-blue text-white px-3 py-1.5 rounded-lg hover:bg-academic-blue/90">
-                  <Download size={14} /> Download
-                </a>
+              <div className="flex items-center gap-2 shrink-0">
+                {uploaded && (
+                  <a href={detail[d.key]} target="_blank" rel="noopener noreferrer"
+                    className="text-xs flex items-center gap-1 bg-academic-blue text-white px-3 py-1.5 rounded-lg hover:bg-academic-blue/90">
+                    <Download size={14} /> Download
+                  </a>
+                )}
+                <input
+                  ref={(el) => { fileRefs.current[d.key] = el; }}
+                  type="file"
+                  accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.xls,.xlsx,.zip,.csv,image/*,application/pdf"
+                  className="hidden"
+                  onChange={(e) => handleFileChange(d.key, e)}
+                />
+                <button
+                  disabled={loading}
+                  onClick={() => fileRefs.current[d.key]?.click()}
+                  className={`text-xs flex items-center gap-1 px-3 py-1.5 rounded-lg disabled:opacity-60 ${uploaded
+                    ? "bg-slate-200 text-slate-700 hover:bg-slate-300"
+                    : "bg-emerald-500 text-white hover:bg-emerald-600"}`}>
+                  <Upload size={14} /> {uploaded ? "Replace" : "Upload"}
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }

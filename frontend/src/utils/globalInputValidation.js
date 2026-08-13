@@ -10,14 +10,44 @@ export function setupGlobalInputValidation() {
 
       const name = (target.name || target.placeholder || target.id || '').toLowerCase();
       
-      // Attempt to get label text if available
+      // Attempt to get label text if available. Only trust the parent
+      // element's text when this is the ONLY editable field inside it —
+      // otherwise a sibling field's placeholder/label (e.g. "Phone (*)"
+      // elsewhere in the same form) leaks into the identification and the
+      // wrong filter applies, e.g. the applicant-name field becoming a
+      // digits-only phone field so letters can never be typed.
       let labelText = '';
       if (target.labels && target.labels.length > 0) {
         labelText = target.labels[0].innerText.toLowerCase();
-      } else if (target.previousSibling && target.previousSibling.innerText) {
-        labelText = target.previousSibling.innerText.toLowerCase();
-      } else if (target.parentElement && target.parentElement.innerText) {
-        labelText = target.parentElement.innerText.toLowerCase();
+      } else if (target.previousElementSibling) {
+        // Only trust the previous sibling when it is a genuine label: a
+        // <label> element, or a short text element that contains no form
+        // controls. A sibling <select> or other control leaks its option
+        // text (e.g. a "Phone" source-of-enquiry option) into the
+        // identification, which misclassifies the field (a "Preferred
+        // branch" text field becoming a digits-only phone field).
+        const sib = target.previousElementSibling;
+        const sibText = (sib.innerText || '').trim();
+        // Count the sibling itself too — a <select> contains <option>s, not
+        // form controls, so querySelectorAll alone would miss it and its
+        // option text (e.g. a "Phone" source-of-enquiry option) would leak
+        // into the identification.
+        const sibIsControl = sib.matches('input, textarea, select');
+        const sibHasControls = sibIsControl || sib.querySelectorAll('input, textarea, select').length > 0;
+        if (sib.tagName === 'LABEL' || (!sibHasControls && sibText.length > 0 && sibText.length <= 60)) {
+          labelText = sibText.toLowerCase();
+        }
+      } else if (target.parentElement) {
+        // Only trust the parent element's text when this is the ONLY editable
+        // field inside it — otherwise a sibling field's placeholder/label
+        // (e.g. "Phone (*)" elsewhere in the same form) leaks into the
+        // identification and the wrong filter applies, e.g. the
+        // applicant-name field becoming a digits-only phone field so letters
+        // can never be typed.
+        const editable = target.parentElement.querySelectorAll('input, textarea, select');
+        if (editable.length === 1) {
+          labelText = target.parentElement.innerText.toLowerCase();
+        }
       }
       
       const ident = (name + ' ' + labelText);
