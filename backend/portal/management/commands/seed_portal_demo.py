@@ -1,3 +1,4 @@
+import os
 from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
@@ -5,17 +6,19 @@ from django.contrib.auth.models import Group
 from django.core.management.base import BaseCommand
 from django.db import connection
 
+from .seed_utils import resolve_seed_password
+
 
 class Command(BaseCommand):
-    help = "Seed demo Student and Teacher portal users/data. All passwords are Edunova@123."
+    help = "Seed demo Student and Teacher portal users/data. Set SEED_TEACHER_PASSWORD / SEED_STUDENT_PASSWORD to pin their passwords."
 
     def handle(self, *args, **options):
         User = get_user_model()
         student_group, _ = Group.objects.get_or_create(name="Student")
         teacher_group, _ = Group.objects.get_or_create(name="Teacher")
 
-        teacher_password = "Edunova@123"
-        student_password = "Edunova@123"
+        teacher_password = resolve_seed_password("SEED_TEACHER_PASSWORD", "Teacher demo account")
+        student_password = resolve_seed_password("SEED_STUDENT_PASSWORD", "Student demo account")
 
         teacher, created = User.objects.get_or_create(
             username="teacher.demo",
@@ -135,5 +138,12 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Demo portal data seeded."))
         self.stdout.write("Student login email : tarannumarshiya489@gmail.com")
         self.stdout.write("Teacher login email : sameerbasha.0809@gmail.com")
-        self.stdout.write("Student password    : Edunova@123")
-        self.stdout.write("Teacher password    : Edunova@123")
+        self.stdout.write("")
+        if os.environ.get("SEED_STUDENT_PASSWORD"):
+            self.stdout.write("Student password set from SEED_STUDENT_PASSWORD.")
+        else:
+            self.stdout.write(f"Student password (generated) : {student_password}")
+        if os.environ.get("SEED_TEACHER_PASSWORD"):
+            self.stdout.write("Teacher password set from SEED_TEACHER_PASSWORD.")
+        else:
+            self.stdout.write(f"Teacher password (generated) : {teacher_password}")

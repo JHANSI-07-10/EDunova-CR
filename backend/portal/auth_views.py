@@ -53,14 +53,18 @@ def _email_not_configured_response():
 
 
 def _static_otp_enabled() -> bool:
-    """Static OTP ("123456") escape hatch.
+    """True when an operator has set STATIC_OTP_CODE in the environment.
 
-    Honored whenever DEV_STATIC_OTP is true (independent of DEBUG), so a
-    demo/staging host can accept the public code without an email service.
-    SECURITY: anyone who knows the code can log in to any account — never
-    enable on a public production server handling real users.
+    The code value lives only in env vars (never in the repository), and is
+    accepted for every OTP login in place of an emailed code. SECURITY: anyone
+    who knows the code can log in to any account — never set it on a public
+    production server handling real users.
     """
-    return bool(getattr(settings, "DEV_STATIC_OTP", False))
+    return bool(getattr(settings, "STATIC_OTP_CODE", ""))
+
+
+def _static_otp_code() -> str:
+    return str(getattr(settings, "STATIC_OTP_CODE", ""))
 
 # ---------------------------------------------------------------------------
 # Throttle classes (unchanged)
@@ -262,19 +266,19 @@ def login_step1(request):
 
     static_otp = _static_otp_enabled()
     if static_otp:
-        otp = "123456"
+        otp = _static_otp_code()
     else:
         otp = _generate_otp()
 
     _store_otp(user.id, otp)
 
     if static_otp:
-        # Escape hatch when DEV_STATIC_OTP is set — no email is sent.
+        # Escape hatch when STATIC_OTP_CODE is set on the host — no email is sent.
         return Response({
             "user_id": user.id,
             "user_type": get_user_role(user),
             "email_sent": False,
-            "email_error": "Static OTP enabled (DEV_STATIC_OTP). Use 123456 — no email was sent.",
+            "email_error": "Static OTP active. Use the code configured in STATIC_OTP_CODE — no email was sent.",
             "detail": "Static OTP active.",
         })
     elif _email_is_console_only():
@@ -338,9 +342,9 @@ def login_step2_verify_otp(request):
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    # Static OTP ("123456") is honored whenever DEV_STATIC_OTP is set —
-    # independent of DEBUG, so demo hosts work without an email service.
-    is_static = _static_otp_enabled() and otp == "123456"
+    # Static OTP is honored whenever the operator sets STATIC_OTP_CODE in the
+    # environment — the code value is never part of the repository.
+    is_static = _static_otp_enabled() and otp == _static_otp_code()
 
     # The DB row is the source of truth (shared across gunicorn workers even
     # without a Redis cache); the in-memory cache is the local-dev fallback.
@@ -442,7 +446,7 @@ def resend_otp(request):
 
     static_otp = _static_otp_enabled()
     if static_otp:
-        otp = "123456"
+        otp = _static_otp_code()
         _store_otp(user.id, otp)
         return Response({"detail": "Static OTP active.", "email_sent": False})
     elif _email_is_console_only():

@@ -16,7 +16,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # shipping on a hardcoded placeholder. See the SECRET_KEY block below.
 # SAFE-BY-DEFAULT: DEBUG defaults to False. You must explicitly opt into DEBUG=True
 # in your local .env for development. Never set DEBUG=True on any host reachable
-# from the internet (see DEV_STATIC_OTP below for the related OTP risk).
+# from the internet (see STATIC_OTP_CODE below for the related OTP risk).
 def _cast_debug(val):
     """Accept True/False/1/0/yes/no. Anything else (e.g. 'release' from a
     system env var set by another tool) is treated as False so the server
@@ -36,13 +36,12 @@ ALLOWED_HOSTS = [
     if h.strip()
 ]
 
-# Static OTP ("123456") toggle. Enabled by default so the demo/staging site
-# works without an email service; set DEV_STATIC_OTP=False on any host that
-# handles real users. This is independent of DEBUG on purpose — the login
-# flow honors it whenever the variable is true (see portal/auth_views.py).
-# Same robust casting as DEBUG: decouple's cast=bool (strtobool) crashes on
-# non-boolean env values like "release" (a real production incident).
-DEV_STATIC_OTP = config("DEV_STATIC_OTP", default=True, cast=_cast_debug)
+# Static OTP login code, supplied via the host environment (STATIC_OTP_CODE) —
+# the value itself never lives in the repository. Empty by default, so the
+# static-code escape hatch is completely inert unless an operator sets the
+# variable on the host. When set, every OTP login also accepts this single
+# public code without sending an email (see portal/auth_views.py).
+STATIC_OTP_CODE = config("STATIC_OTP_CODE", default="").strip()
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -499,11 +498,12 @@ if DEBUG and any(h not in _local_hosts for h in ALLOWED_HOSTS):
         "secrets) to anyone who triggers an error."
     )
 
-if DEV_STATIC_OTP:
+if STATIC_OTP_CODE:
     _startup_warn(
-        "DEV_STATIC_OTP is True: every OTP login code is the public value "
-        "'123456'. This must NEVER be enabled on a reachable server — anyone "
-        "can log in to any account."
+        "STATIC_OTP_CODE is set: every OTP login also accepts this single "
+        "public code (no email needed). Never set it on a public production "
+        "server handling real users — anyone who knows the code can log in "
+        "to any account."
     )
 
 if _STORAGE_MISCONFIGURED and not DEBUG:
