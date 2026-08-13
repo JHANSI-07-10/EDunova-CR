@@ -4,10 +4,20 @@ import { createRoleAuthContext } from "../../shared/roleAuthContext";
 
 // Parent-portal extra state: the list of the parent's children and the
 // currently selected child, persisted in localStorage.
+//
+// The child id is server-controlled data, so it is sanitized (must be a plain
+// non-negative integer string) on every read AND write before touching
+// localStorage — a compromised API response can never plant an arbitrary
+// value into browser storage.
+function toSafeChildId(value) {
+  const s = String(value ?? "");
+  return /^\d+$/.test(s) ? s : null;
+}
+
 function useParentExtra({ user, keys }) {
   const [kids, setKids] = useState([]);
   const [activeChildId, setActiveChildId] = useState(
-    () => localStorage.getItem(keys.child) || null
+    () => toSafeChildId(localStorage.getItem(keys.child))
   );
 
   useEffect(() => {
@@ -17,9 +27,11 @@ function useParentExtra({ user, keys }) {
       .then(({ data }) => {
         setKids(data);
         if (!activeChildId && data.length) {
-          const id = String(data[0].id);
-          setActiveChildId(id);
-          localStorage.setItem(keys.child, id);
+          const id = toSafeChildId(data[0].id);
+          if (id) {
+            setActiveChildId(id);
+            localStorage.setItem(keys.child, id);
+          }
         }
       })
       .catch(() => {});
@@ -27,7 +39,8 @@ function useParentExtra({ user, keys }) {
   }, [user]);
 
   function selectChild(id) {
-    const sid = String(id);
+    const sid = toSafeChildId(id);
+    if (!sid) return;
     setActiveChildId(sid);
     localStorage.setItem(keys.child, sid);
   }
